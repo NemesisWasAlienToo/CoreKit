@@ -5,9 +5,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "Network/Network.cpp"
 #include "Network/EndPoint.cpp"
-
+#include "Network/Socket.cpp"
+#include "Network/Address.cpp"
 #include "Iterable/List.cpp"
 
 namespace Network
@@ -21,7 +21,7 @@ namespace Network
 
         // Static
 
-        static Iterable::List<EndPoint> Resolve(const std::string &Domain, const std::string &Service, AddressFamily Family, SocketType Type)
+        static Iterable::List<EndPoint> Resolve(const std::string &Domain, const std::string &Service, Address::AddressFamily Family, Socket::ConnectionType Type)
         {
             struct addrinfo hints, *res, *p;
             int status;
@@ -48,7 +48,7 @@ namespace Network
             return endPoints;
         }
 
-        static Iterable::List<Address> Resolve(const std::string &Domain, AddressFamily Family = IPv4Address, SocketType Type = TCP)
+        static Iterable::List<Address> Resolve(const std::string &Domain, Address::AddressFamily Family = Address::IPv4, Socket::ConnectionType Type = Socket::TCP)
         {
             struct addrinfo hints, *res, *p;
             int status;
@@ -64,7 +64,7 @@ namespace Network
             for (p = res; p != NULL; p = p->ai_next)
             {
                 Address address;
-                if(p->ai_family == Network::IPv4Address){
+                if(p->ai_family == Network::Address::IPv4){
                     address = Address(((struct sockaddr_in *) p->ai_addr)->sin_addr);
                 }
                 else{
@@ -79,7 +79,7 @@ namespace Network
             return addresses;
         }
 
-        static Iterable::List<EndPoint> Host(const std::string &Service = "", AddressFamily Family = AnyFamilyAddress, SocketType Type = TCP, bool Passive = false)
+        static Iterable::List<EndPoint> Host(const std::string &Service = "", Address::AddressFamily Family = Address::Any, Socket::ConnectionType Type = Socket::TCP, bool Passive = false)
         {
             struct addrinfo hints, *res, *p;
             int status;
@@ -105,7 +105,7 @@ namespace Network
             return endPoints;
         }
 
-        static Iterable::List<Address> Host(AddressFamily Family = AnyFamilyAddress, SocketType Type = TCP, bool Passive = false)
+        static Iterable::List<Address> Host(Address::AddressFamily Family = Address::Any, Socket::ConnectionType Type = Socket::TCP, bool Passive = false)
         {
             struct addrinfo hints, *res, *p;
             int status;
@@ -122,7 +122,7 @@ namespace Network
             for (p = res; p != NULL; p = p->ai_next)
             {
                 Address address;
-                if(p->ai_family == Network::IPv4Address){
+                if(p->ai_family == Network::Address::IPv4){
                     address = Address(((struct sockaddr_in *) p->ai_addr)->sin_addr);
                 }
                 else{

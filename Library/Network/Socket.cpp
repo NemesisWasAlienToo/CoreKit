@@ -9,7 +9,6 @@
 #include <poll.h>
 #include <sys/ioctl.h>
 
-#include "Network/Network.cpp"
 #include "Network/EndPoint.cpp"
 #include "Base/Descriptor.cpp"
 #include "Base/Exeption.cpp"
@@ -24,6 +23,26 @@ namespace Network
 {
     class Socket : public Base::Descriptor
     {
+    public:
+        enum SocketFamily
+        {
+            Any = PF_UNSPEC,
+            // Local = PF_LOCAL,
+            // Bluetooth = PF_BLUETOOTH,
+            // NFC = PF_NFC,
+            // CAN = PF_CAN,
+            Unix = PF_UNIX,
+            IPv4 = PF_INET,
+            IPv6 = PF_INET6,
+        };
+
+        enum ConnectionType
+        {
+            TCP = SOCK_STREAM,
+            UDP = SOCK_DGRAM,
+            // RawSocket = SOCK_RAW,
+        };
+
     private:
         // Types :
 
@@ -31,11 +50,10 @@ namespace Network
 
         // Variables :
 
-        ProtocolFamily _Protocol = IPv4Protocol;
-        SocketType _Type = TCP;
+        SocketFamily _Protocol = IPv4;
+        ConnectionType _Type = TCP;
 
     public:
-
         Socket()
         {
             _Handler = socket(_Protocol, _Type, 0);
@@ -49,7 +67,7 @@ namespace Network
 
         Socket(const int Handler) : Descriptor(Handler) {}
 
-        Socket(ProtocolFamily Protocol, SocketType Type = TCP, bool Blocking = true) : _Protocol(Protocol), _Type(Type)
+        Socket(SocketFamily Protocol, ConnectionType Type = TCP, bool Blocking = true) : _Protocol(Protocol), _Type(Type)
         {
             int Result = 0;
             _Handler = socket(Protocol, Type, 0);
@@ -112,7 +130,7 @@ namespace Network
             struct sockaddr *SocketAddress;
             int Size = 0, Result = 0, yes = 1;
 
-            if (Host.address().Family() == IPv4Address)
+            if (Host.address().Family() == Address::IPv4)
             {
                 SocketAddress = (struct sockaddr *)new struct sockaddr_in;
                 Size = Host.sockaddr_in((struct sockaddr_in *)SocketAddress);
@@ -142,7 +160,7 @@ namespace Network
             struct sockaddr *SocketAddress;
             int Size = 0;
 
-            if (Target.address().Family() == IPv4Address)
+            if (Target.address().Family() == Address::IPv4)
             {
                 SocketAddress = (struct sockaddr *)new struct sockaddr_in;
                 Size = Target.sockaddr_in((struct sockaddr_in *)SocketAddress);
@@ -277,7 +295,8 @@ namespace Network
             return Count;
         }
 
-        Event Await(Event Events, int TimeoutMS = -1){
+        Event Await(Event Events, int TimeoutMS = -1)
+        {
 
             _POLLFD PollStruct = {.fd = _Handler, .events = Events};
 
@@ -332,7 +351,7 @@ namespace Network
             return *this;
         }
 
-        const Socket &operator>>(std::string &Message) const noexcept 
+        const Socket &operator>>(std::string &Message) const noexcept
         {
             char buffer[1024];
             int Result = 0;

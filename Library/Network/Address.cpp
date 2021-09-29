@@ -6,33 +6,31 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
-#include "Network/Network.cpp"
-
 namespace Network
 {
     class Address
     {
-        // public:
-        // // ### Enums
-        
-        // enum AddressFamily
-        // {
-        //     Any = AF_UNSPEC,
-        //     // Local = AF_LOCAL,
-        //     // Bluetooth = AF_BLUETOOTH,
-        //     // NFCAddress = AF_NFC,
-        //     // CAN = AF_CAN,
-        //     Unix = AF_UNIX,
-        //     IPv4 = AF_INET,
-        //     IPv6 = AF_INET6,
-        // };
+    public:
+        // Types :
+
+        enum AddressFamily
+        {
+            Any = AF_UNSPEC,
+            // Local = AF_LOCAL,
+            // Bluetooth = AF_BLUETOOTH,
+            // NFCAddress = AF_NFC,
+            // CAN = AF_CAN,
+            Unix = AF_UNIX,
+            IPv4 = AF_INET,
+            IPv6 = AF_INET6,
+        };
 
     private:
         typedef struct in_addr _IN_ADDR;
         typedef struct sockaddr_in _SOCKADDR_IN;
         typedef struct sockaddr_in6 _SOCKADDR_IN6;
 
-        AddressFamily family = AnyFamilyAddress;
+        AddressFamily family = Any;
         unsigned char address[16] = {0};
 
     public:
@@ -44,13 +42,13 @@ namespace Network
 
         Address(_IN_ADDR &Address) noexcept
         {
-            family = IPv4Address;
+            family = IPv4;
             std::memcpy(address, &(Address.s_addr), sizeof Address.s_addr);
         }
 
         Address(struct in6_addr &Address) noexcept
         {
-            family = IPv6Address;
+            family = IPv6;
             std::memcpy(address, &(Address.__in6_u), sizeof Address.__in6_u);
         }
 
@@ -139,8 +137,9 @@ namespace Network
         // Statics :
 
         // Optimize this
-        
-        Address FromString(AddressFamily Family, std::string AddressString){
+
+        Address FromString(AddressFamily Family, std::string AddressString)
+        {
             Address adr(Family, AddressString);
             return adr;
         }

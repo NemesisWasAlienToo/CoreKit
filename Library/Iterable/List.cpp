@@ -20,7 +20,7 @@ namespace Iterable
         {
             if (_Capacity > _Length)
                 return;
-            if (_Capacity > 0) // ### Change realloc to new due to self pointer
+            if (_Capacity > 0) // ### Change realloc to new due to internal pointer
                 _Content = (T *)std::realloc(_Content, sizeof(T) * ++_Capacity);
             if (_Capacity == 0)
                 _Content = new T[++_Capacity];

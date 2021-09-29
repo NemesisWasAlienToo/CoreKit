@@ -8,8 +8,6 @@
 #include "Network/Socket.cpp"
 #include "Base/Poll.cpp"
 
-#define QUEUE 10
-
 int main(int argc, char const *argv[])
 {
     std::cout << "Running on " << Network::DNS::HostName() << std::endl;

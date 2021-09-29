@@ -8,8 +8,6 @@
 #include "Network/Socket.cpp"
 #include "Base/Poll.cpp"
 
-#define QUEUE 10
-
 int main(int argc, char const *argv[])
 {
     std::cout << "Running on " << Network::DNS::HostName() << std::endl;
@@ -20,7 +18,7 @@ int main(int argc, char const *argv[])
 
     std::cout << "Google is at " << Google << std::endl;
 
-    Network::Socket client(Network::IPv4Protocol, Network::TCP);
+    Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP);
 
     client.Connect(Google);
 

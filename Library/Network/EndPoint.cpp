@@ -2,7 +2,6 @@
 
 #include <sys/socket.h>
 
-#include "Network/Network.cpp"
 #include "Network/Address.cpp"
 
 namespace Network
@@ -30,7 +29,7 @@ namespace Network
 
         EndPoint(struct sockaddr *SocketAddress)
         {
-            if (SocketAddress->sa_family == IPv4Address)
+            if (SocketAddress->sa_family == Address::IPv4)
             {
                 struct sockaddr_in addressStruct = *((struct sockaddr_in *)SocketAddress);
                 _Address.Set(addressStruct);
@@ -81,7 +80,7 @@ namespace Network
         }
 
         int sockaddr(struct sockaddr * SocketAddress){
-            if(SocketAddress->sa_family == IPv4Address){
+            if(SocketAddress->sa_family == Address::IPv4){
                 return sockaddr_in((struct sockaddr_in *) SocketAddress);
             }
             else{
