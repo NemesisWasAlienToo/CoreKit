@@ -107,7 +107,7 @@ namespace Base
         size_t Skip(size_t Count)
         {
 
-            int _Count = 0, Len = Length();
+            size_t _Count = 0, Len = Length();
 
             if (Count >= Len)
             {
