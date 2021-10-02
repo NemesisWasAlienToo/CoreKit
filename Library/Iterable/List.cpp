@@ -3,201 +3,209 @@
 #include <iostream>
 #include <functional>
 
-namespace Iterable
+namespace Core
 {
-    template <typename T>
-    class List
+    namespace Iterable
     {
-    private:
-        // ### Private variables
-
-        T *_Content = NULL;
-        size_t _Capacity = 0;
-        size_t _Length = 0;
-
-        // ### Private functions
-        void increaseCapacity()
+        template <typename T>
+        class List
         {
-            if (_Capacity > _Length)
-                return;
+        private:
+            // ### Private variables
 
-            if (_Capacity > 0) // ### Change realloc to new due to possibility of internal pointer existing
+            T *_Content = NULL;
+            size_t _Capacity = 0;
+            size_t _Length = 0;
+
+            // ### Private functions
+            void increaseCapacity()
             {
-                // for (size_t i = 0; i < Count; i++)
-                // {
-                //     _Content[i] = T(_Content[i]);
-                // }
-                
-                _Content = (T *)std::realloc(_Content, sizeof(T) * ++_Capacity);
-            }
+                if (_Capacity > _Length)
+                    return;
 
-            if (_Capacity == 0)
-                _Content = new T[++_Capacity];
-        }
-
-    public:
-        // ### Constructors
-
-        List() = default;
-
-        List(size_t Capacity) : _Content(new T[Capacity]), _Capacity(Capacity), _Length(0) {}
-
-        List(T Array[], int Count) : _Content(new T[Count]), _Capacity(Count), _Length(Count)
-        {
-            for (size_t i = 0; i < Count; i++)
-            {
-                _Content[i] = T(Array[i]); // Invoke copy constructor of T
-            }
-        }
-        
-        List(List &Other) : _Content(new T[Other._Capacity]), _Capacity(Other._Capacity), _Length(Other._Length)
-        {
-            Other.ForEach([&](int Index, T &Item)
-                          { _Content[Index] = T(Item); });
-        }
-
-        List(List &&Other) noexcept : _Capacity(Other._Capacity), _Length(Other._Length)
-        {
-            std::swap(_Content, Other._Content);
-        }
-
-        // ### Destructor
-
-        ~List()
-        {
-            delete[] _Content;
-            _Content = NULL;
-        }
-
-        // ### Properties
-
-        int Length()
-        {
-            return _Length;
-        }
-
-        // ### Utilities
-
-        void Add(T &item)
-        {
-            T t(item);
-            increaseCapacity();
-            _Content[_Length++] = t;
-        }
-
-        void Add(T &&item)
-        {
-            T t(std::move(item));
-            increaseCapacity();
-            _Content[_Length++] = t;
-        }
-
-        void ForEach(std::function<void(int, T &)> Action)
-        {
-            for (int i = 0; i < _Length; i++)
-            {
-                Action(i, _Content[i]);
-            }
-        }
-
-        List<T> Where(std::function<bool(T &)> Condition)
-        {
-            List<T> result(_Capacity);
-
-            for (T item : _Content)
-            {
-                if (Condition(item))
-                    result.Add(item);
-            }
-
-            return result;
-        }
-
-        bool Contains(T Item)
-        {
-            List<T> result(_Capacity);
-
-            for (T item : _Content)
-            {
-                if (item == Item)
-                    return true;
-            }
-
-            return false;
-        }
-
-        bool Contains(T Item, int &Index)
-        {
-            List<T> result(_Capacity);
-
-            for (int i = 0; i < _Length; i++)
-            {
-                if (_Content[i] == Item)
+                if (_Capacity > 0)
                 {
-                    Index = i;
-                    return true;
+                    _Capacity *= 2;
+
+                    T *_Content_ = new T[_Capacity]; // ## Needs smart growth size optimization
+
+                    for (size_t i = 0; i < _Length; i++)
+                    {
+                        _Content_[i] = T(_Content[i]);
+                    }
+
+                    delete[] _Content;
+                    _Content = _Content_;
+                }
+
+                if (_Capacity == 0)
+                    _Content = new T[++_Capacity];
+            }
+
+        public:
+            // ### Constructors
+
+            List() = default;
+
+            List(size_t Capacity) : _Content(new T[Capacity]), _Capacity(Capacity), _Length(0) {}
+
+            List(T Array[], int Count) : _Content(new T[Count]), _Capacity(Count), _Length(Count)
+            {
+                for (size_t i = 0; i < Count; i++)
+                {
+                    _Content[i] = T(Array[i]); // Invoke copy constructor of T
                 }
             }
 
-            return false;
-        }
-
-        // Remove
-
-        // Remove Where
-
-        template <typename O>
-        List<O> map(std::function<O(T)> Transform)
-        {
-            List<O> result(_Capacity);
-
-            for (T item : _Content)
+            List(List &Other) : _Content(new T[Other._Capacity]), _Capacity(Other._Capacity), _Length(Other._Length)
             {
-                result.Add(Transform(item));
+                Other.ForEach([&](int Index, T &Item)
+                              { _Content[Index] = T(Item); });
             }
 
-            return result;
-        }
+            List(List &&Other) noexcept : _Capacity(Other._Capacity), _Length(Other._Length)
+            {
+                std::swap(_Content, Other._Content);
+            }
 
-        void From(T Array[], int Count)
-        {
-        }
+            // ### Destructor
 
-        void From(List &Other)
-        {
-        }
+            ~List()
+            {
+                delete[] _Content;
+                _Content = NULL;
+            }
 
-        // ### Operators
+            // ### Properties
 
-        T &operator[](int index)
-        {
-            return _Content[index];
-        }
+            int Length()
+            {
+                return _Length;
+            }
 
-        List &operator=(List &Other) = delete;
+            // ### Utilities
 
-        List &operator=(List &&Other) noexcept
-        {
-            if (this == &Other)
+            void Add(T &item)
+            {
+                T t(item);
+                increaseCapacity();
+                _Content[_Length++] = t;
+            }
+
+            void Add(T &&item)
+            {
+                T t(std::move(item));
+                increaseCapacity();
+                _Content[_Length++] = t;
+            }
+
+            void ForEach(std::function<void(int, T &)> Action)
+            {
+                for (int i = 0; i < _Length; i++)
+                {
+                    Action(i, _Content[i]);
+                }
+            }
+
+            List<T> Where(std::function<bool(T &)> Condition)
+            {
+                List<T> result(_Capacity);
+
+                for (T item : _Content)
+                {
+                    if (Condition(item))
+                        result.Add(item);
+                }
+
+                return result;
+            }
+
+            bool Contains(T Item)
+            {
+                List<T> result(_Capacity);
+
+                for (T item : _Content)
+                {
+                    if (item == Item)
+                        return true;
+                }
+
+                return false;
+            }
+
+            bool Contains(T Item, int &Index)
+            {
+                List<T> result(_Capacity);
+
+                for (int i = 0; i < _Length; i++)
+                {
+                    if (_Content[i] == Item)
+                    {
+                        Index = i;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            // Remove
+
+            // Remove Where
+
+            template <typename O>
+            List<O> map(std::function<O(T)> Transform)
+            {
+                List<O> result(_Capacity);
+
+                for (T item : _Content)
+                {
+                    result.Add(Transform(item));
+                }
+
+                return result;
+            }
+
+            void From(T Array[], int Count)
+            {
+            }
+
+            void From(List &Other)
+            {
+            }
+
+            // ### Operators
+
+            T &operator[](int index)
+            {
+                return _Content[index];
+            }
+
+            List &operator=(List &Other) = delete;
+
+            List &operator=(List &&Other) noexcept
+            {
+                if (this == &Other)
+                    return *this;
+
+                delete[] _Content;
+
+                _Capacity = Other._Capacity;
+                _Length = Other._Length;
+                std::swap(_Content, Other._Content);
+
                 return *this;
+            }
 
-            delete[] _Content;
+            bool operator==(const List &Other) noexcept
+            {
+                return this->_Content == Other->_Content;
+            }
 
-            _Capacity = Other._Capacity;
-            _Length = Other._Length;
-            std::swap(_Content, Other._Content);
-
-            return *this;
-        }
-
-        bool operator==(const List &Other) noexcept
-        {
-            return this->_Content == Other->_Content;
-        }
-
-        bool operator!=(const List &Other) noexcept
-        {
-            return this->_Content != Other->_Content;
-        }
-    };
+            bool operator!=(const List &Other) noexcept
+            {
+                return this->_Content != Other->_Content;
+            }
+        };
+    }
 }

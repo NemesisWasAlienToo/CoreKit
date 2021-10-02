@@ -6,12 +6,12 @@
 #include "Network/Socket.cpp"
 #include "Base/Descriptor.cpp"
 
-namespace Base
+namespace Core
 {
     template <typename T>
     class Poll
     {
-        static_assert(std::is_base_of<Base::Descriptor, T>::value, "T must inherit from Base::Descriptor");
+        static_assert(std::is_base_of<Descriptor, T>::value, "T must inherit from Descriptor");
 
     private:
         // Types :
@@ -187,7 +187,7 @@ namespace Base
                 return *this;
 
             delete[] _Content;
-            
+
             _Content = Other._Capacity;
             _Capacity = Other._Capacity;
             _Length = Other._Length;
@@ -197,6 +197,8 @@ namespace Base
             OnError = Other.OnError;
 
             std::swap(_Content, Other._Content);
+
+            return *this;
         }
     };
 }

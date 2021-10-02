@@ -9,139 +9,144 @@
 #include "Network/Socket.cpp"
 #include "Network/Address.cpp"
 #include "Iterable/List.cpp"
-
-namespace Network
+namespace Core
 {
-    class DNS
+    namespace Network
     {
-    private:
-    public:
-    
-        DNS() = default;
-
-        // Static
-
-        static Iterable::List<EndPoint> Resolve(const std::string &Domain, const std::string &Service,  Address::AddressFamily Family = Address::IPv4, Socket::ConnectionType Type = Socket::TCP)
+        class DNS
         {
-            struct addrinfo hints, *res, *p;
-            int status;
-            Iterable::List<EndPoint> endPoints;
+        private:
+        public:
+            DNS() = default;
 
-            std::memset(&hints, 0, sizeof hints);
-            hints.ai_family = Family;
-            hints.ai_socktype = Type;
-            // hints.ai_flags = 0; Maybe add later
+            // Static
 
-            if ((status = getaddrinfo(Domain.c_str(), Service.c_str(), &hints, &res)) != 0)
+            static Iterable::List<EndPoint> Resolve(const std::string &Domain, const std::string &Service, Address::AddressFamily Family = Address::IPv4, Socket::SocketType Type = Socket::TCP)
+            {
+                struct addrinfo hints, *res, *p;
+                int status;
+                Iterable::List<EndPoint> endPoints;
+
+                std::memset(&hints, 0, sizeof hints);
+                hints.ai_family = Family;
+                hints.ai_socktype = Type;
+                // hints.ai_flags = 0; Maybe add later
+
+                if ((status = getaddrinfo(Domain.c_str(), Service.c_str(), &hints, &res)) != 0)
+                    return endPoints;
+
+                for (p = res; p != NULL; p = p->ai_next)
+                {
+
+                    EndPoint endPoint(p->ai_addr);
+
+                    endPoints.Add(endPoint);
+                }
+
+                freeaddrinfo(res);
+
                 return endPoints;
-
-            for (p = res; p != NULL; p = p->ai_next)
-            {
-
-                EndPoint endPoint(p->ai_addr);
-
-                endPoints.Add(endPoint);
             }
 
-            freeaddrinfo(res);
+            static Iterable::List<Address> Resolve(const std::string &Domain, Address::AddressFamily Family = Address::IPv4, Socket::SocketType Type = Socket::TCP)
+            {
+                struct addrinfo hints, *res, *p;
+                int status;
+                Iterable::List<Address> addresses;
 
-            return endPoints;
-        }
+                std::memset(&hints, 0, sizeof hints);
+                hints.ai_family = Family;
+                hints.ai_socktype = Type;
 
-        static Iterable::List<Address> Resolve(const std::string &Domain, Address::AddressFamily Family = Address::IPv4, Socket::ConnectionType Type = Socket::TCP)
-        {
-            struct addrinfo hints, *res, *p;
-            int status;
-            Iterable::List<Address> addresses;
+                if ((status = getaddrinfo(Domain.c_str(), "", &hints, &res)) != 0)
+                    return addresses;
 
-            std::memset(&hints, 0, sizeof hints);
-            hints.ai_family = Family;
-            hints.ai_socktype = Type;
+                for (p = res; p != NULL; p = p->ai_next)
+                {
+                    Address address;
+                    if (p->ai_family == Network::Address::IPv4)
+                    {
+                        address = Address(((struct sockaddr_in *)p->ai_addr)->sin_addr);
+                    }
+                    else
+                    {
+                        address = Address(((struct sockaddr_in6 *)p->ai_addr)->sin6_addr);
+                    }
 
-            if ((status = getaddrinfo(Domain.c_str(), "", &hints, &res)) != 0)
+                    addresses.Add(address);
+                }
+
+                freeaddrinfo(res);
+
                 return addresses;
-
-            for (p = res; p != NULL; p = p->ai_next)
-            {
-                Address address;
-                if(p->ai_family == Network::Address::IPv4){
-                    address = Address(((struct sockaddr_in *) p->ai_addr)->sin_addr);
-                }
-                else{
-                    address = Address(((struct sockaddr_in6 *) p->ai_addr)->sin6_addr);
-                }
-
-                addresses.Add(address);
             }
 
-            freeaddrinfo(res);
+            static Iterable::List<EndPoint> Host(const std::string &Service = "", Address::AddressFamily Family = Address::Any, Socket::SocketType Type = Socket::TCP, bool Passive = false)
+            {
+                struct addrinfo hints, *res, *p;
+                int status;
+                Iterable::List<EndPoint> endPoints;
 
-            return addresses;
-        }
+                std::memset(&hints, 0, sizeof hints);
+                hints.ai_family = Family;
+                hints.ai_socktype = Type;
+                hints.ai_flags = Passive ? AI_PASSIVE : AI_ALL;
 
-        static Iterable::List<EndPoint> Host(const std::string &Service = "", Address::AddressFamily Family = Address::Any, Socket::ConnectionType Type = Socket::TCP, bool Passive = false)
-        {
-            struct addrinfo hints, *res, *p;
-            int status;
-            Iterable::List<EndPoint> endPoints;
+                if ((status = getaddrinfo(NULL, Service.c_str(), &hints, &res)) != 0)
+                    return endPoints;
 
-            std::memset(&hints, 0, sizeof hints);
-            hints.ai_family = Family;
-            hints.ai_socktype = Type;
-            hints.ai_flags = Passive ? AI_PASSIVE : AI_ALL;
+                for (p = res; p != NULL; p = p->ai_next)
+                {
+                    EndPoint endPoint(p->ai_addr);
 
-            if ((status = getaddrinfo(NULL, Service.c_str(), &hints, &res)) != 0)
+                    endPoints.Add(endPoint);
+                }
+
+                freeaddrinfo(res);
+
                 return endPoints;
-
-            for (p = res; p != NULL; p = p->ai_next)
-            {
-                EndPoint endPoint(p->ai_addr);
-
-                endPoints.Add(endPoint);
             }
 
-            freeaddrinfo(res);
+            static Iterable::List<Address> Host(Address::AddressFamily Family = Address::Any, Socket::SocketType Type = Socket::TCP, bool Passive = false)
+            {
+                struct addrinfo hints, *res, *p;
+                int status;
+                Iterable::List<Address> addresses;
 
-            return endPoints;
-        }
+                std::memset(&hints, 0, sizeof hints);
+                hints.ai_family = Family;
+                hints.ai_socktype = Type;
+                hints.ai_flags = Passive ? AI_PASSIVE : AI_ALL;
 
-        static Iterable::List<Address> Host(Address::AddressFamily Family = Address::Any, Socket::ConnectionType Type = Socket::TCP, bool Passive = false)
-        {
-            struct addrinfo hints, *res, *p;
-            int status;
-            Iterable::List<Address> addresses;
+                if ((status = getaddrinfo(NULL, "", &hints, &res)) != 0)
+                    return addresses;
 
-            std::memset(&hints, 0, sizeof hints);
-            hints.ai_family = Family;
-            hints.ai_socktype = Type;
-            hints.ai_flags = Passive ? AI_PASSIVE : AI_ALL;
+                for (p = res; p != NULL; p = p->ai_next)
+                {
+                    Address address;
+                    if (p->ai_family == Network::Address::IPv4)
+                    {
+                        address = Address(((struct sockaddr_in *)p->ai_addr)->sin_addr);
+                    }
+                    else
+                    {
+                        address = Address(((struct sockaddr_in6 *)p->ai_addr)->sin6_addr);
+                    }
 
-            if ((status = getaddrinfo(NULL, "", &hints, &res)) != 0)
+                    addresses.Add(address);
+                }
+
+                freeaddrinfo(res);
+
                 return addresses;
-
-            for (p = res; p != NULL; p = p->ai_next)
-            {
-                Address address;
-                if(p->ai_family == Network::Address::IPv4){
-                    address = Address(((struct sockaddr_in *) p->ai_addr)->sin_addr);
-                }
-                else{
-                    address = Address(((struct sockaddr_in6 *) p->ai_addr)->sin6_addr);
-                }
-
-                addresses.Add(address);
             }
 
-            freeaddrinfo(res);
-
-            return addresses;
-        }
-
-        static std::string HostName()
-        {
-            char name[40];
-            gethostname(name, 40);
-            return name;
-        }
-    };
+            static std::string HostName()
+            {
+                char name[40];
+                gethostname(name, 40);
+                return name;
+            }
+        };
+    }
 }

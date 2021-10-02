@@ -1,4 +1,6 @@
-namespace Base{
+#pragma once
+
+namespace Core{
     class ePoll
     {
     private:

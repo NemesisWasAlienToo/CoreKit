@@ -12,26 +12,31 @@
 
 #include "Base/Poll.cpp"
 
-void HandleClient(Network::Socket Client, Network::EndPoint Info)
+void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 {
-    std::string str;
+    Core::Buffer::FIFO Buffer(1024);
 
-    std::cout << Info << " is now connected" << std::endl;
+    // Buffer << "GET / HTTP/1.1\r\n"
+    //           "Host: ConfusionBox\r\n"
+    //           "Connecttion: closed\r\n\r\n";
 
-    // Client >> std::cout;
+    Buffer << "HTTP/1.1 200 OK\r\n"
+              "Content-Type: text/plain\r\n"
+              "Connection: closed\r\n"
+              "Content-Length: 11\r\n\r\n"
+              "hello there";
 
-    Client << "Say something : ";
+    while (!Buffer.IsEmpty())
+    {
+        Client << Buffer;
 
-    Client >> str;
-
-    Client << "You said : " << str;
-
-    std::cout << "Client said : " << str;
+        Client.Await(Core::Network::Socket::Out);
+    }
 
     Client.Close();
 }
 
-void LunchHandler(Network::Socket &Client, Network::EndPoint &Info)
+void LunchHandler(Core::Network::Socket &Client, Core::Network::EndPoint &Info)
 {
     static int Count = 0;
 
@@ -48,21 +53,21 @@ void LunchHandler(Network::Socket &Client, Network::EndPoint &Info)
 
 int main(int argc, char const *argv[])
 {
-    Network::Socket server(Network::IPv4Protocol, Network::TCP, true);
+    Core::Network::Socket server(Core::Network::Socket::IPv4, Core::Network::Socket::TCP);
 
-    auto result = Network::DNS::Host(Network::IPv4Address);
+    auto result = Core::Network::DNS::Host(Core::Network::Address::IPv4);
 
-    Network::EndPoint Host(result[0], 8888);
+    Core::Network::EndPoint Host(result[0], 8888);
 
     server.Bind(Host);
 
-    std::cout << Network::DNS::HostName() << " is listenning on " << Host << std::endl;
+    std::cout << Core::Network::DNS::HostName() << " is listenning on " << Host << std::endl;
 
     server.Listen(10);
 
     while (1)
     {
-        Network::EndPoint Info;
+        Core::Network::EndPoint Info;
 
         auto Client = server.Accept(Info);
 

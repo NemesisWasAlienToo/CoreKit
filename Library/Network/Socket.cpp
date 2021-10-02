@@ -13,7 +13,7 @@
 #include "Base/Descriptor.cpp"
 #include "Base/Exeption.cpp"
 
-#include "Base/Buffer.cpp"
+#include "Buffer/FIFO.cpp"
 
 // To do :
 //      - Non blocking
@@ -21,410 +21,431 @@
 //      - const functions
 //      - Close on dispose
 
-namespace Network
+namespace Core
 {
-    class Socket : public Base::Descriptor
+    namespace Network
     {
-    public:
-        enum SocketFamily
+        class Socket : public Descriptor
         {
-            Any = PF_UNSPEC,
-            // Local = PF_LOCAL,
-            // Bluetooth = PF_BLUETOOTH,
-            // NFC = PF_NFC,
-            // CAN = PF_CAN,
-            Unix = PF_UNIX,
-            IPv4 = PF_INET,
-            IPv6 = PF_INET6,
+        public:
+            enum SocketFamily
+            {
+                Any = PF_UNSPEC,
+                Unix = PF_UNIX,
+                IPv4 = PF_INET,
+                IPv6 = PF_INET6,
+            };
+
+            enum SocketType
+            {
+                TCP = SOCK_STREAM,
+                UDP = SOCK_DGRAM,
+                Raw = SOCK_RAW,
+                NonBlock = SOCK_NONBLOCK,
+            };
+
+        private:
+            // Types :
+
+            typedef struct pollfd _POLLFD;
+
+            // Variables :
+
+            SocketFamily _Protocol = IPv4;
+            int _Type = TCP;
+
+        public:
+            Socket()
+            {
+                _Handler = socket(_Protocol, _Type, 0);
+
+                if (_Handler < 0)
+                {
+                    std::cout << "Error : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+            }
+
+            Socket(const int Handler) : Descriptor(Handler) {}
+
+            Socket(SocketFamily Protocol, int Type = TCP) : _Protocol(Protocol), _Type(Type)
+            {
+                _Handler = socket(Protocol, Type, 0);
+
+                // Error handling here
+
+                if (_Handler < 0)
+                {
+                    std::cout << "Init : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+            }
+
+            Socket(const Socket &Other) : Descriptor(Other) {}
+
+            bool Blocking(bool Value)
+            {
+                int Result = 0;
+
+                int flags = fcntl(_Handler, F_GETFL, 0);
+
+                if(!(((_Type & NonBlock) == 0) ^ Value)) return Value;
+
+                flags ^= NonBlock;
+                _Type ^= NonBlock;
+
+                Result = fcntl(_Handler, F_SETFL, flags);
+
+                // Error handling here
+
+                if (Result < 0)
+                {
+                    std::cout << "Blocking : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                return (_Type & NonBlock) == 0;
+            }
+
+            bool Blocking()
+            {
+                return (_Type & NonBlock) == 0;
+            }
+
+            void Bind(EndPoint &Host)
+            {
+
+                struct sockaddr *SocketAddress;
+                int Size = 0, Result = 0, yes = 1;
+
+                if (Host.address().Family() == Address::IPv4)
+                {
+                    SocketAddress = (struct sockaddr *)new struct sockaddr_in;
+                    Size = Host.sockaddr_in((struct sockaddr_in *)SocketAddress);
+                }
+                else
+                {
+                    SocketAddress = (struct sockaddr *)new struct sockaddr_in6;
+                    Size = Host.sockaddr_in6((struct sockaddr_in6 *)SocketAddress);
+                }
+
+                setsockopt(_Handler, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+
+                Result = bind(_Handler, SocketAddress, Size);
+
+                // Error handling here
+
+                if (Result < 0)
+                {
+                    std::cout << "Bind : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+            }
+
+            void Connect(EndPoint Target)
+            {
+
+                struct sockaddr *SocketAddress;
+                int Size = 0;
+
+                if (Target.address().Family() == Address::IPv4)
+                {
+                    SocketAddress = (struct sockaddr *)new struct sockaddr_in;
+                    Size = Target.sockaddr_in((struct sockaddr_in *)SocketAddress);
+                }
+                else
+                {
+                    SocketAddress = (struct sockaddr *)new struct sockaddr_in6;
+                    Size = Target.sockaddr_in6((struct sockaddr_in6 *)SocketAddress);
+                }
+
+                int Result = connect(_Handler, SocketAddress, Size);
+
+                // Error handling here
+
+                if (Result < 0 && errno != EINPROGRESS)
+                {
+                    std::cout << "Connect : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+            }
+
+            void Listen(int Count)
+            {
+                int Result = listen(_Handler, Count);
+
+                // Error handling here
+
+                if (Result < 0)
+                {
+                    std::cout << "Listen : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+            }
+
+            Socket Accept()
+            {
+                struct sockaddr_storage ClientAddress;
+                socklen_t Size;
+                int ClientDescriptor;
+
+                Size = sizeof ClientAddress;
+                ClientDescriptor = accept(_Handler, (struct sockaddr *)&ClientAddress, &Size);
+
+                // Error handling here
+
+                if (ClientDescriptor < 0)
+                {
+                    std::cout << "Accept : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                return ClientDescriptor;
+            }
+
+            Socket Accept(EndPoint &Peer)
+            {
+                struct sockaddr_storage ClientAddress;
+                socklen_t Size;
+                int ClientDescriptor, Result = 0;
+
+                Size = sizeof ClientAddress;
+                ClientDescriptor = accept(_Handler, (struct sockaddr *)&ClientAddress, &Size);
+
+                // Error handling here
+
+                if (ClientDescriptor < 0 && errno != EAGAIN)
+                {
+                    std::cout << "Accept : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                if (fcntl(_Handler, F_GETFL, 0) & O_NONBLOCK)
+                    Result = fcntl(ClientDescriptor, F_SETFL, O_NONBLOCK);
+
+                if (Result < 0)
+                {
+                    std::cout << "Accept : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                Peer = EndPoint((struct sockaddr *)&ClientAddress);
+                return ClientDescriptor;
+            }
+
+            bool Closable()
+            {
+                if (_Handler < 0)
+                    return false;
+
+                int error = 0;
+                socklen_t len = sizeof(error);
+                int retval = getsockopt(_Handler, SOL_SOCKET, SO_ERROR, &error, &len);
+
+                if (retval != 0 || error != 0)
+                {
+                    std::cout << "Closable : " << strerror(errno) << std::endl;
+                    return false;
+                }
+
+                return true;
+            }
+
+            EndPoint Peer()
+            {
+                struct sockaddr_storage addr;
+
+                socklen_t addrlen = sizeof addr;
+
+                int Result = getpeername(_Handler, (struct sockaddr *)&addr, &addrlen);
+
+                if (Result < 0)
+                {
+                    std::cout << "Peer : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                return (struct sockaddr *)&addr;
+            }
+
+            int Received()
+            {
+
+                int Count = 0;
+                int Result = ioctl(_Handler, FIONREAD, &Count);
+
+                if (Result < 0)
+                {
+                    std::cout << "Received : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                return Count;
+            }
+
+            int Sending()
+            {
+
+                int Count = 0;
+                int Result = ioctl(_Handler, TIOCOUTQ, &Count);
+
+                if (Result < 0)
+                {
+                    std::cout << "Sending : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                return Count;
+            }
+
+            Event Await(Event Events, int TimeoutMS = -1)
+            {
+
+                _POLLFD PollStruct = {.fd = _Handler, .events = Events};
+
+                int Result = poll(&PollStruct, 1, TimeoutMS);
+
+                if (Result < 0)
+                {
+                    std::cout << "Await : " << strerror(errno) << std::endl;
+                    return 0;
+                }
+                else if (Result == 0)
+                {
+                    return 0;
+                }
+
+                return PollStruct.revents;
+            }
+
+            Socket &operator<<(const std::string &Message) noexcept
+            {
+                int Result = write(_Handler, Message.c_str(), Message.length());
+
+                // Error handling here
+
+                if (Result < 0)
+                {
+                    std::cout << "operator<< : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                return *this;
+            }
+
+            Socket &operator<<(Buffer::FIFO &buffer)
+            {
+                size_t len = buffer.Length();
+
+                char _Buffer[len];
+
+                for (size_t i = 0; i < len; i++)
+                {
+                    _Buffer[i] = buffer[i];
+                }
+
+                int Result = write(_Handler, _Buffer, len);
+
+                // Error handling here
+
+                if (Result < 0)
+                {
+                    std::cout << "operator<< : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                buffer.Free(Result);
+
+                return *this;
+            }
+
+            Socket &operator>>(Buffer::FIFO &buffer)
+            {
+                size_t len = buffer.Capacity() - buffer.Length();
+
+                if(len <= 0) *this;
+
+                char _Buffer[len];
+
+                int Result = read(_Handler, _Buffer, len);
+
+                // Error handling here
+
+                if (Result < 0)
+                {
+                    std::cout << "operator<< : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                for (size_t i = 0; i < len; i++)
+                {
+                    buffer.Put(_Buffer[i]); // ## Optimize later
+                }
+
+                return *this;
+            }
+
+            Socket &operator>>(std::string &Message) noexcept
+            {
+                char buffer[1024];
+                int Result = 0;
+
+                while ((Result = read(_Handler, buffer, 1024)) > 0)
+                {
+                    buffer[Result] = 0;
+                    Message.append(buffer);
+
+                    if (Result < 1024)
+                        break;
+                }
+
+                // Error handling here
+
+                if (Result < 0 && errno != EAGAIN)
+                {
+                    std::cout << "operator>> " << errno << " : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                return *this;
+            }
+
+            const Socket &operator>>(std::string &Message) const noexcept
+            {
+                char buffer[1024];
+                int Result = 0;
+
+                while ((Result = read(_Handler, buffer, 1024)) > 0)
+                {
+                    buffer[Result] = 0;
+                    Message.append(buffer);
+
+                    if (Result < 1024)
+                        break;
+                }
+
+                // Error handling here
+
+                if (Result < 0 && errno != EAGAIN)
+                {
+                    std::cout << "operator>> " << errno << " : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                return *this;
+            }
+
+            // // Maybe add rvalue later?
+            Socket &operator=(const Socket &Other) = delete;
+
+            // Friend operators
+
+            friend std::ostream &operator<<(std::ostream &os, const Socket &socket)
+            {
+                std::string str;
+                socket >> str;
+                return os << str;
+            }
         };
-
-        enum ConnectionType
-        {
-            TCP = SOCK_STREAM,
-            UDP = SOCK_DGRAM,
-            // RawSocket = SOCK_RAW,
-        };
-
-    private:
-        // Types :
-
-        typedef struct pollfd _POLLFD;
-
-        // Variables :
-
-        SocketFamily _Protocol = IPv4;
-        ConnectionType _Type = TCP;
-
-    public:
-        Socket()
-        {
-            _Handler = socket(_Protocol, _Type, 0);
-
-            if (_Handler < 0)
-            {
-                std::cout << "Error : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-        }
-
-        Socket(const int Handler) : Descriptor(Handler) {}
-
-        Socket(SocketFamily Protocol, ConnectionType Type = TCP, bool Blocking = true) : _Protocol(Protocol), _Type(Type)
-        {
-            int Result = 0;
-            _Handler = socket(Protocol, Type, 0);
-
-            // Error handling here
-
-            if (_Handler < 0)
-            {
-                std::cout << "Init : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            if (!Blocking)
-                Result = fcntl(_Handler, F_SETFL, O_NONBLOCK);
-
-            // Error handling here
-
-            if (Result < 0)
-            {
-                std::cout << "Init : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-        }
-
-        Socket(const Socket &Other) : Descriptor(Other) {}
-
-        bool Blocking(bool Value)
-        {
-            int Result = 0;
-
-            int flags = fcntl(_Handler, F_GETFL, 0);
-            flags = Value ? flags ^ O_NONBLOCK : flags | O_NONBLOCK;
-
-            Result = fcntl(_Handler, F_SETFL, flags);
-
-            // Error handling here
-
-            if (Result < 0)
-            {
-                std::cout << "Blocking : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            return flags & O_NONBLOCK;
-        }
-
-        bool Blocking()
-        {
-            int Result = fcntl(_Handler, F_GETFL, 0);
-
-            return Result & O_NONBLOCK;
-        }
-
-        void Bind(EndPoint &Host)
-        {
-
-            struct sockaddr *SocketAddress;
-            int Size = 0, Result = 0, yes = 1;
-
-            if (Host.address().Family() == Address::IPv4)
-            {
-                SocketAddress = (struct sockaddr *)new struct sockaddr_in;
-                Size = Host.sockaddr_in((struct sockaddr_in *)SocketAddress);
-            }
-            else
-            {
-                SocketAddress = (struct sockaddr *)new struct sockaddr_in6;
-                Size = Host.sockaddr_in6((struct sockaddr_in6 *)SocketAddress);
-            }
-
-            setsockopt(_Handler, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
-
-            Result = bind(_Handler, SocketAddress, Size);
-
-            // Error handling here
-
-            if (Result < 0)
-            {
-                std::cout << "Bind : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-        }
-
-        void Connect(EndPoint Target)
-        {
-
-            struct sockaddr *SocketAddress;
-            int Size = 0;
-
-            if (Target.address().Family() == Address::IPv4)
-            {
-                SocketAddress = (struct sockaddr *)new struct sockaddr_in;
-                Size = Target.sockaddr_in((struct sockaddr_in *)SocketAddress);
-            }
-            else
-            {
-                SocketAddress = (struct sockaddr *)new struct sockaddr_in6;
-                Size = Target.sockaddr_in6((struct sockaddr_in6 *)SocketAddress);
-            }
-
-            int Result = connect(_Handler, SocketAddress, Size);
-
-            // Error handling here
-
-            if (Result < 0 && errno != EINPROGRESS)
-            {
-                std::cout << "Connect : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-        }
-
-        void Listen(int Count)
-        {
-            int Result = listen(_Handler, Count);
-
-            // Error handling here
-
-            if (Result < 0)
-            {
-                std::cout << "Listen : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-        }
-
-        Socket Accept()
-        {
-            struct sockaddr_storage ClientAddress;
-            socklen_t Size;
-            int ClientDescriptor;
-
-            Size = sizeof ClientAddress;
-            ClientDescriptor = accept(_Handler, (struct sockaddr *)&ClientAddress, &Size);
-
-            // Error handling here
-
-            if (ClientDescriptor < 0)
-            {
-                std::cout << "Accept : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            return ClientDescriptor;
-        }
-
-        Socket Accept(EndPoint &Peer)
-        {
-            struct sockaddr_storage ClientAddress;
-            socklen_t Size;
-            int ClientDescriptor, Result = 0;
-
-            Size = sizeof ClientAddress;
-            ClientDescriptor = accept(_Handler, (struct sockaddr *)&ClientAddress, &Size);
-
-            // Error handling here
-
-            if (ClientDescriptor < 0 && errno != EAGAIN)
-            {
-                std::cout << "Accept : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            if (fcntl(_Handler, F_GETFL, 0) & O_NONBLOCK)
-                Result = fcntl(ClientDescriptor, F_SETFL, O_NONBLOCK);
-
-            if (Result < 0)
-            {
-                std::cout << "Accept : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            Peer = EndPoint((struct sockaddr *)&ClientAddress);
-            return ClientDescriptor;
-        }
-
-        bool Closable()
-        {
-            if (_Handler < 0)
-                return false;
-
-            int error = 0;
-            socklen_t len = sizeof(error);
-            int retval = getsockopt(_Handler, SOL_SOCKET, SO_ERROR, &error, &len);
-
-            if (retval != 0 || error != 0)
-            {
-                std::cout << "Closable : " << strerror(errno) << std::endl;
-                return false;
-            }
-
-            return true;
-        }
-
-        EndPoint Peer()
-        {
-            struct sockaddr_storage addr;
-
-            socklen_t addrlen = sizeof addr;
-
-            int Result = getpeername(_Handler, (struct sockaddr *)&addr, &addrlen);
-
-            if (Result < 0)
-            {
-                std::cout << "Peer : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            return (struct sockaddr *)&addr;
-        }
-
-        int Received()
-        {
-
-            int Count = 0;
-            int Result = ioctl(_Handler, FIONREAD, &Count);
-
-            if (Result < 0)
-            {
-                std::cout << "Received : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            return Count;
-        }
-
-        int Sending(){
-
-            int Count = 0;
-            int Result =  ioctl(_Handler, TIOCOUTQ, &Count);
-
-            if (Result < 0)
-            {
-                std::cout << "Sending : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            return Count;
-        }
-
-        Event Await(Event Events, int TimeoutMS = -1)
-        {
-
-            _POLLFD PollStruct = {.fd = _Handler, .events = Events};
-
-            int Result = poll(&PollStruct, 1, TimeoutMS);
-
-            if (Result < 0)
-            {
-                std::cout << "Await : " << strerror(errno) << std::endl;
-                return 0;
-            }
-
-            return PollStruct.revents;
-        }
-
-        Socket &operator<<(const std::string &Message) noexcept
-        {
-            int Result = write(_Handler, Message.c_str(), Message.length());
-
-            // Error handling here
-
-            if (Result < 0)
-            {
-                std::cout << "operator<< : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            return *this;
-        }
-
-        Socket& operator<<(Base::Buffer &buffer)
-        {
-            size_t len = buffer.Length();
-
-            char _Buffer[len];
-
-            for (size_t i = 0; i < len; i++)
-            {
-                _Buffer[i] = buffer[i];
-            }
-
-            int Result = write(_Handler, _Buffer, len);
-
-            // Error handling here
-
-            if (Result < 0)
-            {
-                std::cout << "operator<< : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            buffer.Skip(Result);
-        
-            return *this;
-        }
-
-        Socket &operator>>(std::string &Message) noexcept
-        {
-            char buffer[1024];
-            int Result = 0;
-
-            while ((Result = read(_Handler, buffer, 1024)) > 0)
-            {
-                buffer[Result] = 0;
-                Message.append(buffer);
-
-                if (Result < 1024)
-                    break;
-            }
-
-            // Error handling here
-
-            if (Result < 0 && errno != EAGAIN)
-            {
-                std::cout << "operator>> " << errno << " : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            return *this;
-        }
-
-        const Socket &operator>>(std::string &Message) const noexcept
-        {
-            char buffer[1024];
-            int Result = 0;
-
-            while ((Result = read(_Handler, buffer, 1024)) > 0)
-            {
-                buffer[Result] = 0;
-                Message.append(buffer);
-
-                if (Result < 1024)
-                    break;
-            }
-
-            // Error handling here
-
-            if (Result < 0 && errno != EAGAIN)
-            {
-                std::cout << "operator>> " << errno << " : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
-
-            return *this;
-        }
-
-        // // Maybe add rvalue later?
-        Socket &operator=(const Socket &Other) = delete;
-
-        // Friend operators
-
-        friend std::ostream &operator<<(std::ostream &os, const Socket &socket)
-        {
-            std::string str;
-            socket >> str;
-            return os << str;
-        }
-    };
+    }
 }

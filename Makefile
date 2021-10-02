@@ -4,6 +4,7 @@ BUILD_DIR=Build
 TEST_DIR=Test
 SAMPLE_DIR=Sample
 TARGET:=Socket.elf
+TEST_TARGET:=Test_Socket.elf
 
 CPP_SOURCES:=$(shell find $(SOURCE_DIR) -name '*.cpp')
 C_SOURCES:=$(shell find $(SOURCE_DIR) -name '*.c')
@@ -25,6 +26,7 @@ CPP_FLAGS:=-g -Wall -c -I$(LIBRARY_DIR)
 LINKER_FLAGS:=-pthread -Wall
 
 RUN_ARGS:=
+TEST_ARGS:=
 
 all:$(OBJECTS)
 	$(CC) $(LINKER_FLAGS) $^ -o  $(BUILD_DIR)/$(TARGET)
@@ -45,7 +47,7 @@ clean:
 	rm -Rf $(BUILD_DIR)
 
 test:$(TEST_OBJECTS)
-	$(CC) $(LINKER_FLAGS) $^ -o  $(BUILD_DIR)/$(TARGET)
+	$(CC) $(LINKER_FLAGS) $^ -o  $(BUILD_DIR)/$(TEST_TARGET)
 
 $(BUILD_DIR)/%.o:$(TEST_DIR)/%.cpp Makefile | $(BUILD_DIR)
 	$(CC) $(CPP_FLAGS) $< -o $@

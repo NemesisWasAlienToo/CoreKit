@@ -3,8 +3,7 @@
 #include <iostream>
 #include <string>
 #include <cstring>
-
-namespace Base
+namespace Core
 {
     class Buffer
     {
@@ -14,13 +13,27 @@ namespace Base
         char *_First = NULL;
         char *_Last = NULL;
 
-#define _Start (_Content)
-#define _End (_Capacity > 0 ? &_Content[_Capacity - 1] : NULL)
+        inline char *_Start()
+        {
+            return _Content;
+        }
 
-#define Index(Pointer) (Pointer - _Start)
-#define Min(First, Second) (First <= Second ? First : Second)
-#define Max(First, Second) (First >= Second ? First : Second)
-#define Wrap(Indx) ((Index(_First) + Indx) % _Capacity)
+        inline char *_End()
+        {
+            return _Capacity > 0 ? &_Content[_Capacity - 1] : NULL;
+        }
+
+        //
+
+        inline size_t Index(const char *Pointer)
+        {
+            return (size_t)(Pointer - _Start());
+        }
+
+        inline size_t Wrap(size_t Indx)
+        {
+            return (size_t)((Index(_First) + Indx) % _Capacity);
+        }
 
     public:
         Buffer() = default;
@@ -46,81 +59,23 @@ namespace Base
             delete[] _Content;
         }
 
-        char *Data()
-        {
-            return _First;
-        }
+        virtual char *Data() = 0;
 
-        size_t Length()
-        {
-            return _Last == NULL ? 0 : _First < _Last ? (_Last - _First + 1)
-                                                      : ((_Last - _Start + 1) + (_First - _End + 1));
-        }
+        virtual size_t Length() = 0;
+
+        virtual bool IsEmpty() = 0;
+
+        virtual bool IsFull() = 0;
+
+        virtual bool Put(const char &Item) = 0; // Call move operator (in which distructor then constructor are called)
+
+        virtual bool Take(char &Item) = 0;
+
+        virtual size_t Skip(size_t Count) = 0;
 
         size_t Capacity()
         {
             return _Capacity;
-        }
-
-        bool IsEmpty() { return _Last == NULL; }
-
-        // Needs test
-        bool IsFull() { return _End == NULL ? true : (_First == &_Last[1]) || (_First == _Start && _Last == _End); }
-
-        bool Put(const char &Item) // Call constructor
-        {
-            if (IsFull())
-                return false;
-
-            if (IsEmpty())
-            {
-                *_First = char(Item); // Invoke copy operator of char
-                _Last = _First;
-            }
-            else
-            {
-                *(++_Last) = char(Item);
-            }
-
-            return true;
-        }
-
-        bool Take(char &Item) // Call dispose ?
-        {
-            if (IsEmpty())
-                return false;
-
-            if (_First == _Last)
-            {
-                _Last = NULL;
-                Item = char(*(_First));
-                return true;
-            }
-            else
-            {
-                Item = char(*(_First++));
-
-                return true;
-            }
-        }
-
-        size_t Skip(size_t Count)
-        {
-
-            size_t _Count = 0, Len = Length();
-
-            if (Count >= Len)
-            {
-                _Count = Len;
-                _Last = NULL;
-            }
-            else
-            {
-                _Count = Count;
-                _First = _Start + Wrap(Count);
-            }
-
-            return _Count;
         }
 
         Buffer &operator=(Buffer &Other) = delete;
@@ -168,19 +123,6 @@ namespace Base
                 Put(Item[i]);
             }
             return *this;
-        }
-
-        friend std::ostream &operator<<(std::ostream &os, Buffer &buffer)
-        {
-            char Item;
-
-            while (!buffer.IsEmpty())
-            {
-                buffer.Take(Item);
-                os << Item;
-            }
-
-            return os;
         }
     };
 }

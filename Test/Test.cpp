@@ -1,7 +1,8 @@
 #include <iostream>
 #include <string>
 
-#include "Base/Buffer.cpp"
+#include "Buffer/FIFO.cpp"
+#include "Network/Socket.cpp"
 
 using namespace std;
 
@@ -15,19 +16,13 @@ void Assert(const string &Message, bool Result)
 
 int main(int argc, char const *argv[])
 {
-    Base::Buffer buf(2);
-    char str;
-    size_t count;
+    Core::Network::Socket client(Core::Network::Socket::IPv4, Core::Network::Socket::TCP | Core::Network::Socket::NonBlock);
 
-    Assert("Put 1", buf.Put('a'));
-    Assert("Put 2", buf.Put('a'));
+    Assert("Non blocking", !client.Blocking());
 
-    count = buf.Length();
+    client.Blocking(true);
 
-    Assert("Empty", buf.Skip(count) == count);
-
-    Assert("Length", buf.Length() == 0);
-    Assert("Take 1", !buf.Take(str));
+    Assert("Blocking", client.Blocking());
 
     return 0;
 }

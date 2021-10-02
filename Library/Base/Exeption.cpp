@@ -1,4 +1,4 @@
-namespace Base{
+namespace Core{
     class Exeption
     {
     private:
