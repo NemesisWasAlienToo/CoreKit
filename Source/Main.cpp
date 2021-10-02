@@ -32,6 +32,8 @@ int main(int argc, char const *argv[])
     while (!Buffer.IsEmpty())
     {
         client << Buffer;
+
+        client.Await(Network::Socket::Out);
     }
 
     for (client.Await(Network::Socket::In); client.Received() > 0; client.Await(Network::Socket::In))
