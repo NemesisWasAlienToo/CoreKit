@@ -40,19 +40,36 @@ namespace Base
     public:
         typedef short Event;
 
-        enum PollEvents{
+        enum PollEvents
+        {
             In = POLLIN,
             Out = POLLOUT,
             Error = POLLNVAL,
         };
-        
+
         Callback OnRead = NULL;
         Callback OnWrite = NULL;
         Callback OnError = NULL;
 
         Poll() = default;
+
         Poll(int Capacity) : _Content(new _POLLFD[Capacity]), _Capacity(Capacity), _Length(0) {}
+
+        Poll(Poll &Other) : _Content(new _POLLFD[Other._Capacity]), _Capacity(Other._Capacity), _Length(Other._Length), OnRead(Other.OnRead), OnWrite(Other.OnWrite), OnError(Other.OnError)
+        {
+            for (size_t i = 0; i < Other._Length; i++)
+            {
+                _Content[i] = _POLLFD(Other._Content[i]);
+            }
+        }
+
+        Poll(Poll &&Other) noexcept : _Content(new _POLLFD[Other._Capacity]), _Capacity(Other._Capacity), _Length(Other._Length), OnRead(Other.OnRead), OnWrite(Other.OnWrite), OnError(Other.OnError)
+        {
+            std::swap(_Content, Other._Content);
+        }
+
         // Poll(Iterable::List<T> Descriptors){}
+
         ~Poll()
         {
             delete[] _Content;
@@ -161,6 +178,25 @@ namespace Base
             return _Content[Index];
         }
 
-        Poll& operator=(const Poll& Other) = delete;
+        Poll &operator=(Poll &Other) = delete;
+
+        // Implement later
+        Poll &operator=(Poll &&Other) noexcept
+        {
+            if (this == &Other)
+                return *this;
+
+            delete[] _Content;
+            
+            _Content = Other._Capacity;
+            _Capacity = Other._Capacity;
+            _Length = Other._Length;
+
+            OnRead = Other.OnRead;
+            OnWrite = Other.OnWrite;
+            OnError = Other.OnError;
+
+            std::swap(_Content, Other._Content);
+        }
     };
 }

@@ -21,7 +21,7 @@ namespace Network
 
         // Static
 
-        static Iterable::List<EndPoint> Resolve(const std::string &Domain, const std::string &Service, Address::AddressFamily Family, Socket::ConnectionType Type)
+        static Iterable::List<EndPoint> Resolve(const std::string &Domain, const std::string &Service,  Address::AddressFamily Family = Address::IPv4, Socket::ConnectionType Type = Socket::TCP)
         {
             struct addrinfo hints, *res, *p;
             int status;

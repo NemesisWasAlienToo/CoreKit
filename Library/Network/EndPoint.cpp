@@ -59,6 +59,8 @@ namespace Network
 
         EndPoint(const Address& EndPointAddress, int Port) : _Address(EndPointAddress), _Port(Port){}
 
+        EndPoint(const EndPoint& Othere) : _Address(Othere._Address), _Port(Othere._Port), _Flow(Othere._Flow), _Scope(Othere._Scope) {}
+
         // Functions :
 
         int sockaddr_in(struct sockaddr_in * SocketAddress){

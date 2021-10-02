@@ -25,7 +25,10 @@ namespace Base
         Event Events;
 
         Descriptor() = default;
+        
         Descriptor(int Handler) : _Handler(Handler) {}
+
+        Descriptor(const Descriptor& Other) : _Handler(Other._Handler) {}
 
         void Close()
         {
@@ -45,5 +48,21 @@ namespace Base
         }
 
         int Handler() { return _Handler; }
+
+        Descriptor& operator=(Descriptor& Other) = delete;
+
+        Descriptor& operator=(Descriptor&& Other){
+            std::swap(_Handler, Other._Handler);
+        }
+
+        inline bool operator==(const Descriptor &Other)
+        {
+            return Other._Handler == this->_Handler;
+        }
+
+        inline bool operator!=(const Descriptor &Other)
+        {
+            return Other._Handler != this->_Handler;
+        }
     };
 }

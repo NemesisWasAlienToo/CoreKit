@@ -27,9 +27,12 @@ namespace Network
 
     private:
         typedef struct in_addr _IN_ADDR;
+        typedef struct in6_addr _IN6_ADDR;
         typedef struct sockaddr_in _SOCKADDR_IN;
         typedef struct sockaddr_in6 _SOCKADDR_IN6;
+        typedef struct sockaddr_storage _SOCKADDR_STORAGE;
 
+        // _SOCKADDR_STORAGE _AddressStorage;
         AddressFamily family = Any;
         unsigned char address[16] = {0};
 
@@ -46,7 +49,7 @@ namespace Network
             std::memcpy(address, &(Address.s_addr), sizeof Address.s_addr);
         }
 
-        Address(struct in6_addr &Address) noexcept
+        Address(_IN6_ADDR &Address) noexcept
         {
             family = IPv6;
             std::memcpy(address, &(Address.__in6_u), sizeof Address.__in6_u);

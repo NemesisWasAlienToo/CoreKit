@@ -13,6 +13,8 @@
 #include "Base/Descriptor.cpp"
 #include "Base/Exeption.cpp"
 
+#include "Base/Buffer.cpp"
+
 // To do :
 //      - Non blocking
 //      - Error handling
@@ -92,10 +94,7 @@ namespace Network
             }
         }
 
-        Socket(const Socket &Other)
-        {
-            _Handler = Other._Handler;
-        }
+        Socket(const Socket &Other) : Descriptor(Other) {}
 
         bool Blocking(bool Value)
         {
@@ -280,7 +279,7 @@ namespace Network
             return (struct sockaddr *)&addr;
         }
 
-        int HasData()
+        int Received()
         {
 
             int Count = 0;
@@ -288,8 +287,22 @@ namespace Network
 
             if (Result < 0)
             {
-                std::cout << "Peer : " << strerror(errno) << std::endl;
-                return 0;
+                std::cout << "Received : " << strerror(errno) << std::endl;
+                exit(-1);
+            }
+
+            return Count;
+        }
+
+        int Sending(){
+
+            int Count = 0;
+            int Result =  ioctl(_Handler, TIOCOUTQ, &Count);
+
+            if (Result < 0)
+            {
+                std::cout << "Sending : " << strerror(errno) << std::endl;
+                exit(-1);
             }
 
             return Count;
@@ -304,7 +317,7 @@ namespace Network
 
             if (Result < 0)
             {
-                std::cout << "Peer : " << strerror(errno) << std::endl;
+                std::cout << "Await : " << strerror(errno) << std::endl;
                 return 0;
             }
 
@@ -323,6 +336,32 @@ namespace Network
                 exit(-1);
             }
 
+            return *this;
+        }
+
+        Socket& operator<<(Base::Buffer &buffer)
+        {
+            size_t len = buffer.Length();
+
+            char _Buffer[len];
+
+            for (size_t i = 0; i < len; i++)
+            {
+                _Buffer[i] = buffer[i];
+            }
+
+            int Result = write(_Handler, _Buffer, len);
+
+            // Error handling here
+
+            if (Result < 0)
+            {
+                std::cout << "operator<< : " << strerror(errno) << std::endl;
+                exit(-1);
+            }
+
+            buffer.Skip(Result);
+        
             return *this;
         }
 
@@ -376,16 +415,7 @@ namespace Network
             return *this;
         }
 
-        inline bool operator==(const Socket &Other)
-        {
-            return Other._Handler == this->_Handler;
-        }
-
-        inline bool operator!=(const Socket &Other)
-        {
-            return Other._Handler != this->_Handler;
-        }
-
+        // // Maybe add rvalue later?
         Socket &operator=(const Socket &Other) = delete;
 
         // Friend operators

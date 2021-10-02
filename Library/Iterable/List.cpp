@@ -11,17 +11,26 @@ namespace Iterable
     private:
         // ### Private variables
 
-        T * _Content = NULL;
-        int _Capacity = 0;
-        int _Length = 0;
+        T *_Content = NULL;
+        size_t _Capacity = 0;
+        size_t _Length = 0;
 
         // ### Private functions
         void increaseCapacity()
         {
             if (_Capacity > _Length)
                 return;
-            if (_Capacity > 0) // ### Change realloc to new due to internal pointer
+
+            if (_Capacity > 0) // ### Change realloc to new due to possibility of internal pointer existing
+            {
+                // for (size_t i = 0; i < Count; i++)
+                // {
+                //     _Content[i] = T(_Content[i]);
+                // }
+                
                 _Content = (T *)std::realloc(_Content, sizeof(T) * ++_Capacity);
+            }
+
             if (_Capacity == 0)
                 _Content = new T[++_Capacity];
         }
@@ -31,11 +40,19 @@ namespace Iterable
 
         List() = default;
 
-        List(int Capacity) : _Content(new T[Capacity]), _Capacity(Capacity), _Length(0) {}
+        List(size_t Capacity) : _Content(new T[Capacity]), _Capacity(Capacity), _Length(0) {}
 
+        List(T Array[], int Count) : _Content(new T[Count]), _Capacity(Count), _Length(Count)
+        {
+            for (size_t i = 0; i < Count; i++)
+            {
+                _Content[i] = T(Array[i]); // Invoke copy constructor of T
+            }
+        }
+        
         List(List &Other) : _Content(new T[Other._Capacity]), _Capacity(Other._Capacity), _Length(Other._Length)
         {
-            Other.ForEach([&](int Index, T& Item)
+            Other.ForEach([&](int Index, T &Item)
                           { _Content[Index] = T(Item); });
         }
 
@@ -43,11 +60,6 @@ namespace Iterable
         {
             std::swap(_Content, Other._Content);
         }
-
-        // List(T Array[], int Count) : _Content(new T[Count]), _Capacity(Count), _Length(Count)
-        // {
-            
-        // }
 
         // ### Destructor
 
@@ -80,7 +92,7 @@ namespace Iterable
             _Content[_Length++] = t;
         }
 
-        void ForEach(std::function<void(int, T&)> Action)
+        void ForEach(std::function<void(int, T &)> Action)
         {
             for (int i = 0; i < _Length; i++)
             {
@@ -88,7 +100,7 @@ namespace Iterable
             }
         }
 
-        List<T> Where(std::function<bool(T&)> Condition)
+        List<T> Where(std::function<bool(T &)> Condition)
         {
             List<T> result(_Capacity);
 
@@ -101,7 +113,8 @@ namespace Iterable
             return result;
         }
 
-        bool Contains(T Item){
+        bool Contains(T Item)
+        {
             List<T> result(_Capacity);
 
             for (T item : _Content)
@@ -113,16 +126,17 @@ namespace Iterable
             return false;
         }
 
-        bool Contains(T Item, int& Index){
+        bool Contains(T Item, int &Index)
+        {
             List<T> result(_Capacity);
 
-            for (int i = 0 ; i < _Length ; i++)
+            for (int i = 0; i < _Length; i++)
             {
                 if (_Content[i] == Item)
-                    {
-                        Index = i;
-                        return true;
-                    }
+                {
+                    Index = i;
+                    return true;
+                }
             }
 
             return false;
@@ -145,12 +159,12 @@ namespace Iterable
             return result;
         }
 
-        void From(T Array[], int Count){
-            
+        void From(T Array[], int Count)
+        {
         }
 
-        void From(List &Other){
-
+        void From(List &Other)
+        {
         }
 
         // ### Operators
@@ -167,6 +181,8 @@ namespace Iterable
             if (this == &Other)
                 return *this;
 
+            delete[] _Content;
+
             _Capacity = Other._Capacity;
             _Length = Other._Length;
             std::swap(_Content, Other._Content);
@@ -174,11 +190,13 @@ namespace Iterable
             return *this;
         }
 
-        bool operator==(const List& Other) noexcept{
+        bool operator==(const List &Other) noexcept
+        {
             return this->_Content == Other->_Content;
         }
 
-        bool operator!=(const List& Other) noexcept{
+        bool operator!=(const List &Other) noexcept
+        {
             return this->_Content != Other->_Content;
         }
     };

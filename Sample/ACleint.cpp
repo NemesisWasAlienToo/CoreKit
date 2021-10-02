@@ -7,7 +7,6 @@
 #include "Network/DNS.cpp"
 #include "Network/Socket.cpp"
 #include "Base/Poll.cpp"
-#include "Base/Buffer.cpp"
 
 int main(int argc, char const *argv[])
 {
@@ -19,20 +18,23 @@ int main(int argc, char const *argv[])
 
     std::cout << "Google is at " << Google << std::endl;
 
-    Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP);
+    Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP, false);
 
     client.Connect(Google);
 
-    Base::Buffer Buffer(1024);
+    client.Await(Network::Socket::Out);
 
-    Buffer << "GET / HTTP/1.1 \r\n"
+    int t = client.Sending();
+
+    client << "GET / HTTP/1.1 \r\n"
               "Host: ConfusionBox \r\n"
               "Connecttion: closed\r\n\r\n";
 
-    while (!Buffer.IsEmpty())
-    {
-        client << Buffer;
-    }
+    t = client.Sending();
+
+    client.Await(Network::Socket::Out);
+
+    t = client.Sending();
 
     for (client.Await(Network::Socket::In); client.Received() > 0; client.Await(Network::Socket::In))
     {

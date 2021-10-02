@@ -13,11 +13,11 @@
 
 int main(int argc, char const *argv[])
 {
-    Network::Socket server(Network::IPv4Protocol, Network::TCP);
+    Network::Socket server(Network::Socket::IPv4, Network::Socket::TCP);
 
     Base::Poll<Network::Socket> Watcher(QUEUE + 1);
 
-    auto result = Network::DNS::Host(Network::IPv4Address);
+    auto result = Network::DNS::Host(Network::Address::IPv4);
 
     Network::EndPoint Host(result[0], 8888);
 
