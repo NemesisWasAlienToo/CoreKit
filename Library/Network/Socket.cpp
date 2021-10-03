@@ -363,7 +363,7 @@ namespace Core
             {
                 size_t len = buffer.Capacity() - buffer.Length();
 
-                if(len <= 0) *this;
+                if(len == 0) return *this;
 
                 char _Buffer[len];
 

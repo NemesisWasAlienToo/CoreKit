@@ -23,19 +23,19 @@ TEST_OBJECTS:=$(TEST_CPP_OBJECTS) $(TEST_C_OBJECTS)
 
 CC:=g++
 CPP_FLAGS:=-g -Wall -c -I$(LIBRARY_DIR)
-LINKER_FLAGS:=-pthread -Wall
+LINKER_FLAGS:=-pthread -Wall -Wpedantic -pedantic -lssl -lcrypto
 
 RUN_ARGS:=
 TEST_ARGS:=
 
 all:$(OBJECTS)
-	$(CC) $(LINKER_FLAGS) $^ -o  $(BUILD_DIR)/$(TARGET)
+	$(CC) $^ -o $(BUILD_DIR)/$(TARGET) $(LINKER_FLAGS)
 
 $(BUILD_DIR)/%.o:$(SOURCE_DIR)/%.cpp Makefile | $(BUILD_DIR)
-	$(CC) $(CPP_FLAGS) $< -o $@
+	$(CC) $< -o $@ $(CPP_FLAGS)
 
 $(BUILD_DIR)/%.o:$(SOURCE_DIR)/%.c Makefile | $(BUILD_DIR)
-	$(CC) $(CPP_FLAGS) $< -o $@
+	$(CC)$< -o $@ $(CPP_FLAGS) 
 
 $(BUILD_DIR):
 	mkdir $@

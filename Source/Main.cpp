@@ -1,20 +1,48 @@
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <cstring>
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include <functional>
 
 #include "Iterable/List.cpp"
 #include "Network/DNS.cpp"
 #include "Network/Socket.cpp"
 #include "Base/Poll.cpp"
+#include "Cryptography/Hash.cpp"
 
 void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 {
-    Client.Await(Core::Network::Socket::In);
+    std::string Request;
 
-    std::cout << Info << " Says : " << std::endl << Client << std::endl;
+    bool Condition = false;
+
+    size_t Contet_Length = 0;
+
+    while (!Condition)
+    {
+        Client.Await(Core::Network::Socket::In);
+
+        Client >> Request;
+
+        size_t pos = 0;
+
+        if((pos = Request.find("Content-Length: ")) != std::string::npos){
+            std::string len = Request.substr(pos + 16);
+            len = len.substr(0, len.find("\r\n"));
+
+            Contet_Length = std::stoul(len);
+        }
+
+        if ((pos = Request.find("\r\n\r\n")) != std::string::npos && Request.substr(pos + 4).length() >= Contet_Length)
+            Condition = true;
+    }
+
+    std::cout << Info << " Says : " << std::endl
+              << Request << std::endl;
 
     Core::Buffer::FIFO Buffer(1024);
 
@@ -36,7 +64,7 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 
 void LunchHandler(Core::Network::Socket &Client, Core::Network::EndPoint &Info)
 {
-    std::thread handler(HandleClient, std::move(Client), std::move(Info));
+    std::thread handler(HandleClient, Client, Info);
 
     handler.detach();
 }
