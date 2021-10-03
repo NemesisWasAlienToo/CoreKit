@@ -12,7 +12,7 @@
 #include "Network/DNS.cpp"
 #include "Network/Socket.cpp"
 #include "Base/Poll.cpp"
-#include "Cryptography/Hash.cpp"
+#include "Cryptography/Digest.cpp"
 
 void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 {

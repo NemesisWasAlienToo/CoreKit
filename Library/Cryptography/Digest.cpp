@@ -24,24 +24,24 @@ namespace Core
         };
 
         template <typename T, HashScheme<T> &O>
-        class Hash
+        class Digest
         {
         private:
             T _State;
 
         public:
-            Hash()
+            Digest()
             {
                 O.Init(&_State);
             }
 
-            Hash(const Hash &Other) = delete;
+            Digest(const Digest &Other) = delete;
 
-            ~Hash() {}
+            ~Digest() {}
 
-            Hash &operator=(const Hash &Other) = delete;
+            Digest &operator=(const Digest &Other) = delete;
 
-            Hash &operator<<(const std::string Data)
+            Digest &operator<<(const std::string Data)
             {
                 O.Update(&_State, Data.c_str(), Data.size());
             }
@@ -65,14 +65,14 @@ namespace Core
                 return ss.str();
             }
 
-            void Compute(const std::string &Data, unsigned char *Hash)
+            void Compute(const std::string &Data, unsigned char *Digest)
             {
-                O.Name((unsigned char *)Data.c_str(), Data.length(), Hash);
+                O.Name((unsigned char *)Data.c_str(), Data.length(), Digest);
             }
 
-            void Compute(const unsigned char *Data, size_t Size, unsigned char *Hash)
+            void Compute(const unsigned char *Data, size_t Size, unsigned char *Digest)
             {
-                O.Name(Data, Size, Hash);
+                O.Name(Data, Size, Digest);
             }
 
             static std::string Hex(const std::string &Data)
@@ -119,7 +119,7 @@ namespace Core
             .Final = ::SHA1_Final,
         };
 
-        typedef Hash<SHA_CTX, SHA1Functionality> SHA1;
+        typedef Digest<SHA_CTX, SHA1Functionality> SHA1;
 #endif
 
 #ifndef OPENSSL_NO_SHA256
@@ -131,7 +131,7 @@ namespace Core
             .Final = ::SHA256_Final,
         };
 
-        typedef Hash<SHA256_CTX, SHA256Functionality> SHA256;
+        typedef Digest<SHA256_CTX, SHA256Functionality> SHA256;
 #endif
 
 #ifndef OPENSSL_NO_SHA384
@@ -143,7 +143,7 @@ namespace Core
             .Final = ::SHA384_Final,
         };
 
-        typedef Hash<SHA512_CTX, SHA384Functionality> SHA384;
+        typedef Digest<SHA512_CTX, SHA384Functionality> SHA384;
 #endif
 
 #ifndef OPENSSL_NO_SHA512
@@ -155,7 +155,7 @@ namespace Core
             .Final = ::SHA512_Final,
         };
 
-        typedef Hash<SHA512_CTX, SHA512Functionality> SHA512;
+        typedef Digest<SHA512_CTX, SHA512Functionality> SHA512;
 #endif
         // ## MD
 
@@ -168,7 +168,7 @@ namespace Core
             .Final = ::MD5_Final,
         };
 
-        typedef Hash<MD5_CTX, MD5Functionality> MD5;
+        typedef Digest<MD5_CTX, MD5Functionality> MD5;
 #endif
 
 #ifndef OPENSSL_NO_MD4
@@ -180,7 +180,7 @@ namespace Core
             .Final = ::MD4_Final,
         };
 
-        typedef Hash<MD4_CTX, MD4Functionality> MD4;
+        typedef Digest<MD4_CTX, MD4Functionality> MD4;
 #endif
 
 #ifndef OPENSSL_NO_MD2
@@ -192,7 +192,7 @@ namespace Core
             .Final = ::MD2_Final,
         };
 
-        typedef Hash<MD2_CTX, SHA512Functionality> MD2;
+        typedef Digest<MD2_CTX, SHA512Functionality> MD2;
 #endif
     }
 }

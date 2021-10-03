@@ -1,8 +1,7 @@
 #include <iostream>
 #include <string>
 
-#include "Buffer/FIFO.cpp"
-#include "Network/Socket.cpp"
+#include "Cryptography/Digest.cpp"
 
 using namespace std;
 
@@ -16,13 +15,12 @@ void Assert(const string &Message, bool Result)
 
 int main(int argc, char const *argv[])
 {
-    Core::Network::Socket client(Core::Network::Socket::IPv4, Core::Network::Socket::TCP | Core::Network::Socket::NonBlock);
-
-    Assert("Non blocking", !client.Blocking());
-
-    client.Blocking(true);
-
-    Assert("Blocking", client.Blocking());
+    std::cout << Core::Cryptography::SHA1::Hex("Hello ther") << std::endl;
+    std::cout << Core::Cryptography::SHA256::Hex("Hello ther") << std::endl;
+    std::cout << Core::Cryptography::SHA384::Hex("Hello ther") << std::endl;
+    std::cout << Core::Cryptography::SHA512::Hex("Hello ther") << std::endl;
+    std::cout << Core::Cryptography::MD5::Hex("Hello ther") << std::endl;
+    std::cout << Core::Cryptography::MD4::Hex("Hello ther") << std::endl;
 
     return 0;
 }

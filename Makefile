@@ -47,7 +47,7 @@ clean:
 	rm -Rf $(BUILD_DIR)
 
 test:$(TEST_OBJECTS)
-	$(CC) $(LINKER_FLAGS) $^ -o  $(BUILD_DIR)/$(TEST_TARGET)
+	$(CC) $^ -o $(BUILD_DIR)/$(TEST_TARGET) $(LINKER_FLAGS)
 
 $(BUILD_DIR)/%.o:$(TEST_DIR)/%.cpp Makefile | $(BUILD_DIR)
 	$(CC) $(CPP_FLAGS) $< -o $@

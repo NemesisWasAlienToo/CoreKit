@@ -1,24 +1,50 @@
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <cstring>
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include <functional>
 
 #include "Iterable/List.cpp"
-
 #include "Network/DNS.cpp"
 #include "Network/Socket.cpp"
-
 #include "Base/Poll.cpp"
+#include "Cryptography/Digest.cpp"
 
 void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 {
-    Core::Buffer::FIFO Buffer(1024);
+    std::string Request;
 
-    // Buffer << "GET / HTTP/1.1\r\n"
-    //           "Host: ConfusionBox\r\n"
-    //           "Connecttion: closed\r\n\r\n";
+    bool Condition = false;
+
+    size_t Contet_Length = 0;
+
+    while (!Condition)
+    {
+        Client.Await(Core::Network::Socket::In);
+
+        Client >> Request;
+
+        size_t pos = 0;
+
+        if((pos = Request.find("Content-Length: ")) != std::string::npos){
+            std::string len = Request.substr(pos + 16);
+            len = len.substr(0, len.find("\r\n"));
+
+            Contet_Length = std::stoul(len);
+        }
+
+        if ((pos = Request.find("\r\n\r\n")) != std::string::npos && Request.substr(pos + 4).length() >= Contet_Length)
+            Condition = true;
+    }
+
+    std::cout << Info << " Says : " << std::endl
+              << Request << std::endl;
+
+    Core::Buffer::FIFO Buffer(1024);
 
     Buffer << "HTTP/1.1 200 OK\r\n"
               "Content-Type: text/plain\r\n"
@@ -38,15 +64,7 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 
 void LunchHandler(Core::Network::Socket &Client, Core::Network::EndPoint &Info)
 {
-    static int Count = 0;
-
-    if (Count++ > 10)
-    {
-        std::cout << Info << " is now connected" << std::endl;
-        return;
-    }
-
-    std::thread handler(HandleClient, std::move(Client), std::move(Info));
+    std::thread handler(HandleClient, Client, Info);
 
     handler.detach();
 }
