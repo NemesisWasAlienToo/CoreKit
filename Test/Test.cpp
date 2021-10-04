@@ -2,6 +2,7 @@
 #include <string>
 
 #include "Cryptography/Digest.cpp"
+#include "Cryptography/Random.cpp"
 
 using namespace std;
 
@@ -15,12 +16,8 @@ void Assert(const string &Message, bool Result)
 
 int main(int argc, char const *argv[])
 {
-    std::cout << Core::Cryptography::SHA1::Hex("Hello ther") << std::endl;
-    std::cout << Core::Cryptography::SHA256::Hex("Hello ther") << std::endl;
-    std::cout << Core::Cryptography::SHA384::Hex("Hello ther") << std::endl;
-    std::cout << Core::Cryptography::SHA512::Hex("Hello ther") << std::endl;
-    std::cout << Core::Cryptography::MD5::Hex("Hello ther") << std::endl;
-    std::cout << Core::Cryptography::MD4::Hex("Hello ther") << std::endl;
+    Core::Cryptography::Random::Load(Core::Cryptography::Random::random, 32);
+    std::cout << Core::Cryptography::SHA256::Hex(Core::Cryptography::Random::Hex(2)) << std::endl;
 
     return 0;
 }

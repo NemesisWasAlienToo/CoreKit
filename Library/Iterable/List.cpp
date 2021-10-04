@@ -176,9 +176,10 @@ namespace Core
 
             // ### Operators
 
-            T &operator[](int index)
+            T &operator[](int Index)
             {
-                return _Content[index];
+                if(Index > _Length) throw std::out_of_range("");
+                return _Content[Index];
             }
 
             List &operator=(List &Other) = delete;

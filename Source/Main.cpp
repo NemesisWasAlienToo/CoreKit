@@ -13,6 +13,7 @@
 #include "Network/Socket.cpp"
 #include "Base/Poll.cpp"
 #include "Cryptography/Digest.cpp"
+#include "Cryptography/Random.cpp"
 
 void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 {
@@ -26,11 +27,14 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
     {
         Client.Await(Core::Network::Socket::In);
 
+        if(Client.Received() <= 0) return;
+
         Client >> Request;
 
         size_t pos = 0;
 
-        if((pos = Request.find("Content-Length: ")) != std::string::npos){
+        if ((pos = Request.find("Content-Length: ")) != std::string::npos)
+        {
             std::string len = Request.substr(pos + 16);
             len = len.substr(0, len.find("\r\n"));
 
@@ -62,13 +66,6 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
     Client.Close();
 }
 
-void LunchHandler(Core::Network::Socket &Client, Core::Network::EndPoint &Info)
-{
-    std::thread handler(HandleClient, Client, Info);
-
-    handler.detach();
-}
-
 int main(int argc, char const *argv[])
 {
     Core::Network::Socket server(Core::Network::Socket::IPv4, Core::Network::Socket::TCP);
@@ -89,6 +86,8 @@ int main(int argc, char const *argv[])
 
         auto Client = server.Accept(Info);
 
-        LunchHandler(Client, Info);
+        std::thread handler(HandleClient, Client, Info);
+
+        handler.detach();
     }
 }

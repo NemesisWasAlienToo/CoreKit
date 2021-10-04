@@ -122,6 +122,18 @@ namespace Core
         typedef Digest<SHA_CTX, SHA1Functionality> SHA1;
 #endif
 
+#ifndef OPENSSL_NO_SHA224
+        HashScheme<SHA256_CTX> SHA224Functionality = {
+            .Lenght = SHA224_DIGEST_LENGTH,
+            .Name = ::SHA224,
+            .Init = ::SHA224_Init,
+            .Update = ::SHA224_Update,
+            .Final = ::SHA224_Final,
+        };
+
+        typedef Digest<SHA256_CTX, SHA224Functionality> SHA224;
+#endif
+
 #ifndef OPENSSL_NO_SHA256
         HashScheme<SHA256_CTX> SHA256Functionality = {
             .Lenght = SHA256_DIGEST_LENGTH,

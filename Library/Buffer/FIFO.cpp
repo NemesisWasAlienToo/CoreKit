@@ -167,6 +167,7 @@ namespace Core
 
             char &operator[](const size_t &index)
             {
+                if(index > Length()) throw std::out_of_range("");
                 return _Content[Wrap(index)];
             }
 
