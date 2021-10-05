@@ -71,7 +71,27 @@ namespace Core
                 return sizeof(struct sockaddr_in);
             }
 
+            int sockaddr_in(struct sockaddr_in *SocketAddress) const
+            {
+                std::memset(SocketAddress, 0, sizeof(struct sockaddr_in));
+                _Address.in_addr(&(SocketAddress->sin_addr));
+                SocketAddress->sin_family = (sa_family_t)_Address.Family();
+                SocketAddress->sin_port = htons(_Port);
+                return sizeof(struct sockaddr_in);
+            }
+
             int sockaddr_in6(struct sockaddr_in6 *SocketAddress)
+            {
+                std::memset(SocketAddress, 0, sizeof(struct sockaddr_in6));
+                _Address.in6_addr(&(SocketAddress->sin6_addr));
+                SocketAddress->sin6_family = (sa_family_t)_Address.Family();
+                SocketAddress->sin6_port = htons(_Port);
+                SocketAddress->sin6_flowinfo = _Flow;
+                SocketAddress->sin6_scope_id = _Scope;
+                return sizeof(struct sockaddr_in6);
+            }
+
+            int sockaddr_in6(struct sockaddr_in6 *SocketAddress) const
             {
                 std::memset(SocketAddress, 0, sizeof(struct sockaddr_in6));
                 _Address.in6_addr(&(SocketAddress->sin6_addr));
@@ -94,6 +114,18 @@ namespace Core
                 }
             }
 
+            int sockaddr(struct sockaddr *SocketAddress) const
+            {
+                if (SocketAddress->sa_family == Address::IPv4)
+                {
+                    return sockaddr_in((struct sockaddr_in *)SocketAddress);
+                }
+                else
+                {
+                    return sockaddr_in6((struct sockaddr_in6 *)SocketAddress);
+                }
+            }
+
             // Properties
 
             //  Setters
@@ -101,19 +133,26 @@ namespace Core
             Address &address() { return _Address; }
             const Address &address() const { return _Address; }
 
-            int port() { return _Port; }
+            int port() { return _Port; } const
             int port(int Port)
             {
                 _Port = Port;
                 return _Port;
             }
-            int port() const { return _Port; }
 
-            int flow() { return _Flow; }
             int flow() const { return _Flow; }
+            int flow(int Flow)
+            {
+                _Flow = Flow;
+                return _Flow;
+            }
 
-            int scope() { return _Scope; }
             int scope() const { return _Scope; }
+            int scope(int Scope)
+            {
+                _Scope = Scope;
+                return _Scope;
+            }
 
             //  Setters
 

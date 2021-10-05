@@ -111,7 +111,7 @@ namespace Core
                 return (_Type & NonBlock) == 0;
             }
 
-            void Bind(EndPoint &Host)
+            void Bind(const EndPoint &Host)
             {
 
                 struct sockaddr *SocketAddress;
