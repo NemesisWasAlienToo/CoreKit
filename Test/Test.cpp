@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 
+#include "Network/DNS.cpp"
 #include "Cryptography/Digest.cpp"
 #include "Cryptography/Random.cpp"
 
@@ -17,7 +18,19 @@ void Assert(const string &Message, bool Result)
 int main(int argc, char const *argv[])
 {
     Core::Cryptography::Random::Load(Core::Cryptography::Random::random, 32);
-    std::cout << Core::Cryptography::SHA256::Hex(Core::Cryptography::Random::Hex(2)) << std::endl;
+
+    std::string Name = Core::Network::DNS::HostName();
+    std::string Nonce = Core::Cryptography::Random::Hex(16);
+    std::string Hash = Core::Cryptography::SHA256::Hex(Name + Nonce);
+
+    while (Hash.substr(0, 2) != "00")
+    {
+        Nonce = Core::Cryptography::Random::Hex(16);
+        Hash = Core::Cryptography::SHA256::Hex(Name + Nonce);
+        usleep(10000);
+    }
+
+    std::cout << "Nonce is : " << Nonce << std::endl;
 
     return 0;
 }

@@ -35,16 +35,28 @@ namespace Core
 
             // int RAND_bytes_ex(OSSL_LIB_CTX *ctx, unsigned char *buf, size_t num, unsigned int strength);
 
-            static void Load(const char *File, long MaxSize = -1)
+            static void Load(const char *File = NULL, long MaxSize = -1)
             {
-
-                int Result = RAND_load_file(File, MaxSize);
-
-                if (Result <= 0)
+                if (File == NULL)
                 {
-                    unsigned long Error = ERR_get_error();
-                    std::cout << "Random Load : " << ERR_reason_error_string(Error) << std::endl;
-                    exit(-1);
+                    static bool Initiated = false;
+
+                    if (!Initiated) // Not needed just to be sure
+                    {
+                        RAND_poll();
+                        Initiated = true;
+                    }
+                }
+                else
+                {
+                    int Result = RAND_load_file(File, MaxSize);
+
+                    if (Result <= 0)
+                    {
+                        unsigned long Error = ERR_get_error();
+                        std::cout << "Random Load : " << ERR_reason_error_string(Error) << std::endl;
+                        exit(-1);
+                    }
                 }
             }
 
@@ -74,14 +86,6 @@ namespace Core
 
             static void Bytes(unsigned char *Data, int Size)
             {
-                static bool Initiated = false;
-
-                if (!Initiated)  // Not needed just to be sure
-                {
-                    RAND_poll();
-                    Initiated = true;
-                }
-
                 int Result = RAND_bytes(Data, Size);
 
                 if (Result <= 0)

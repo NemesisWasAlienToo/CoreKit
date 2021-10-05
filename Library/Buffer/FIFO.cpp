@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <cstring>
 
 namespace Core
@@ -145,6 +146,32 @@ namespace Core
                 }
 
                 return _Count;
+            }
+
+            void Peak(char * Buffer, size_t Size = 0){
+                if(Size > Length()) throw std::out_of_range("");
+
+                if(Size == 0) Size = Length();
+
+                for (size_t i = 0; i < Size ; i++)
+                {
+                    Buffer[i] = _Content[Wrap(i)];
+                }
+            }
+
+            std::string Peak(size_t Size = 0){
+                if(Size > Length()) throw std::out_of_range("");
+
+                if(Size == 0) Size = Length();
+
+                std::stringstream ss;
+
+                for (size_t i = 0; i < Size; i++)
+                {
+                    ss << _Content[Wrap(i)];
+                }
+
+                return ss.str();
             }
 
             FIFO &operator=(FIFO &Other) = delete;

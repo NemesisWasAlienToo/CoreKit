@@ -81,7 +81,7 @@ namespace Core
                 return addresses;
             }
 
-            static Iterable::List<EndPoint> Host(const std::string &Service = "", Address::AddressFamily Family = Address::Any, Socket::SocketType Type = Socket::TCP, bool Passive = false)
+            static Iterable::List<EndPoint> Host(const std::string &Service = "", Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP, bool Passive = false)
             {
                 struct addrinfo hints, *res, *p;
                 int status;
@@ -107,7 +107,7 @@ namespace Core
                 return endPoints;
             }
 
-            static Iterable::List<Address> Host(Address::AddressFamily Family = Address::Any, Socket::SocketType Type = Socket::TCP, bool Passive = false)
+            static Iterable::List<Address> Host(Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP, bool Passive = false)
             {
                 struct addrinfo hints, *res, *p;
                 int status;

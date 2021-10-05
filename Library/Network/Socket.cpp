@@ -11,7 +11,6 @@
 
 #include "Network/EndPoint.cpp"
 #include "Base/Descriptor.cpp"
-#include "Base/Exeption.cpp"
 
 #include "Buffer/FIFO.cpp"
 

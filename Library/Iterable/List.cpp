@@ -87,9 +87,8 @@ namespace Core
 
             void Add(T &item)
             {
-                T t(item);
                 increaseCapacity();
-                _Content[_Length++] = t;
+                _Content[_Length++] = T(item);
             }
 
             void Add(T &&item)
@@ -176,7 +175,7 @@ namespace Core
 
             // ### Operators
 
-            T &operator[](int Index)
+            T &operator[](size_t Index)
             {
                 if(Index > _Length) throw std::out_of_range("");
                 return _Content[Index];

@@ -16,7 +16,7 @@ namespace Core
 
             enum AddressFamily
             {
-                Any = AF_UNSPEC,
+                AnyFamily = AF_UNSPEC,
                 // Local = AF_LOCAL,
                 // Bluetooth = AF_BLUETOOTH,
                 // NFCAddress = AF_NFC,
@@ -34,26 +34,45 @@ namespace Core
             typedef struct sockaddr_storage _SOCKADDR_STORAGE;
 
             // _SOCKADDR_STORAGE _AddressStorage;
-            AddressFamily family = Any;
-            unsigned char address[16] = {0};
+            AddressFamily family = AnyFamily;
+            unsigned char address[INET6_ADDRSTRLEN] = {0}; //16
 
         public:
+
             // Variables :
 
             // Constructors :
 
-            Address() = default;
-
-            Address(_IN_ADDR &Address) noexcept
-            {
-                family = IPv4;
-                std::memcpy(address, &(Address.s_addr), sizeof Address.s_addr);
+            static Address Any(AddressFamily Family = AnyFamily){
+                if(Family == IPv4) return INADDR_ANY;
+                else if(Family == IPv6) return IN6ADDR_ANY_INIT;
+                else return INADDR_ANY; // For future uses
             }
 
-            Address(_IN6_ADDR &Address) noexcept
+            static Address Loop(AddressFamily Family = AnyFamily){
+                if(Family == IPv4) return INADDR_LOOPBACK;
+                else if(Family == IPv6) return IN6ADDR_LOOPBACK_INIT;
+                else return INADDR_LOOPBACK; // For future uses
+            }
+
+            Address() = default;
+
+            Address(const uint32_t &Other) noexcept
+            {
+                family = IPv4;
+                std::memcpy(address, &Other, sizeof Other);
+            }
+
+            Address(const _IN_ADDR &Other) noexcept
+            {
+                family = IPv4;
+                std::memcpy(address, &(Other.s_addr), sizeof Other.s_addr);
+            }
+
+            Address(const _IN6_ADDR &Other) noexcept
             {
                 family = IPv6;
-                std::memcpy(address, &(Address.__in6_u), sizeof Address.__in6_u);
+                std::memcpy(address, &(Other.__in6_u), sizeof Other.__in6_u);
             }
 
             Address(AddressFamily Family, std::string Address) noexcept
