@@ -34,8 +34,8 @@ namespace Core
             typedef struct sockaddr_storage _SOCKADDR_STORAGE;
 
             // _SOCKADDR_STORAGE _AddressStorage;
-            AddressFamily family = AnyFamily;
-            unsigned char address[INET6_ADDRSTRLEN] = {0}; //16
+            AddressFamily _Family = AnyFamily;
+            unsigned char _Content[INET6_ADDRSTRLEN] = {0}; //16
 
         public:
 
@@ -47,96 +47,96 @@ namespace Core
 
             Address(const uint32_t &Other) noexcept
             {
-                family = IPv4;
-                std::memcpy(address, &Other, sizeof Other);
+                _Family = IPv4;
+                std::memcpy(_Content, &Other, sizeof Other);
             }
 
             Address(const _IN_ADDR &Other) noexcept
             {
-                family = IPv4;
-                std::memcpy(address, &(Other.s_addr), sizeof Other.s_addr);
+                _Family = IPv4;
+                std::memcpy(_Content, &(Other.s_addr), sizeof Other.s_addr);
             }
 
             Address(const _IN6_ADDR &Other) noexcept
             {
-                family = IPv6;
-                std::memcpy(address, &(Other.__in6_u), sizeof Other.__in6_u);
+                _Family = IPv6;
+                std::memcpy(_Content, &(Other.__in6_u), sizeof Other.__in6_u);
             }
 
             Address(AddressFamily Family, std::string Address) noexcept
             {
-                family = Family;
-                inet_pton(Family, Address.c_str(), address);
+                _Family = Family;
+                inet_pton(Family, Address.c_str(), _Content);
             }
 
             Address(const Address &Other) noexcept
             {
-                family = Other.family;
-                std::memcpy(address, Other.address, sizeof address);
+                _Family = Other._Family;
+                std::memcpy(_Content, Other._Content, sizeof _Content);
             }
 
             // Functions :
 
             void Set(AddressFamily Family, std::string IPAddress)
             {
-                family = Family;
-                inet_pton(family, IPAddress.c_str(), address);
+                _Family = Family;
+                inet_pton(_Family, IPAddress.c_str(), _Content);
             }
 
             void Set(AddressFamily Family)
             {
-                family = Family;
+                _Family = Family;
             }
 
             void Set(std::string IPAddress)
             {
-                inet_pton(family, IPAddress.c_str(), address);
+                inet_pton(_Family, IPAddress.c_str(), _Content);
             }
 
             void Set(_SOCKADDR_IN Address)
             {
-                family = (AddressFamily)Address.sin_family;
-                std::memcpy(address, &(Address.sin_addr.s_addr), sizeof Address.sin_addr.s_addr);
+                _Family = (AddressFamily)Address.sin_family;
+                std::memcpy(_Content, &(Address.sin_addr.s_addr), sizeof Address.sin_addr.s_addr);
             }
 
             void Set(_SOCKADDR_IN6 Address)
             {
-                family = (AddressFamily)Address.sin6_family;
-                std::memcpy(address, &(Address.sin6_addr.__in6_u), sizeof Address.sin6_addr.__in6_u);
+                _Family = (AddressFamily)Address.sin6_family;
+                std::memcpy(_Content, &(Address.sin6_addr.__in6_u), sizeof Address.sin6_addr.__in6_u);
             }
 
             // Properties :
 
-            AddressFamily Family() const { return family; }
+            AddressFamily Family() const { return _Family; }
 
             std::string IP() const
             {
                 char str[INET6_ADDRSTRLEN] = {0};
-                inet_ntop(family, address, str, sizeof str);
+                inet_ntop(_Family, _Content, str, sizeof str);
                 return str;
             }
 
             int in_addr(_IN_ADDR *Address)
             {
-                std::memcpy(Address, address, sizeof(_IN_ADDR));
+                std::memcpy(Address, _Content, sizeof(_IN_ADDR));
                 return sizeof(_IN_ADDR);
             }
 
             int in_addr(_IN_ADDR *Address) const
             {
-                std::memcpy(Address, address, sizeof(_IN_ADDR));
+                std::memcpy(Address, _Content, sizeof(_IN_ADDR));
                 return sizeof(_IN_ADDR);
             }
 
             int in6_addr(struct in6_addr *Address)
             {
-                std::memcpy(Address, address, sizeof(struct in6_addr));
+                std::memcpy(Address, _Content, sizeof(struct in6_addr));
                 return sizeof(struct in6_addr);
             }
 
             int in6_addr(struct in6_addr *Address) const
             {
-                std::memcpy(Address, address, sizeof(struct in6_addr));
+                std::memcpy(Address, _Content, sizeof(struct in6_addr));
                 return sizeof(struct in6_addr);
             }
 
@@ -145,7 +145,7 @@ namespace Core
             friend std::ostream &operator<<(std::ostream &os, const Address &tc)
             {
                 char str[INET6_ADDRSTRLEN] = {0};
-                inet_ntop(tc.family, (void *)tc.address, str, sizeof str);
+                inet_ntop(tc._Family, (void *)tc._Content, str, sizeof str);
                 return os << str;
             }
 

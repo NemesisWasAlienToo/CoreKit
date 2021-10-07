@@ -237,6 +237,16 @@ namespace Core
                 return *this;
             }
 
+            FIFO &operator<<(const std::string _String)
+            {
+                const char * C_Str = _String.c_str();
+                for (size_t i = 0; C_Str[i] != 0; i++)
+                {
+                    Put(C_Str[i]);
+                }
+                return *this;
+            }
+
             friend std::ostream &operator<<(std::ostream &os, FIFO &buffer)
             {
                 char Item;

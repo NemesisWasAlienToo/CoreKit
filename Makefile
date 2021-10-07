@@ -22,7 +22,7 @@ OBJECTS:=$(CPP_OBJECTS) $(C_OBJECTS)
 TEST_OBJECTS:=$(TEST_CPP_OBJECTS) $(TEST_C_OBJECTS)
 
 CC:=g++
-CPP_FLAGS:=-g -Wall -c -I$(LIBRARY_DIR)
+CPP_FLAGS:=-std=c++2a -g -Wall -c -I$(LIBRARY_DIR) #-std=gnu++20
 LINKER_FLAGS:=-pthread -Wall -Wpedantic -pedantic -lssl -lcrypto
 
 RUN_ARGS:=

@@ -23,9 +23,9 @@ namespace Core
         public:
             // ## Enums
 
-            constexpr static char *urandom = "/dev/urandom";
-            constexpr static char *arandom = "/dev/arandom";
-            constexpr static char *random = "/dev/random";
+            constexpr static char *urandom = (char *) "/dev/urandom";
+            constexpr static char *arandom = (char *) "/dev/arandom";
+            constexpr static char *random = (char *) "/dev/random";
 
             // ## static functions
 

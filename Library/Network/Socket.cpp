@@ -15,10 +15,8 @@
 #include "Buffer/FIFO.cpp"
 
 // To do :
-//      - Non blocking
 //      - Error handling
 //      - const functions
-//      - Close on dispose
 
 namespace Core
 {

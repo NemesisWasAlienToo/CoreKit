@@ -39,13 +39,6 @@ namespace Core
 
             ~Digest() {}
 
-            Digest &operator=(const Digest &Other) = delete;
-
-            Digest &operator<<(const std::string Data)
-            {
-                O.Update(&_State, Data.c_str(), Data.size());
-            }
-
             int Add(unsigned char *Data, size_t Size)
             {
                 return O.Update(&_State, Data, Size);
@@ -65,14 +58,30 @@ namespace Core
                 return ss.str();
             }
 
-            void Compute(const std::string &Data, unsigned char *Digest)
+            void Bytes(unsigned char * Data)
+            {
+                O.Final(Data, &_State);
+            }
+
+            Digest &operator=(const Digest &Other) = delete;
+
+            Digest &operator<<(const std::string& Data)
+            {
+                O.Update(&_State, Data.c_str(), Data.size());
+            }
+
+            static void Bytes(const std::string &Data, unsigned char *Digest)
             {
                 O.Name((unsigned char *)Data.c_str(), Data.length(), Digest);
             }
 
-            void Compute(const unsigned char *Data, size_t Size, unsigned char *Digest)
+            static void Bytes(const unsigned char *Data, size_t Size, unsigned char *Digest)
             {
                 O.Name(Data, Size, Digest);
+            }
+
+            static size_t Size(){
+                return O.Lenght;
             }
 
             static std::string Hex(const std::string &Data)

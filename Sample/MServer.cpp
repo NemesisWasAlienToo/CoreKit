@@ -1,18 +1,11 @@
 #include <iostream>
-#include <iomanip>
-#include <sstream>
 #include <string>
-#include <cstring>
 #include <thread>
-#include <chrono>
-#include <mutex>
-#include <functional>
 
 #include "Iterable/List.cpp"
 #include "Network/DNS.cpp"
+#include "Network/Address.cpp"
 #include "Network/Socket.cpp"
-#include "Base/Poll.cpp"
-#include "Cryptography/Digest.cpp"
 
 void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 {
@@ -26,7 +19,8 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
     {
         Client.Await(Core::Network::Socket::In);
 
-        if(Client.Received() <= 0) return;
+        if (Client.Received() <= 0)
+            return;
 
         Client >> Request;
 
@@ -67,11 +61,9 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 
 int main(int argc, char const *argv[])
 {
+    Core::Network::EndPoint Host(Core::Network::Address(Core::Network::Address::Any()), 8888);
+
     Core::Network::Socket server(Core::Network::Socket::IPv4, Core::Network::Socket::TCP);
-
-    auto result = Core::Network::DNS::Host(Core::Network::Address::IPv4);
-
-    Core::Network::EndPoint Host(result[0], 8888);
 
     server.Bind(Host);
 
