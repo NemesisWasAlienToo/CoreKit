@@ -85,6 +85,22 @@ namespace Core
 
             // ### Utilities
 
+            T &First()
+            {
+                if (_Length <= 0)
+                    throw std::out_of_range("");
+
+                return _Content[0];
+            }
+
+            T &Last()
+            {
+                if (_Length <= 0)
+                    throw std::out_of_range("");
+
+                return _Content[_Length - 1];
+            }
+
             void Add(T &item)
             {
                 increaseCapacity();
@@ -177,7 +193,8 @@ namespace Core
 
             T &operator[](size_t Index)
             {
-                if(Index > _Length) throw std::out_of_range("");
+                if (Index > _Length)
+                    throw std::out_of_range("");
                 return _Content[Index];
             }
 

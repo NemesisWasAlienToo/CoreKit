@@ -43,10 +43,8 @@ namespace Core
 
             for (size_t i = 0; i < Len; i++)
             {
-                const unsigned char Big = Str[2 * i];
-                const unsigned char Small = Str[(2 * i) + 1];
-                Data[i] = Number(Big, Small, Upper);
-                //Str += 2;
+                Data[i] = Number(*(Str), Str[1], Upper);
+                Str += 2;
             }
         }
 

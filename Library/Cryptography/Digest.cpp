@@ -9,6 +9,8 @@
 #include <openssl/md4.h>
 #include <openssl/md2.h>
 
+// ## Add SHA3
+
 namespace Core
 {
     namespace Cryptography

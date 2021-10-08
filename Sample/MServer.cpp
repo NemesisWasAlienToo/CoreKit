@@ -43,11 +43,16 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 
     Core::Buffer::FIFO Buffer(1024);
 
+    // std::string Content = "<body>hi there</body>";
+    std::string Content = "{\"Name\" : \"Nemesis\"}";
+
     Buffer << "HTTP/1.1 200 OK\r\n"
               "Content-Type: text/plain\r\n"
+            //   "Content-Type: text/html; charset=UTF-8\r\n"
+              "Content-Type: application/json; charset=UTF-8\r\n"
               "Connection: closed\r\n"
-              "Content-Length: 11\r\n\r\n"
-              "hello there";
+              "Content-Length: " + std::to_string(Content.length()) + "\r\n\r\n"
+              + Content;
 
     while (!Buffer.IsEmpty())
     {
