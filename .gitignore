@@ -3,3 +3,5 @@
 Build
 .fake
 .ionide
+Public.pem
+Private.pem
