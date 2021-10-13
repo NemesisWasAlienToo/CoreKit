@@ -122,6 +122,14 @@ namespace Core
                 }
             }
 
+            void ForEach(std::function<void(T &)> Action)
+            {
+                for (int i = 0; i < _Length; i++)
+                {
+                    Action(_Content[i]);
+                }
+            }
+
             List<T> Where(std::function<bool(T &)> Condition)
             {
                 List<T> result(_Capacity);

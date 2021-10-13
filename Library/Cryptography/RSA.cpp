@@ -8,8 +8,10 @@
 #include <openssl/rsa.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/engine.h>
 
-#include "Base/Converter.cpp"
+#include "Conversion/Hex.cpp"
+#include "Conversion/Base64.cpp"
 
 namespace Core
 {
@@ -41,26 +43,6 @@ namespace Core
 
             Key *_Keys = NULL;
             RSAPadding _Padding = OAEP;
-
-            static Key * Generate(int Lenght)
-            {
-                Key *Keys = RSA_new();
-                BIGNUM *bn = BN_new();
-                BN_set_word(bn, RSA_F4); // What was RSA_F4????
-
-                int Result = RSA_generate_key_ex(Keys, Lenght, bn, NULL);
-
-                BN_free(bn);
-
-                if (Result < 1)
-                {
-                    unsigned long Error = ERR_get_error();
-                    std::cout << "RSA : " << ERR_reason_error_string(Error) << std::endl;
-                    exit(-1);
-                }
-
-                return Keys;
-            }
 
         public:
             // ## Constructors
@@ -95,13 +77,15 @@ namespace Core
                 RSA_free(_Keys);
             }
 
-            void New()
-            {
-                if (_Keys != NULL)
-                    RSA_free(_Keys);
+            // ## Functions
 
-                _Keys = RSA_new();
-            }
+            // void New()
+            // {
+            //     if (_Keys != NULL)
+            //         RSA_free(_Keys);
+
+            //     _Keys = RSA_new();
+            // }
 
             void New(int Length)
             {
@@ -111,9 +95,7 @@ namespace Core
                 _Keys = Generate(Length);
             }
 
-            // ## Functions
-
-            int DataSize()
+            int PlainSize()
             {
                 int Extra = 0;
                 if (_Padding == PKCS1 || _Padding == SSL)
@@ -177,6 +159,18 @@ namespace Core
                 Encrypt<Private>(Digest, T::Size(), Signature);
             }
 
+            // template <typename T>
+            // void PKCSSign(const std::string &Data, unsigned char *Signature)
+            // {
+            //     unsigned char Digest[T::Size()];
+
+            //     T::Bytes(Data, Digest);
+
+            //     ::RSA_sign(::SHA)
+
+            //     Encrypt<Private>(Digest, T::Size(), Signature);
+            // }
+
             template <typename T>
             bool Verify(const std::string &Data, unsigned char *Signature)
             {
@@ -195,9 +189,27 @@ namespace Core
                 return true;
             }
 
-            bool Validate()
+            // template <typename T>
+            // bool PKCSVerify(const std::string &Data, unsigned char *Signature)
+            // {
+            //     size_t Size = T::Size();
+            //     unsigned char MDigest[Size];
+            //     unsigned char CDigest[Size];
+
+            //     T::Bytes(Data, MDigest);
+
+            //     Dencrypt<Public>(Signature, CypherSize(), CDigest);
+
+            //     for (size_t i = 0; i < Size; i++)
+            //         if (MDigest[i] != CDigest[i])
+            //             return false;
+
+            //     return true;
+            // }
+
+            bool IsValid()
             {
-                return Validate(_Keys);
+                return IsValid(_Keys);
             }
 
             // ## Properties
@@ -240,6 +252,17 @@ namespace Core
             }
 
             template <KeyType T>
+            void Keys(Key * Keys)
+            {
+                if (T == Public)
+                {
+                }
+                else
+                {
+                }
+            }
+
+            template <KeyType T>
             void ToFile(const std::string &Name)
             {
                 if (T == Public)
@@ -270,6 +293,8 @@ namespace Core
                     BIO_free_all(PrivateKeyBuffer);
                 }
             }
+
+            // ##  Static functiosn
 
             template <KeyType T>
             static RSA From(const std::string &Value)
@@ -348,11 +373,34 @@ namespace Core
                 return _New;
             }
 
-            // ##  Static functiosn
-
-            static bool Validate(Key *Keys)
+            static inline bool IsValid(Key *Keys)
             {
                 return RSA_check_key(Keys) == 1;
+            }
+
+            static inline Key * Generate()
+            {
+                return RSA_new();
+            }
+
+            static Key * Generate(int Lenght)
+            {
+                Key *Keys = RSA_new();
+                BIGNUM *bn = BN_new();
+                BN_set_word(bn, RSA_F4);
+
+                int Result = RSA_generate_key_ex(Keys, Lenght, bn, NULL);
+
+                BN_free(bn);
+
+                if (Result < 1)
+                {
+                    unsigned long Error = ERR_get_error();
+                    std::cout << "RSA : " << ERR_reason_error_string(Error) << std::endl;
+                    exit(-1);
+                }
+
+                return Keys;
             }
 
             // ## Operators

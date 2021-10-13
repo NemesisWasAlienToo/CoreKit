@@ -33,12 +33,10 @@ namespace Core
             typedef struct sockaddr_in6 _SOCKADDR_IN6;
             typedef struct sockaddr_storage _SOCKADDR_STORAGE;
 
-            // _SOCKADDR_STORAGE _AddressStorage;
             AddressFamily _Family = AnyFamily;
-            unsigned char _Content[INET6_ADDRSTRLEN] = {0}; //16
+            unsigned char _Content[16] = {0};
 
         public:
-
             // Variables :
 
             // Constructors :
@@ -128,16 +126,16 @@ namespace Core
                 return sizeof(_IN_ADDR);
             }
 
-            int in6_addr(struct in6_addr *Address)
+            int in6_addr(_IN6_ADDR *Address)
             {
-                std::memcpy(Address, _Content, sizeof(struct in6_addr));
-                return sizeof(struct in6_addr);
+                std::memcpy(Address, _Content, sizeof(_IN6_ADDR));
+                return sizeof(_IN6_ADDR);
             }
 
-            int in6_addr(struct in6_addr *Address) const
+            int in6_addr(_IN6_ADDR *Address) const
             {
-                std::memcpy(Address, _Content, sizeof(struct in6_addr));
-                return sizeof(struct in6_addr);
+                std::memcpy(Address, _Content, sizeof(_IN6_ADDR));
+                return sizeof(_IN6_ADDR);
             }
 
             // Operators :
@@ -151,16 +149,24 @@ namespace Core
 
             // Statics :
 
-            static Address Any(AddressFamily Family = AnyFamily){
-                if(Family == IPv4) return INADDR_ANY;
-                else if(Family == IPv6) return IN6ADDR_ANY_INIT;
-                else return INADDR_ANY; // For future uses
+            static Address Any(AddressFamily Family = IPv4)
+            {
+                if (Family == IPv4)
+                    return INADDR_ANY;
+                else if (Family == IPv6)
+                    return IN6ADDR_ANY_INIT;
+                else
+                    throw std::invalid_argument(""); // For future uses
             }
 
-            static Address Loop(AddressFamily Family = AnyFamily){
-                if(Family == IPv4) return INADDR_LOOPBACK;
-                else if(Family == IPv6) return IN6ADDR_LOOPBACK_INIT;
-                else return INADDR_LOOPBACK; // For future uses
+            static Address Loop(AddressFamily Family = IPv4)
+            {
+                if (Family == IPv4)
+                    return INADDR_LOOPBACK;
+                else if (Family == IPv6)
+                    return IN6ADDR_LOOPBACK_INIT;
+                else
+                    throw std::invalid_argument(""); // For future uses
             }
 
             // Optimize this

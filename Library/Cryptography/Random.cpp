@@ -16,8 +16,8 @@ namespace Core
     {
         class Random
         {
-        protected:
-            Random(/* args */) = default;
+        private:
+            Random();
             ~Random();
 
         public:
@@ -96,25 +96,8 @@ namespace Core
                 }
             }
 
-            static void Hex(std::string &String, const int &Size)
-            {
-
-                unsigned char Data[Size];
-                std::stringstream ss;
-
-                Bytes(Data, Size);
-
-                for (int i = 0; i < Size; i++)
-                {
-                    ss << std::hex << std::setw(2) << std::setfill('0') << (int)Data[i];
-                }
-
-                String.append(ss.str());
-            }
-
             static std::string Hex(int Size)
             {
-
                 unsigned char Data[Size];
                 std::stringstream ss;
 

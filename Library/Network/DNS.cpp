@@ -48,7 +48,7 @@ namespace Core
                 return endPoints;
             }
 
-            static Iterable::List<Address> Resolve(const std::string &Domain, Address::AddressFamily Family = Address::IPv4, Socket::SocketType Type = Socket::TCP)
+            static Iterable::List<Address> Resolve(const std::string &Domain, Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP)
             {
                 struct addrinfo hints, *res, *p;
                 int status;
@@ -80,6 +80,19 @@ namespace Core
 
                 return addresses;
             }
+
+            // static std::string Name(EndPoint Target)
+            // {
+            //     struct sockaddr_storage _Target;
+            //     socklen_t len = Target.sockaddr_storage(&_Target);
+
+            //     char host[1024];
+            //     char serv[16];
+
+            //     int Result = getnameinfo((struct sockaddr *) &_Target, len, host, sizeof host, serv, sizeof serv, 0);
+
+            //     return host;
+            // }
 
             static Iterable::List<EndPoint> Host(const std::string &Service = "", Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP, bool Passive = false)
             {

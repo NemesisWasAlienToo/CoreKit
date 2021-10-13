@@ -7,32 +7,6 @@
 #include "Network/Address.cpp"
 #include "Network/Socket.cpp"
 
-void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info);
-
-int main(int argc, char const *argv[])
-{
-    Core::Network::EndPoint Host(Core::Network::Address(Core::Network::Address::Any()), 8888);
-
-    Core::Network::Socket server(Core::Network::Socket::IPv4, Core::Network::Socket::TCP);
-
-    server.Bind(Host);
-
-    std::cout << Core::Network::DNS::HostName() << " is listenning on " << Host << std::endl;
-
-    server.Listen(10);
-
-    while (1)
-    {
-        Core::Network::EndPoint Info;
-
-        auto Client = server.Accept(Info);
-
-        std::thread handler(HandleClient, Client, Info);
-
-        handler.detach();
-    }
-}
-
 void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 {
     std::string Request;
@@ -88,4 +62,28 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
     }
 
     Client.Close();
+}
+
+int main(int argc, char const *argv[])
+{
+    Core::Network::EndPoint Host(Core::Network::Address(Core::Network::Address::Any()), 8888);
+
+    Core::Network::Socket server(Core::Network::Socket::IPv4, Core::Network::Socket::TCP);
+
+    server.Bind(Host);
+
+    std::cout << Core::Network::DNS::HostName() << " is listenning on " << Host << std::endl;
+
+    server.Listen(10);
+
+    while (1)
+    {
+        Core::Network::EndPoint Info;
+
+        auto Client = server.Accept(Info);
+
+        std::thread handler(HandleClient, Client, Info);
+
+        handler.detach();
+    }
 }

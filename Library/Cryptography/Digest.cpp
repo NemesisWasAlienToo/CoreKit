@@ -86,6 +86,7 @@ namespace Core
                 return O.Lenght;
             }
 
+            // ## Remove this
             static std::string Hex(const std::string &Data)
             {
                 unsigned char _Content[O.Lenght];
@@ -102,6 +103,7 @@ namespace Core
                 return ss.str();
             }
 
+            // ## Remove this
             static std::string Hex(const char *Data, size_t Size)
             {
                 unsigned char _Content[O.Lenght];
@@ -204,18 +206,6 @@ namespace Core
         };
 
         typedef Digest<MD4_CTX, MD4Functionality> MD4;
-#endif
-
-#ifndef OPENSSL_NO_MD2
-        HashScheme<MD2_CTX> MD2Functionality = {
-            .Lenght = MD2_DIGEST_LENGTH,
-            .Name = ::MD2,
-            .Init = ::MD2_Init,
-            .Update = ::MD2_Update,
-            .Final = ::MD2_Final,
-        };
-
-        typedef Digest<MD2_CTX, SHA512Functionality> MD2;
 #endif
     }
 }

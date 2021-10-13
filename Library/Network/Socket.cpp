@@ -86,7 +86,8 @@ namespace Core
 
                 int flags = fcntl(_Handler, F_GETFL, 0);
 
-                if(!(((_Type & NonBlock) == 0) ^ Value)) return Value;
+                if (!(((_Type & NonBlock) == 0) ^ Value))
+                    return Value;
 
                 flags ^= NonBlock;
                 _Type ^= NonBlock;
@@ -315,9 +316,61 @@ namespace Core
                 return PollStruct.revents;
             }
 
+            size_t Send(char *Data, size_t Length)
+            {
+                return write(_Handler, Data, Length);
+            }
+
+            size_t Receive(char *Data, size_t Length)
+            {
+                return read(_Handler, Data, Length);
+            }
+
+            size_t SendTo(char *Data, size_t Length, EndPoint Target, int Flags = 0)
+            {
+                struct sockaddr_storage Client;
+                socklen_t len = Target.sockaddr((struct sockaddr *)&Client);
+                int Result = sendto(_Handler, (const char *)Data, Length, Flags, (struct sockaddr *)&Client, len);
+
+                if (Result < 0)
+                {
+                    std::cout << "ReceiveFrom : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                return Result;
+            }
+
+            size_t ReceiveFrom(char *Data, size_t Length, EndPoint& Target, int Flags = 0)
+            {
+                struct sockaddr_storage Client;
+                socklen_t len = sizeof(Client);
+
+                int Result = recvfrom(_Handler, Data, Length, Flags, (struct sockaddr *)&Client, &len);
+
+                if (Result < 0)
+                {
+                    std::cout << "ReceiveFrom : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                Target = EndPoint(&Client);
+
+                return Result;
+            }
+
             Socket &operator<<(const std::string &Message) noexcept
             {
-                int Result = write(_Handler, Message.c_str(), Message.length());
+                int Result = 0;
+                int Left = Message.length();
+                const char * str = Message.c_str();
+
+                while (Left > 0)
+                {
+                    Await(Out);
+                    Result = write(_Handler, str, Left);
+                    Left -= Result;
+                }
 
                 // Error handling here
 
@@ -360,7 +413,8 @@ namespace Core
             {
                 size_t len = buffer.Capacity() - buffer.Length();
 
-                if(len == 0) return *this;
+                if (len == 0)
+                    return *this;
 
                 char _Buffer[len];
 

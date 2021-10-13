@@ -5,16 +5,29 @@
 #include <unistd.h>
 
 namespace Core{
-    class File
+    class File : public Descriptor
     {
     private:
         /* data */
     public:
-        File(/* args */) {}
+        enum AccessTestType{
+            CanRead = R_OK,
+            CanWrite = W_OK,
+            CanExecute = X_OK,
+        };
+
+        enum AccessType{
+            Read,
+            Create,
+            Append,
+            Write,
+        };
+
+        File() {}
         ~File() {}
 
-        static inline bool Exist(const std::string& Name){
-            return ( access( Name.c_str(), F_OK ) != -1 );
+        static inline bool Exist(const std::string& Name, int AccessTests = F_OK){
+            return ( access( Name.c_str(), AccessTests ) != -1 );
         }
     };
 }

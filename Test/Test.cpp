@@ -2,7 +2,8 @@
 #include <string>
 
 #include "Network/DNS.cpp"
-#include "Base/Converter.cpp"
+#include "Conversion/Base64.cpp"
+#include "Conversion/Hex.cpp"
 #include "Base/Test.cpp"
 #include "Base/File.cpp"
 #include "Cryptography/Digest.cpp"
@@ -10,79 +11,61 @@
 #include "Cryptography/RSA.cpp"
 
 using namespace std;
+using namespace Core;
+
+void get_dns_servers()
+{
+	FILE *fp;
+	char line[200], *p;
+	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL)
+	{
+		printf("Failed opening /etc/resolv.conf file \n");
+	}
+
+	while (fgets(line, 200, fp))
+	{
+		if (line[0] == '#')
+		{
+			continue;
+		}
+
+		if (strncmp(line, "nameserver", 10) == 0)
+		{
+			p = strtok(line, " ");
+			p = strtok(NULL, " ");
+
+			cout << p << endl;
+		}
+	}
+}
+#define PORT 8888
 
 int main(int argc, char const *argv[])
 {
-    Core::Cryptography::Random::Load();
+	Core::Network::EndPoint Host(Core::Network::Address(Core::Network::Address::Any()), 8888);
 
-    std::string Name = Core::Network::DNS::HostName();
+	Core::Network::Socket server(Core::Network::Socket::IPv4, Core::Network::Socket::UDP);
 
-    Core::Cryptography::RSA RSA;
+	server.Bind(Host);
 
-    if (Core::File::Exist("Private.pem"))
-    {
-        RSA = Core::Cryptography::RSA::FromFile<Core::Cryptography::RSA::Private>("Private.pem");
-    }
-    else
-    {
-        RSA.New(2048);
-        RSA.ToFile<Core::Cryptography::RSA::Private>("Private.pem");
-    }
+	std::cout << Core::Network::DNS::HostName() << " is listenning on " << Host << std::endl;
 
-    Core::Test::Assert("RSA Validation", RSA.Validate());
+	while (1)
+	{
+		char buffer[1024];
 
-    int DSize = RSA.DataSize();
+		Core::Network::EndPoint Client;
 
-    int CSize = RSA.CypherSize();
+		server.Await(Network::Socket::In);
 
-    // Hex converter
+		int Result = server.ReceiveFrom(buffer, sizeof buffer, Client);
 
-    unsigned char HexTest[] = {0xE1, 0xB0};
+		buffer[Result] = '\0';
 
-    Core::Test::Assert("Sign verification", Core::Converter::Hex(HexTest, sizeof HexTest) == "e1b0");
+		cout << Client << " : " << buffer << endl;
 
-    // Enc and Dec
+		server.SendTo((char*)"Hello there", 12, Client);
+	}
 
-    unsigned char Plain[DSize];
-    unsigned char Cypher[CSize];
-
-    // ## Encryption
-
-    RSA.Encrypt<Core::Cryptography::RSA::Private>((const unsigned char *)Name.c_str(), Name.length() + 1, Cypher);
-
-    RSA.Dencrypt<Core::Cryptography::RSA::Public>(Cypher, CSize, Plain);
-
-    std::string ENCOut((char *)Plain);
-
-    Core::Test::Assert("Encryption", ENCOut == Name);
-
-    // ## Convertion
-
-    unsigned char CypherPrime[CSize];
-
-    std::string CypherString = Core::Converter::Hex(Cypher, CSize);
-
-    Core::Converter::Bytes(CypherString, CypherPrime);
-
-    Core::Test::Assert("Convertion", CypherString == Core::Converter::Hex(CypherPrime, CSize));
-
-    // ## Signing
-
-    RSA.Encrypt<Core::Cryptography::RSA::Public>((const unsigned char *)Name.c_str(), Name.length() + 1, Cypher);
-
-    RSA.Dencrypt<Core::Cryptography::RSA::Private>(Cypher, CSize, Plain);
-
-    std::string SIGOut((char *)Plain);
-
-    Core::Test::Assert("Sign", SIGOut == Name);
-
-    // ## Easy Signing
-
-    unsigned char Signature[CSize];
-
-    RSA.Sign<Core::Cryptography::SHA256>("Hello", Signature);
-
-    Core::Test::Assert("Easy Signing", RSA.Verify<Core::Cryptography::SHA256>("Hello", Signature));
-
-    return 0;
+	return 0;
 }
