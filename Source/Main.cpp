@@ -6,6 +6,7 @@
 #include "Network/DNS.cpp"
 #include "Network/Address.cpp"
 #include "Network/Socket.cpp"
+#include "Network/HTTP.cpp"
 
 void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info);
 
@@ -75,7 +76,8 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
     Buffer << "HTTP/1.1 200 OK\r\n"
               "Content-Type: text/plain\r\n"
             //   "Content-Type: text/html; charset=UTF-8\r\n"
-              "Content-Type: application/json; charset=UTF-8\r\n"
+            //   "Content-Type: application/json; charset=UTF-8\r\n"
+              "Content-Type: application/json\r\n"
               "Connection: closed\r\n"
               "Content-Length: " + std::to_string(Content.length()) + "\r\n\r\n"
               + Content;

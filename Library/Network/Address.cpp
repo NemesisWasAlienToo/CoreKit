@@ -138,6 +138,13 @@ namespace Core
                 return sizeof(_IN6_ADDR);
             }
 
+            std::string ToString()
+            {
+                char str[INET6_ADDRSTRLEN] = {0};
+                inet_ntop(_Family, (void *)_Content, str, sizeof str);
+                return std::string(str);
+            }
+
             // Operators :
 
             friend std::ostream &operator<<(std::ostream &os, const Address &tc)

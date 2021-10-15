@@ -31,7 +31,7 @@ namespace Core
 
             // static void Engine(); // Set engine mode to hardware or software
 
-            // static int Needed(){ return ENTROPY_NEEDED; }
+            static int InitEntropy(){ return 32; } //ENTROPY_NEEDED
 
             // int RAND_bytes_ex(OSSL_LIB_CTX *ctx, unsigned char *buf, size_t num, unsigned int strength);
 

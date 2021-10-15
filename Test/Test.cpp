@@ -1,71 +1,145 @@
 #include <iostream>
 #include <string>
+#include <cstring>
 
+#include "Iterable/List.cpp"
+#include "Iterable/Buffer.cpp"
 #include "Network/DNS.cpp"
-#include "Conversion/Base64.cpp"
-#include "Conversion/Hex.cpp"
-#include "Base/Test.cpp"
-#include "Base/File.cpp"
+#include "Network/Socket.cpp"
+#include "Network/HTTP.cpp"
 #include "Cryptography/Digest.cpp"
 #include "Cryptography/Random.cpp"
-#include "Cryptography/RSA.cpp"
 
-using namespace std;
 using namespace Core;
 
-void get_dns_servers()
-{
-	FILE *fp;
-	char line[200], *p;
-	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL)
-	{
-		printf("Failed opening /etc/resolv.conf file \n");
-	}
+Iterable::List<Network::EndPoint> Peers(1);
 
-	while (fgets(line, 200, fp))
-	{
-		if (line[0] == '#')
-		{
-			continue;
-		}
+uint8_t GetRandom(uint8_t Lower, uint8_t Upper){
+    
+    if(Lower == Upper) return Upper;
 
-		if (strncmp(line, "nameserver", 10) == 0)
-		{
-			p = strtok(line, " ");
-			p = strtok(NULL, " ");
+    uint8_t Num = 0;
 
-			cout << p << endl;
-		}
-	}
+    Cryptography::Random::Bytes((unsigned char *)&Num, sizeof Num);
+
+    while (Num > Upper || Num < Lower)
+    {
+        Cryptography::Random::Bytes((unsigned char *)&Num, sizeof Num);
+    }
+    
+    return Num;
 }
-#define PORT 8888
 
 int main(int argc, char const *argv[])
 {
-	Core::Network::EndPoint Host(Core::Network::Address(Core::Network::Address::Any()), 8888);
+    Cryptography::Random::Load(Cryptography::Random::random, Cryptography::Random::InitEntropy());
 
-	Core::Network::Socket server(Core::Network::Socket::IPv4, Core::Network::Socket::UDP);
+    // Cryptography::Random::Load();
 
-	server.Bind(Host);
+    Iterable::Buffer Buffer;
 
-	std::cout << Core::Network::DNS::HostName() << " is listenning on " << Host << std::endl;
+    auto result = Network::DNS::Host(Network::Address::IPv4);
 
-	while (1)
-	{
-		char buffer[1024];
+    Network::EndPoint Me(result[0], 8888);
 
-		Core::Network::EndPoint Client;
+    Peers.Add(Me);
 
-		server.Await(Network::Socket::In);
+    std::cout << Network::DNS::HostName() << " is5 at " << Me << std::endl;
 
-		int Result = server.ReceiveFrom(buffer, sizeof buffer, Client);
+    Network::Socket Server(Network::Socket::IPv4, Network::Socket::TCP);
 
-		buffer[Result] = '\0';
+    Server.Bind(Network::Address::Any(Network::Address::IPv4), 8888);
 
-		cout << Client << " : " << buffer << endl;
+    Server.Listen(10);
 
-		server.SendTo((char*)"Hello there", 12, Client);
-	}
+    while (true)
+    {
+        Server.Await(Network::Socket::In);
 
-	return 0;
+        Network::EndPoint Info;
+
+        Network::Socket Client = Server.Accept(Info);
+
+        Peers.Add(Info);
+
+        std::cout << Info << " Added" << std::endl;
+
+        uint8_t RandIndex = GetRandom(0, Peers.Length());
+
+        Client << Peers[RandIndex].ToString() << "\n";
+
+        // Client << Peers.ToString();
+
+        Client.Close();
+    }
+
+    return 0;
 }
+
+// int main(int argc, char const *argv[])
+// {
+//     std::cout << "Running on " << Network::DNS::HostName() << std::endl;
+
+//     auto result = Network::DNS::Resolve("google.com");
+
+//     Network::EndPoint Google(result[0], 80);
+
+//     std::cout << "Google is at " << Google << std::endl;
+
+//     Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP);
+
+//     client.Connect(Google);
+
+//     Iterable::Buffer Buffer;
+
+// 	Network::HTTP::Request Req;
+
+// 	Req.Type = "GET";
+// 	Req.Version = "1.1";
+// 	Req.Headers.insert(std::make_pair<std::string, std::string>("Host", "ConfusionBox"));
+// 	Req.Headers.insert(std::make_pair<std::string, std::string>("Connection", "closed"));
+
+//     Buffer << Req;
+
+//     while (!Buffer.IsEmpty())
+//     {
+//         client << Buffer;
+
+//         client.Await(Network::Socket::Out);
+//     }
+
+//     for (client.Await(Network::Socket::In); client.Received() > 0; client.Await(Network::Socket::In, 3000))
+//     {
+//         std::cout << client;
+//     }
+
+//     client.Close();
+
+//     return 0;
+// }
+
+// void get_dns_servers()
+// {
+// 	FILE *fp;
+// 	char line[200], *p;
+// 	if ((fp = fopen("/etc/resolv.conf", "r")) == NULL)
+// 	{
+// 		printf("Failed opening /etc/resolv.conf file \n");
+// 	}
+
+// 	while (fgets(line, 200, fp))
+// 	{
+// 		if (line[0] == '#')
+// 		{
+// 			continue;
+// 		}
+
+// 		if (strncmp(line, "nameserver", 10) == 0)
+// 		{
+// 			p = strtok(line, " ");
+// 			p = strtok(NULL, " ");
+
+// 			cout << p << endl;
+// 		}
+// 	}
+// }

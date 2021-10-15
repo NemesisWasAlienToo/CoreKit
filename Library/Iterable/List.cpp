@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <sstream>
 #include <functional>
 
 namespace Core
@@ -16,12 +17,16 @@ namespace Core
             T *_Content = NULL;
             size_t _Capacity = 0;
             size_t _Length = 0;
+            bool _Growable = true;
 
             // ### Private functions
             void increaseCapacity()
             {
                 if (_Capacity > _Length)
                     return;
+
+                if (!_Growable)
+                    throw std::out_of_range("");
 
                 if (_Capacity > 0)
                 {
@@ -47,7 +52,7 @@ namespace Core
 
             List() = default;
 
-            List(size_t Capacity) : _Content(new T[Capacity]), _Capacity(Capacity), _Length(0) {}
+            List(size_t Capacity, bool Growable = true) : _Content(new T[Capacity]), _Capacity(Capacity), _Length(0), _Growable(Growable) {}
 
             List(T Array[], int Count) : _Content(new T[Count]), _Capacity(Count), _Length(Count)
             {
@@ -83,6 +88,14 @@ namespace Core
                 return _Length;
             }
 
+            bool Growable() const {
+                return _Growable;
+            }
+
+            bool Growable(bool CanGrow){
+                return (_Growable = CanGrow);
+            }
+
             // ### Utilities
 
             T &First()
@@ -93,7 +106,23 @@ namespace Core
                 return _Content[0];
             }
 
+            const T &First() const
+            {
+                if (_Length <= 0)
+                    throw std::out_of_range("");
+
+                return _Content[0];
+            }
+
             T &Last()
+            {
+                if (_Length <= 0)
+                    throw std::out_of_range("");
+
+                return _Content[_Length - 1];
+            }
+
+            const T &Last() const
             {
                 if (_Length <= 0)
                     throw std::out_of_range("");
@@ -122,6 +151,14 @@ namespace Core
                 }
             }
 
+            void ForEach(std::function<void(int, const T &)> Action) const
+            {
+                for (int i = 0; i < _Length; i++)
+                {
+                    Action(i, _Content[i]);
+                }
+            }
+
             void ForEach(std::function<void(T &)> Action)
             {
                 for (int i = 0; i < _Length; i++)
@@ -130,7 +167,15 @@ namespace Core
                 }
             }
 
-            List<T> Where(std::function<bool(T &)> Condition)
+            void ForEach(std::function<void(const T &)> Action) const
+            {
+                for (int i = 0; i < _Length; i++)
+                {
+                    Action(_Content[i]);
+                }
+            }
+
+            List<T> Where(std::function<bool(const T &)> Condition) const
             {
                 List<T> result(_Capacity);
 
@@ -143,7 +188,7 @@ namespace Core
                 return result;
             }
 
-            bool Contains(T Item)
+            bool Contains(T Item) const
             {
                 List<T> result(_Capacity);
 
@@ -156,7 +201,7 @@ namespace Core
                 return false;
             }
 
-            bool Contains(T Item, int &Index)
+            bool Contains(T Item, int &Index) const
             {
                 List<T> result(_Capacity);
 
@@ -176,8 +221,9 @@ namespace Core
 
             // Remove Where
 
+            // Should this be const?
             template <typename O>
-            List<O> map(std::function<O(T)> Transform)
+            List<O> map(std::function<O(const T& )> Transform) const
             {
                 List<O> result(_Capacity);
 
@@ -189,17 +235,28 @@ namespace Core
                 return result;
             }
 
-            void From(T Array[], int Count)
+            std::string ToString()
             {
-            }
+                std::stringstream ss;
 
-            void From(List &Other)
-            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    ss << _Content[i] << '\n';
+                }
+
+                return ss.str();
             }
 
             // ### Operators
 
             T &operator[](size_t Index)
+            {
+                if (Index > _Length)
+                    throw std::out_of_range("");
+                return _Content[Index];
+            }
+
+            const T &operator[](size_t Index) const
             {
                 if (Index > _Length)
                     throw std::out_of_range("");
@@ -230,6 +287,15 @@ namespace Core
             bool operator!=(const List &Other) noexcept
             {
                 return this->_Content != Other->_Content;
+            }
+
+            friend std::ostream &operator<<(std::ostream &os, const List &list)
+            {
+                list.ForEach([os](const T& Item){
+                    os << Item << std::endl;
+                });
+
+                return os;
             }
         };
     }

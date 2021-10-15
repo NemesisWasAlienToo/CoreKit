@@ -5,11 +5,18 @@
 #include <sstream>
 #include <cstring>
 
+#include "Network/HTTP.cpp"
+
+/*
+    TODO:
+        Change _First and _Last from pointer to index (size_t)
+*/
+
 namespace Core
 {
-    namespace Buffer
+    namespace Iterable
     {
-        class FIFO
+        class Buffer
         {
         private:
             size_t _Capacity = 0;
@@ -26,11 +33,11 @@ namespace Core
 #define Wrap(Indx) ((Index(_First) + Indx) % _Capacity)
 
         public:
-            FIFO() = default;
+            Buffer() = default;
 
-            FIFO(size_t Capacity) : _Capacity(Capacity), _Content(new char[Capacity]), _First(_Content) {}
+            Buffer(size_t Capacity) : _Capacity(Capacity), _Content(new char[Capacity]), _First(_Content) {}
 
-            FIFO(FIFO &Other) : _Capacity(Other._Capacity), _Content(new char[Other._Capacity]), _First(Other._First), _Last(Other._Last)
+            Buffer(Buffer &Other) : _Capacity(Other._Capacity), _Content(new char[Other._Capacity]), _First(Other._First), _Last(Other._Last)
             {
 
                 for (size_t i = 0; i < Other._Capacity; i++)
@@ -39,18 +46,17 @@ namespace Core
                 }
             }
 
-            FIFO(FIFO &&Other)
-            noexcept : _Capacity(Other._Capacity), _First(Other._First), _Last(Other._Last)
+            Buffer(Buffer &&Other) noexcept : _Capacity(Other._Capacity), _First(Other._First), _Last(Other._Last)
             {
                 std::swap(_Content, Other._Content);
             }
 
-            ~FIFO()
+            ~Buffer()
             {
                 delete[] _Content;
             }
 
-            char * Data()
+            char *Data()
             {
                 return _First;
             }
@@ -69,17 +75,23 @@ namespace Core
             void Resize(size_t Size)
             {
                 size_t len = Length();
-                char * _New = new char[Size];
+                char *_New = new char[Size];
 
                 for (size_t i = 0; i < len; i++)
                 {
                     int j = Wrap(i);
                     _New[j] = char(_Content[j]);
                 }
-                
+
+                _First = _New + (_First - _Content);
+                if (!IsEmpty())
+                    _Last = _New + (_Last - _Content);
+
                 delete[] _Content;
 
                 _Content = _New;
+
+                _Capacity = Size;
             }
 
             bool IsEmpty() { return _Last == NULL; }
@@ -95,7 +107,8 @@ namespace Core
             bool Put(const char &Item) // Call constructor
             {
                 if (IsFull())
-                    return false;
+                    Resize((_Capacity * 2) + 1);
+                // return false;
 
                 if (IsEmpty())
                 {
@@ -148,21 +161,27 @@ namespace Core
                 return _Count;
             }
 
-            void Peak(char * Buffer, size_t Size = 0){
-                if(Size > Length()) throw std::out_of_range("");
+            void Bytes(char *Buffer, size_t Size = 0)
+            {
+                if (Size > Length())
+                    throw std::out_of_range("");
 
-                if(Size == 0) Size = Length();
+                if (Size == 0)
+                    Size = Length();
 
-                for (size_t i = 0; i < Size ; i++)
+                for (size_t i = 0; i < Size; i++)
                 {
                     Buffer[i] = _Content[Wrap(i)];
                 }
             }
 
-            std::string Peak(size_t Size = 0){
-                if(Size > Length()) throw std::out_of_range("");
+            std::string ToString(size_t Size = 0)
+            {
+                if (Size > Length())
+                    throw std::out_of_range("");
 
-                if(Size == 0) Size = Length();
+                if (Size == 0)
+                    Size = Length();
 
                 std::stringstream ss;
 
@@ -174,9 +193,9 @@ namespace Core
                 return ss.str();
             }
 
-            FIFO &operator=(FIFO &Other) = delete;
+            Buffer &operator=(Buffer &Other) = delete;
 
-            FIFO &operator=(FIFO &&Other) noexcept
+            Buffer &operator=(Buffer &&Other) noexcept
             {
                 if (this == &Other)
                     return *this;
@@ -194,11 +213,12 @@ namespace Core
 
             char &operator[](const size_t &index)
             {
-                if(index > Length()) throw std::out_of_range("");
+                if (index > Length())
+                    throw std::out_of_range("");
                 return _Content[Wrap(index)];
             }
 
-            FIFO &operator>>(std::string &str)
+            Buffer &operator>>(std::string &str)
             {
                 char Item;
 
@@ -212,34 +232,26 @@ namespace Core
             }
 
             // ## Handle termination character
-            FIFO &operator>>(char &Item)
+            Buffer &operator>>(char &Item)
             {
 
                 if (!IsEmpty())
                     Take(Item);
+
                 return *this;
             }
 
             // ## Handle termination character
-            FIFO &operator<<(const char &Item)
+            Buffer &operator<<(const char &Item)
             {
-                if (!IsFull())
-                    Put(Item);
+                Put(Item);
+
                 return *this;
             }
 
-            FIFO &operator<<(const char *Item)
+            Buffer &operator<<(const std::string &_String)
             {
-                for (size_t i = 0; !IsFull() && Item[i] != 0; i++)
-                {
-                    Put(Item[i]);
-                }
-                return *this;
-            }
-
-            FIFO &operator<<(const std::string _String)
-            {
-                const char * C_Str = _String.c_str();
+                const char *C_Str = _String.c_str();
                 for (size_t i = 0; C_Str[i] != 0; i++)
                 {
                     Put(C_Str[i]);
@@ -247,7 +259,18 @@ namespace Core
                 return *this;
             }
 
-            friend std::ostream &operator<<(std::ostream &os, FIFO &buffer)
+            Buffer &operator<<(const Core::Network::HTTP::Common &Message)
+            {
+                std::string Text = Message.ToString();
+
+                for (size_t i = 0; Text[i] != 0; i++)
+                {
+                    Put(Text[i]);
+                }
+                return *this;
+            }
+
+            friend std::ostream &operator<<(std::ostream &os, Buffer &buffer)
             {
                 char Item;
 
@@ -260,5 +283,6 @@ namespace Core
                 return os;
             }
         };
+
     }
 }

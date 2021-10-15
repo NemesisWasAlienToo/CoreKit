@@ -12,7 +12,7 @@
 #include "Network/EndPoint.cpp"
 #include "Base/Descriptor.cpp"
 
-#include "Buffer/FIFO.cpp"
+#include "Iterable/Buffer.cpp"
 
 // To do :
 //      - Error handling
@@ -140,6 +140,11 @@ namespace Core
                 }
             }
 
+            void Bind(const Address &address, short Port)
+            {
+                Bind(EndPoint(address, Port));
+            }
+
             void Connect(EndPoint Target)
             {
 
@@ -166,6 +171,11 @@ namespace Core
                     std::cout << "Connect : " << strerror(errno) << std::endl;
                     exit(-1);
                 }
+            }
+
+            void Connect(const Address &address, short Port)
+            {
+                Connect(EndPoint(address, Port));
             }
 
             void Listen(int Count)
@@ -383,7 +393,7 @@ namespace Core
                 return *this;
             }
 
-            Socket &operator<<(Buffer::FIFO &buffer)
+            Socket &operator<<(Iterable::Buffer &buffer)
             {
                 size_t len = buffer.Length();
 
@@ -409,7 +419,7 @@ namespace Core
                 return *this;
             }
 
-            Socket &operator>>(Buffer::FIFO &buffer)
+            Socket &operator>>(Iterable::Buffer &buffer)
             {
                 size_t len = buffer.Capacity() - buffer.Length();
 
@@ -494,7 +504,7 @@ namespace Core
             friend std::ostream &operator<<(std::ostream &os, const Socket &socket)
             {
                 std::string str;
-                socket >> str;
+                socket >> str; // fix this
                 return os << str;
             }
         };

@@ -1,5 +1,0 @@
-namespace Core{
-    namespace Buffer{
-        
-    }
-}

@@ -125,6 +125,11 @@ namespace Core
                 return sizeof(struct sockaddr_in6);
             }
 
+            std::string ToString()
+            {
+                return _Address.ToString() + std::to_string(ntohs(_Port));
+            }
+
             // Properties
 
             //  Setters
