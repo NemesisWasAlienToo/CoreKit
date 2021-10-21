@@ -41,7 +41,7 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
     std::cout << Info << " Says : " << std::endl
               << Request << std::endl;
 
-    Core::Buffer::FIFO Buffer(1024);
+    Core::Iterable::Buffer Buffer(1024);
 
     // std::string Content = "<body>hi there</body>";
     std::string Content = "{\"Name\" : \"Nemesis\"}";

@@ -12,39 +12,32 @@ namespace Core
         class List
         {
         private:
+            static_assert(std::is_move_assignable<T>::value, "T must be move assignable");
+            static_assert(std::is_copy_assignable<T>::value, "T must be copy assignable");
+
             // ### Private variables
 
-            T *_Content = NULL;
             size_t _Capacity = 0;
             size_t _Length = 0;
+            T *_Content = NULL;
             bool _Growable = true;
 
-            // ### Private functions
-            void increaseCapacity()
+            std::function<size_t(size_t, size_t)> _ResizeCallback = [](size_t Current, size_t Minimum) -> size_t
             {
-                if (_Capacity > _Length)
+                return (Current * 2) + Minimum;
+            };
+
+            // ### Private Functions
+
+            void _IncreaseCapacity(size_t Minimum = 1)
+            {
+                if (!IsFull())
                     return;
 
                 if (!_Growable)
                     throw std::out_of_range("");
 
-                if (_Capacity > 0)
-                {
-                    _Capacity *= 2;
-
-                    T *_Content_ = new T[_Capacity]; // ## Needs smart growth size optimization
-
-                    for (size_t i = 0; i < _Length; i++)
-                    {
-                        _Content_[i] = T(_Content[i]);
-                    }
-
-                    delete[] _Content;
-                    _Content = _Content_;
-                }
-
-                if (_Capacity == 0)
-                    _Content = new T[++_Capacity];
+                Resize(_ResizeCallback(_Capacity, Minimum));
             }
 
         public:
@@ -54,21 +47,23 @@ namespace Core
 
             List(size_t Capacity, bool Growable = true) : _Content(new T[Capacity]), _Capacity(Capacity), _Length(0), _Growable(Growable) {}
 
-            List(T Array[], int Count) : _Content(new T[Count]), _Capacity(Count), _Length(Count)
+            List(T Array[], int Count, bool Growable = true) : _Content(new T[Count]), _Capacity(Count), _Length(Count), _Growable(Growable)
             {
                 for (size_t i = 0; i < Count; i++)
                 {
-                    _Content[i] = T(Array[i]); // Invoke copy constructor of T
+                    _Content[i] = Array[i];
                 }
             }
 
-            List(List &Other) : _Content(new T[Other._Capacity]), _Capacity(Other._Capacity), _Length(Other._Length)
+            List(List &Other) : _Content(new T[Other._Capacity]), _Capacity(Other._Capacity), _Length(Other._Length), _Growable(Other._Growable)
             {
-                Other.ForEach([&](int Index, T &Item)
-                              { _Content[Index] = T(Item); });
+                for (size_t i = 0; i < Other._Length; i++)
+                {
+                    _Content[i] = Other._Content[i];
+                }
             }
 
-            List(List &&Other) noexcept : _Capacity(Other._Capacity), _Length(Other._Length)
+            List(List &&Other) noexcept : _Capacity(Other._Capacity), _Length(Other._Length), _Growable(Other._Growable)
             {
                 std::swap(_Content, Other._Content);
             }
@@ -78,7 +73,6 @@ namespace Core
             ~List()
             {
                 delete[] _Content;
-                _Content = NULL;
             }
 
             // ### Properties
@@ -88,15 +82,53 @@ namespace Core
                 return _Length;
             }
 
-            bool Growable() const {
+            size_t Capacity()
+            {
+                return _Capacity;
+            }
+
+            std::function<size_t(size_t, size_t)> Growable() const
+            {
+                return _ResizeCallback;
+            }
+
+            void OnResize(std::function<size_t(size_t, size_t)> CallBack){
+                _ResizeCallback = CallBack;
+            }
+
+            bool Growable() const
+            {
                 return _Growable;
             }
 
-            bool Growable(bool CanGrow){
-                return (_Growable = CanGrow);
+            void Growable(bool CanGrow) noexcept
+            {
+                _Growable = CanGrow;
             }
 
-            // ### Utilities
+            inline bool IsEmpty() { return _Length == 0; }
+
+            inline bool IsFull() { return _Length == _Capacity; }
+
+            // ### Public Functions
+
+            void Resize(size_t Size)
+            {
+                T *_New = new T[Size];
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    _New[i] = std::move(_Content[i]);
+                }
+
+                delete[] _Content;
+
+                _Content = _New;
+
+                _First = _Content;
+
+                _Capacity = Size;
+            }
 
             T &First()
             {
@@ -130,62 +162,55 @@ namespace Core
                 return _Content[_Length - 1];
             }
 
-            void Add(T &item)
+            void Add(const T &item)
             {
-                increaseCapacity();
-                _Content[_Length++] = T(item);
+                _IncreaseCapacity();
+                _Content[_Length++] = item;
             }
 
             void Add(T &&item)
             {
-                T t(std::move(item));
-                increaseCapacity();
-                _Content[_Length++] = t;
+                _IncreaseCapacity();
+                _Content[_Length++] = std::move(item);
             }
 
-            void ForEach(std::function<void(int, T &)> Action)
+            void Fill(const T &Item)
             {
-                for (int i = 0; i < _Length; i++)
+                for (size_t i = _Length; i < _Capacity; i++)
                 {
-                    Action(i, _Content[i]);
+                    _Content[i] = Item;
                 }
             }
 
-            void ForEach(std::function<void(int, const T &)> Action) const
+            void Fill(const T &Item, size_t Count)
             {
-                for (int i = 0; i < _Length; i++)
+                for (size_t i = _Length; i < _Capacity; i++)
                 {
-                    Action(i, _Content[i]);
+                    _Content[i] = Item;
                 }
             }
 
-            void ForEach(std::function<void(T &)> Action)
+            T Take()
             {
-                for (int i = 0; i < _Length; i++)
-                {
-                    Action(_Content[i]);
-                }
+                if (_Length == 0)
+                    throw std::out_of_range("");
+
+                _Length--;
+
+                return std::move(_Content[_Length]);
             }
 
-            void ForEach(std::function<void(const T &)> Action) const
+            void Remove(size_t Index)
             {
-                for (int i = 0; i < _Length; i++)
+                if (Index > _Length)
+                    throw std::out_of_range("");
+
+                _Length--;
+
+                for (size_t i = Index; i < _Length; i++)
                 {
-                    Action(_Content[i]);
+                    _Content[i] = std::move(_Content[i + 1]);
                 }
-            }
-
-            List<T> Where(std::function<bool(const T &)> Condition) const
-            {
-                List<T> result(_Capacity);
-
-                for (T item : _Content)
-                {
-                    if (Condition(item))
-                        result.Add(item);
-                }
-
-                return result;
             }
 
             bool Contains(T Item) const
@@ -217,13 +242,37 @@ namespace Core
                 return false;
             }
 
-            // Remove
+            void ForEach(std::function<void(int, const T &)> Action) const
+            {
+                for (int i = 0; i < _Length; i++)
+                {
+                    Action(i, _Content[i]);
+                }
+            }
 
-            // Remove Where
+            void ForEach(std::function<void(const T &)> Action) const
+            {
+                for (int i = 0; i < _Length; i++)
+                {
+                    Action(_Content[i]);
+                }
+            }
 
-            // Should this be const?
+            List<T> Where(std::function<bool(const T &)> Condition) const
+            {
+                List<T> result(_Capacity);
+
+                for (T item : _Content)
+                {
+                    if (Condition(item))
+                        result.Add(item);
+                }
+
+                return result;
+            }
+
             template <typename O>
-            List<O> map(std::function<O(const T& )> Transform) const
+            List<O> Map(std::function<O(const T &)> Transform) const
             {
                 List<O> result(_Capacity);
 
@@ -253,6 +302,7 @@ namespace Core
             {
                 if (Index > _Length)
                     throw std::out_of_range("");
+
                 return _Content[Index];
             }
 
@@ -260,6 +310,7 @@ namespace Core
             {
                 if (Index > _Length)
                     throw std::out_of_range("");
+
                 return _Content[Index];
             }
 
@@ -291,9 +342,8 @@ namespace Core
 
             friend std::ostream &operator<<(std::ostream &os, const List &list)
             {
-                list.ForEach([os](const T& Item){
-                    os << Item << std::endl;
-                });
+                list.ForEach([os](const T &Item)
+                             { os << Item << std::endl; });
 
                 return os;
             }

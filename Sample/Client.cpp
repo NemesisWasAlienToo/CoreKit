@@ -3,10 +3,9 @@
 #include <cstring>
 
 #include "Iterable/List.cpp"
+#include "Iterable/Buffer.cpp"
 #include "Network/DNS.cpp"
 #include "Network/Socket.cpp"
-#include "Base/Poll.cpp"
-#include "Buffer/FIFO.cpp"
 
 int main(int argc, char const *argv[])
 {
@@ -22,7 +21,7 @@ int main(int argc, char const *argv[])
 
     client.Connect(Google);
 
-    Core::Buffer::FIFO Buffer(1024);
+    Core::Iterable::Buffer Buffer(1024);
 
     Buffer << "GET / HTTP/1.1\r\n"
               "Host: ConfusionBox\r\n"

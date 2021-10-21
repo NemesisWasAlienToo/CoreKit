@@ -127,7 +127,7 @@ namespace Core
 
             std::string ToString()
             {
-                return _Address.ToString() + std::to_string(ntohs(_Port));
+                return _Address.ToString() + ":" + std::to_string(ntohs(_Port));
             }
 
             // Properties

@@ -50,11 +50,12 @@ namespace Core
             public:
                 std::string Version;
                 std::map<std::string, std::string> Headers;
+                size_t Length;
                 std::string Body;
 
                 virtual std::string ToString() const { return ""; };
 
-                static Common From(std::string Text);
+                virtual void From(std::string Text){}
             };
 
             class Request : public Common
@@ -75,7 +76,7 @@ namespace Core
                     return str + "\r\n" + Body;
                 }
 
-                static Request From(std::string Text)
+                virtual void From(std::string Text)
                 {
                     //
                 }
@@ -96,11 +97,15 @@ namespace Core
                     return str + "\r\n" + Body;
                 }
 
-                static Response From(std::string Text)
+                virtual void From(std::string Text)
                 {
                     //
                 }
             };
+
+            Response Send(const Request& request){
+                
+            }
         }
     }
 }

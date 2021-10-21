@@ -41,6 +41,16 @@ namespace Core
                 NonBlock = SOCK_NONBLOCK,
             };
 
+            enum MessageFlags{
+                CloseOnExec = MSG_CMSG_CLOEXEC,
+                DontWait = MSG_DONTWAIT,
+                ErrorQueue = MSG_ERRQUEUE,
+                OutOfBand = MSG_OOB,
+                Peek = MSG_PEEK,
+                Truncate = MSG_TRUNC,
+                WaitAll = MSG_WAITALL,
+            };
+
         private:
             // Types :
 
@@ -326,14 +336,14 @@ namespace Core
                 return PollStruct.revents;
             }
 
-            size_t Send(char *Data, size_t Length)
+            size_t Send(char *Data, size_t Length, int Flags)
             {
-                return write(_Handler, Data, Length);
+                return send(_Handler, Data, Length, Flags);
             }
 
-            size_t Receive(char *Data, size_t Length)
+            size_t Receive(char *Data, size_t Length, int Flags)
             {
-                return read(_Handler, Data, Length);
+                return recv(_Handler, Data, Length, Flags);
             }
 
             size_t SendTo(char *Data, size_t Length, EndPoint Target, int Flags = 0)
@@ -351,7 +361,7 @@ namespace Core
                 return Result;
             }
 
-            size_t ReceiveFrom(char *Data, size_t Length, EndPoint& Target, int Flags = 0)
+            size_t ReceiveFrom(char *Data, size_t Length, EndPoint &Target, int Flags = 0)
             {
                 struct sockaddr_storage Client;
                 socklen_t len = sizeof(Client);
@@ -373,7 +383,7 @@ namespace Core
             {
                 int Result = 0;
                 int Left = Message.length();
-                const char * str = Message.c_str();
+                const char *str = Message.c_str();
 
                 while (Left > 0)
                 {
@@ -393,7 +403,7 @@ namespace Core
                 return *this;
             }
 
-            Socket &operator<<(Iterable::Buffer &buffer)
+            Socket &operator<<(Iterable::Buffer<char> &buffer)
             {
                 size_t len = buffer.Length();
 
@@ -419,7 +429,7 @@ namespace Core
                 return *this;
             }
 
-            Socket &operator>>(Iterable::Buffer &buffer)
+            Socket &operator>>(Iterable::Buffer<char> &buffer)
             {
                 size_t len = buffer.Capacity() - buffer.Length();
 
@@ -440,7 +450,7 @@ namespace Core
 
                 for (size_t i = 0; i < len; i++)
                 {
-                    buffer.Put(_Buffer[i]); // ## Optimize later
+                    buffer.Add(_Buffer[i]); // ## Optimize later
                 }
 
                 return *this;

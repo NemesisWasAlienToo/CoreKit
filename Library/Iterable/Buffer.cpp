@@ -1,70 +1,84 @@
 #pragma once
 
 #include <iostream>
-#include <string>
 #include <sstream>
+#include <functional>
+#include <string>
 #include <cstring>
-
-#include "Network/HTTP.cpp"
-
-/*
-    TODO:
-        Change _First and _Last from pointer to index (size_t)
-*/
 
 namespace Core
 {
     namespace Iterable
     {
+        template <typename T>
         class Buffer
         {
+
         private:
+            static_assert(std::is_move_assignable<T>::value, "T must be move assignable");
+            static_assert(std::is_copy_assignable<T>::value, "T must be copy assignable");
+
+            // ### Private variables
+
             size_t _Capacity = 0;
-            char *_Content = NULL;
-            char *_First = NULL;
-            char *_Last = NULL;
+            size_t _Length = 0;
+            T *_Content = NULL;
+            bool _Growable = true;
 
-#define _Start (_Content)
-#define _End (_Capacity > 0 ? &_Content[_Capacity - 1] : NULL)
+            std::function<size_t(size_t, size_t)> _ResizeCallback = [](size_t Current, size_t Minimum) -> size_t
+            {
+                return (Current * 2) + Minimum;
+            };
 
-#define Index(Pointer) (Pointer - _Start)
-#define Min(First, Second) (First <= Second ? First : Second)
-#define Max(First, Second) (First >= Second ? First : Second)
-#define Wrap(Indx) ((Index(_First) + Indx) % _Capacity)
+            size_t _First = 0;
+
+            // ### Private Functions
+
+            void _IncreaseCapacity(size_t Minimum = 1)
+            {
+                if (!IsFull())
+                    return;
+
+                if (!_Growable)
+                    throw std::out_of_range("");
+
+                Resize(_ResizeCallback(_Capacity, Minimum));
+            }
 
         public:
+            // ### Constructors
+
             Buffer() = default;
 
-            Buffer(size_t Capacity) : _Capacity(Capacity), _Content(new char[Capacity]), _First(_Content) {}
+            Buffer(size_t Capacity, bool Growable = true) : _Capacity(Capacity), _Length(0), _Content(new T[Capacity]), _Growable(Growable), _First(0) {}
 
-            Buffer(Buffer &Other) : _Capacity(Other._Capacity), _Content(new char[Other._Capacity]), _First(Other._First), _Last(Other._Last)
+            Buffer(Buffer &Other) : _Capacity(Other._Capacity), _Length(Other._Length), _Content(new T[Other._Capacity]), _First(Other._First), _Growable(Other._Growable)
             {
-
-                for (size_t i = 0; i < Other._Capacity; i++)
+                for (size_t i = 0; i < Other._Length; i++)
                 {
-                    _Content[i] = char(_Content[i]);
+                    _Content[i] = Other._Content[(Other._First + i) % Other._Capacity];
                 }
             }
 
-            Buffer(Buffer &&Other) noexcept : _Capacity(Other._Capacity), _First(Other._First), _Last(Other._Last)
+            Buffer(Buffer &&Other) noexcept : _Capacity(Other._Capacity), _Length(Other._Length), _First(Other._First), _Growable(Other._Growable)
             {
                 std::swap(_Content, Other._Content);
             }
 
-            ~Buffer()
-            {
-                delete[] _Content;
-            }
+            // ### Destructor
 
-            char *Data()
+            ~Buffer() { delete[] _Content; }
+
+            // ### Properties
+
+            T *Content()
             {
-                return _First;
+                return _Content;
             }
 
             size_t Length()
             {
-                return _Last == NULL ? 0 : _First < _Last ? (_Last - _First + 1)
-                                                          : ((_Last - _Start + 1) + (_First - _End + 1));
+                return _Length;
             }
 
             size_t Capacity()
@@ -72,126 +86,260 @@ namespace Core
                 return _Capacity;
             }
 
+            std::function<size_t(size_t, size_t)> Growable() const
+            {
+                return _ResizeCallback;
+            }
+
+            void OnResize(std::function<size_t(size_t, size_t)> CallBack){
+                _ResizeCallback = CallBack;
+            }
+
+            bool Growable() const
+            {
+                return _Growable;
+            }
+
+            void Growable(bool CanGrow) noexcept
+            {
+                _Growable = CanGrow;
+            }
+
+            inline bool IsEmpty() { return _Length == 0; }
+
+            inline bool IsFull() { return _Length == _Capacity; }
+
+            inline size_t IsFree() { return _Capacity - _Length; }
+
+            // ### Public Functions
+
             void Resize(size_t Size)
             {
-                size_t len = Length();
-                char *_New = new char[Size];
+                T *_New = new T[Size];
 
-                for (size_t i = 0; i < len; i++)
+                for (size_t i = 0; i < _Length; i++)
                 {
-                    int j = Wrap(i);
-                    _New[j] = char(_Content[j]);
+                    _New[i] = std::move(_Content[(_First + i) % _Capacity]);
                 }
-
-                _First = _New + (_First - _Content);
-                if (!IsEmpty())
-                    _Last = _New + (_Last - _Content);
 
                 delete[] _Content;
 
                 _Content = _New;
 
+                _First = _Content;
+
                 _Capacity = Size;
             }
 
-            bool IsEmpty() { return _Last == NULL; }
-
-            bool IsFull() { return _End == NULL ? true : (_First == &_Last[1]) || (_First == _Start && _Last == _End); }
-
-            void Empty()
+            void Add(const T &Item)
             {
-                _First = _Start;
-                _Last = NULL;
+                _IncreaseCapacity();
+
+                _Content[(_First + _Length) % _Capacity] = Item;
+                _Length++;
             }
 
-            bool Put(const char &Item) // Call constructor
+            void Add(T &&Item)
             {
-                if (IsFull())
-                    Resize((_Capacity * 2) + 1);
-                // return false;
+                _IncreaseCapacity();
 
-                if (IsEmpty())
-                {
-                    *_First = char(Item); // Invoke copy operator of char
-                    _Last = _First;
-                }
-                else
-                {
-                    *(++_Last) = char(Item);
-                }
-
-                return true;
+                _Content[(_First + _Length) % _Capacity] = std::move(Item);
+                _Length++;
             }
 
-            bool Take(char &Item) // Call dispose ?
+            void Add(const T *Items, size_t Count)
             {
-                if (IsEmpty())
-                    return false;
+                _IncreaseCapacity(Count);
 
-                if (_First == _Last)
+                for (size_t i = 0; i < Count; i++)
                 {
-                    _Last = NULL;
-                    Item = char(*(_First));
-                    return true;
-                }
-                else
-                {
-                    Item = char(*(_First++));
-
-                    return true;
+                    Add(Items[i]);
                 }
             }
 
-            size_t Free(size_t Count)
+            void Remove(size_t Index)
             {
-
-                size_t _Count = 0, Len = Length();
-
-                if (Count >= Len)
-                {
-                    _Count = Len;
-                    _Last = NULL;
-                }
-                else
-                {
-                    _Count = Count;
-                    _First = _Start + Wrap(Count);
-                }
-
-                return _Count;
-            }
-
-            void Bytes(char *Buffer, size_t Size = 0)
-            {
-                if (Size > Length())
+                if (Index > _Length)
                     throw std::out_of_range("");
 
-                if (Size == 0)
-                    Size = Length();
+                _Length--;
+
+                for (size_t i = Index; i < _Length; i++)
+                {
+                    _Content[(_First + i) % _Capacity] = std::move(_Content[(_First + i + 1) % _Capacity]);
+                }
+            }
+
+            void Fill(const T &Item)
+            {
+                size_t Count = _Capacity - _Length;
+
+                for (size_t i = 0; i < Count; i++)
+                {
+                    Add(Item);
+                }
+            }
+
+            void Fill(const T &Item, size_t Count)
+            {
+                for (size_t i = 0; i < Count; i++)
+                {
+                    Add(Item);
+                }
+            }
+
+            T Take()
+            {
+                if (IsEmpty())
+                    throw std::out_of_range("");
+
+                T Item = std::move(_Content[_First]); // OK?
+                _Length--;
+                _First = (_First + 1) % _Capacity;
+
+                return Item;
+            }
+
+            void Take(T *Items, size_t Count)
+            {
+                if (_Length < Count)
+                    throw std::out_of_range("");
+
+                for (size_t i = 0; i < Count; i++)
+                {
+                    Items[i] = Take();
+                }
+            }
+
+            void Free()
+            {
+                while (!IsEmpty())
+                {
+                    Take();
+                }
+            }
+
+            void Free(size_t Count)
+            {
+                for (size_t i = 0; i < Count; i++)
+                {
+                    Take();
+                }
+            }
+
+            T &First()
+            {
+                if (IsEmpty())
+                    throw std::out_of_range("");
+
+                return _Content[_First];
+            }
+
+            T &Last()
+            {
+                if (IsEmpty())
+                    throw std::out_of_range("");
+
+                return _Content[(_First + (_Length - 1)) % _Capacity];
+            }
+
+            void ForEach(std::function<void(const T &)> Action) const
+            {
+                for (int i = 0; i < _Length; i++)
+                {
+                    Action(_Content[i]);
+                }
+            }
+
+            void ForEach(std::function<void(int, const T &)> Action) const
+            {
+                for (int i = 0; i < _Length; i++)
+                {
+                    Action(i, _Content[(_First + i) % _Capacity]);
+                }
+            }
+
+            //
+
+            Buffer<T> Where(std::function<bool(const T &)> Condition) const
+            {
+                Buffer<T> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    T Item = T(_Content[(_First + i) % _Capacity]);
+                    if (Condition(Item))
+                        result.Add(Item);
+                }
+
+                return result;
+            }
+
+            bool Contains(T Item) const
+            {
+                Buffer<T> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    if (_Content[(_First + i) % _Capacity] == Item)
+                        return true;
+                }
+
+                return false;
+            }
+
+            bool Contains(T Item, int &Index) const
+            {
+                Buffer<T> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    if (_Content[(_First + i) % _Capacity] == Item)
+                    {
+                        Index = i;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            template <typename O>
+            Buffer<O> Map(std::function<O(const T &)> Transform) const
+            {
+                Buffer<O> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    result.Add(Transform(_Content[(_First + i) % _Capacity]));
+                }
+
+                return result;
+            }
+
+            std::string ToString(size_t Size)
+            {
+                if (Size > _Length)
+                    throw std::out_of_range("");
+
+                std::string str; // Optimization needed
+
+                str.resize(Size * sizeof(T));
 
                 for (size_t i = 0; i < Size; i++)
                 {
-                    Buffer[i] = _Content[Wrap(i)];
+                    str += _Content[(_First + i) % _Capacity];
                 }
+
+                return str;
             }
 
-            std::string ToString(size_t Size = 0)
+            std::string ToString()
             {
-                if (Size > Length())
-                    throw std::out_of_range("");
-
-                if (Size == 0)
-                    Size = Length();
-
-                std::stringstream ss;
-
-                for (size_t i = 0; i < Size; i++)
-                {
-                    ss << _Content[Wrap(i)];
-                }
-
-                return ss.str();
+                return ToString(_Length);
             }
+
+            // ### Operators
 
             Buffer &operator=(Buffer &Other) = delete;
 
@@ -204,7 +352,7 @@ namespace Core
 
                 _Capacity = Other._Capacity;
                 _First = Other._First;
-                _Last = Other._Last;
+                _Length = Other._Length;
 
                 std::swap(_Content, Other._Content);
 
@@ -213,76 +361,44 @@ namespace Core
 
             char &operator[](const size_t &index)
             {
-                if (index > Length())
+                if (index >= _Length)
                     throw std::out_of_range("");
-                return _Content[Wrap(index)];
+
+                return _Content[(_First + index) % _Capacity];
             }
 
-            Buffer &operator>>(std::string &str)
-            {
-                char Item;
-
-                while (!IsEmpty())
-                {
-                    Take(Item);
-                    str += (Item);
-                }
-
-                return *this;
-            }
-
-            // ## Handle termination character
-            Buffer &operator>>(char &Item)
+            Buffer &operator>>(T &Item)
             {
 
                 if (!IsEmpty())
-                    Take(Item);
+                    Item = Take();
 
                 return *this;
             }
 
-            // ## Handle termination character
-            Buffer &operator<<(const char &Item)
+            Buffer &operator<<(T &Item)
             {
-                Put(Item);
+                Add(Item);
 
                 return *this;
             }
 
-            Buffer &operator<<(const std::string &_String)
+            Buffer &operator<<(T &&Item)
             {
-                const char *C_Str = _String.c_str();
-                for (size_t i = 0; C_Str[i] != 0; i++)
-                {
-                    Put(C_Str[i]);
-                }
-                return *this;
-            }
+                Add(std::move(Item));
 
-            Buffer &operator<<(const Core::Network::HTTP::Common &Message)
-            {
-                std::string Text = Message.ToString();
-
-                for (size_t i = 0; Text[i] != 0; i++)
-                {
-                    Put(Text[i]);
-                }
                 return *this;
             }
 
             friend std::ostream &operator<<(std::ostream &os, Buffer &buffer)
             {
-                char Item;
-
                 while (!buffer.IsEmpty())
                 {
-                    buffer.Take(Item);
-                    os << Item;
+                    os << buffer.Take();
                 }
 
                 return os;
             }
         };
-
     }
 }
