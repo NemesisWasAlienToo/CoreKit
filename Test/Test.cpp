@@ -17,7 +17,7 @@ using namespace std;
 
 int main(int argc, char const *argv[])
 {
-	Test::Log("Running on " + Network::DNS::HostName());
+    Test::Log("Running on " + Network::DNS::HostName());
 
     auto result = Network::DNS::Resolve("google.com");
 
@@ -31,12 +31,12 @@ int main(int argc, char const *argv[])
 
     Iterable::Buffer<char> Buffer(128);
 
-	Network::HTTP::Request Req;
+    Network::HTTP::Request Req;
 
-	Req.Type = "GET";
-	Req.Version = "1.1";
-	Req.Headers["Host"] = "ConfusionBox";
-	Req.Headers["Connection"] = "closed";
+    Req.Type = "GET";
+    Req.Version = "1.1";
+    Req.Headers["Host"] = "ConfusionBox";
+    Req.Headers["Connection"] = "closed";
 
     std::string requestText = Req.ToString();
 

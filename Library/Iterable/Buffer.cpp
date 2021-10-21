@@ -48,7 +48,7 @@ namespace Core
         public:
             // ### Constructors
 
-            Buffer() = default;
+            Buffer() : _Capacity(0), _Length(0), _Content(new T[1]), _Growable(true), _First(0) {}
 
             Buffer(size_t Capacity, bool Growable = true) : _Capacity(Capacity), _Length(0), _Content(new T[Capacity]), _Growable(Growable), _First(0) {}
 
@@ -86,7 +86,7 @@ namespace Core
                 return _Capacity;
             }
 
-            std::function<size_t(size_t, size_t)> Growable() const
+            std::function<size_t(size_t, size_t)> OnResize() const
             {
                 return _ResizeCallback;
             }
@@ -126,7 +126,7 @@ namespace Core
 
                 _Content = _New;
 
-                _First = _Content;
+                _First = 0;
 
                 _Capacity = Size;
             }
