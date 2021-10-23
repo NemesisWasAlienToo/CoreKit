@@ -15,20 +15,30 @@ namespace Core
         {
             class Common
             {
+            public:
+                std::string Version;
+                std::map<std::string, std::string> Headers;
+                std::string Body;
+
+                virtual std::string ToString() const { return ""; };
+
             protected:
                 Common() = default;
+                Common(const Common &Other) : Version(Other.Version), Headers(Other.Headers), Body(Other.Body) {}
+                Common(Common &&Other) : Version(std::move(Other.Version)), Headers(std::move(Other.Headers)), Body(std::move(Other.Body)) {}
                 ~Common() {}
 
-                Iterable::List<std::string> _SplitString(const std::string &Text, const std::string &Seprator)
+                static Iterable::List<std::string> _SplitString(const std::string &Text, const std::string &Seprator)
                 {
                     Iterable::List<std::string> Temp;
                     size_t start = 0;
                     size_t end;
-
-                    std::string Sub;
+                    const size_t skip = Seprator.length();
 
                     while (true)
                     {
+                        std::string Sub;
+
                         if ((end = Text.find(Seprator, start)) == std::string::npos)
                         {
                             if (!(Sub = Text.substr(start)).empty())
@@ -41,21 +51,11 @@ namespace Core
 
                         Sub = Text.substr(start, end - start);
                         Temp.Add(Sub);
-                        start = end + 1;
+                        start = end + skip;
                     }
 
                     return Temp;
                 }
-
-            public:
-                std::string Version;
-                std::map<std::string, std::string> Headers;
-                size_t Length;
-                std::string Body;
-
-                virtual std::string ToString() const { return ""; };
-
-                virtual void From(std::string Text){}
             };
 
             class Request : public Common
@@ -73,12 +73,44 @@ namespace Core
                     for (auto const &kv : Headers)
                         str += kv.first + ": " + kv.second + "\r\n";
 
+                    str += "Content-Length: " + std::to_string(Body.length()) + "\r\n";
+
                     return str + "\r\n" + Body;
                 }
 
-                virtual void From(std::string Text)
+                static Request From(const std::string &Text)
                 {
-                    //
+                    Request ret;
+
+                    auto _Sepration = Text.find("\r\n\r\n");
+                    auto _HeadersText = Text.substr(0, _Sepration);
+                    auto _BodyText = Text.substr(_Sepration + 4);
+
+                    auto HeadersList = _SplitString(_HeadersText, "\r\n");
+
+                    auto Info = HeadersList[0]; // Handle this later
+                    HeadersList.Remove(0);
+
+                    int Pos1 = Info.find(' ');
+
+                    ret.Type = std::move(Info.substr(0, Pos1));
+
+                    int Pos2 = Info.find(' ', ++Pos1);
+
+                    ret.Path = Info.substr(Pos1, Pos2 - Pos1);
+
+                    ret.Version = std::move(Info.substr(++Pos2 + 5));
+
+                    HeadersList.ForEach([&](const std::string SingleHeader)
+                                        {
+                        auto KeyValue = _SplitString(SingleHeader, ": ");
+                        ret.Headers[KeyValue[0]] = KeyValue[1]; });
+
+                    ret.Body = std::move(_BodyText);
+
+                    ret.Headers["Content-Length"] = _BodyText.length();
+
+                    return ret;
                 }
             };
 
@@ -88,24 +120,55 @@ namespace Core
                 unsigned short Status;
                 std::string Brief;
 
+                Response() = default;
+                Response(const Response &Other) : Common(Other), Status(Other.Status), Brief(Other.Brief) {}
+                Response(Response &&Other) : Common(std::move(Other)), Status(std::move(Other.Status)), Brief(std::move(Other.Brief)) {}
+                ~Response() {}
+
                 std::string ToString() const
                 {
-                    std::string str = "HTTP/" + Version + std::to_string(Status) + Brief + "\r\n";
+                    std::string str = "HTTP/" + Version + " " + std::to_string(Status) + " " + Brief + "\r\n";
                     for (auto const &kv : Headers)
                         str += kv.first + ": " + kv.second + "\r\n";
 
                     return str + "\r\n" + Body;
                 }
 
-                virtual void From(std::string Text)
+                static Response From(const std::string &Text)
                 {
-                    //
+                    Response ret;
+
+                    auto _Sepration = Text.find("\r\n\r\n");
+                    auto _HeadersText = Text.substr(0, _Sepration);
+                    auto _BodyText = Text.substr(_Sepration + 4);
+
+                    auto HeadersList = _SplitString(_HeadersText, "\r\n");
+
+                    auto Info = HeadersList[0]; // Handle this later
+                    HeadersList.Remove(0);
+
+                    int Pos1 = Info.find(' ');
+
+                    ret.Version = std::move(Info.substr(5, Pos1 - 5));
+
+                    int Pos2 = Info.find(' ', ++Pos1);
+
+                    ret.Status = std::stoul(Info.substr(Pos1, Pos2 - Pos1));
+
+                    ret.Brief = std::move(Info.substr(++Pos2));
+
+                    HeadersList.ForEach([&](const std::string &SingleHeader)
+                                        {
+                        auto KeyValue = _SplitString(SingleHeader, ": ");
+                        ret.Headers[KeyValue[0]] = std::move(KeyValue[1]); });
+
+                    ret.Body = std::move(_BodyText);
+
+                    ret.Headers["Content-Length"] = _BodyText.length();
+
+                    return ret;
                 }
             };
-
-            Response Send(const Request& request){
-                
-            }
         }
     }
 }

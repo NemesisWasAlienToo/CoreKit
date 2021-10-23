@@ -36,7 +36,7 @@ namespace Core
 
             void _IncreaseCapacity(size_t Minimum = 1)
             {
-                if (!IsFull())
+                if (_Capacity - _Length >= Minimum)
                     return;
 
                 if (!_Growable)
@@ -91,7 +91,8 @@ namespace Core
                 return _ResizeCallback;
             }
 
-            void OnResize(std::function<size_t(size_t, size_t)> CallBack){
+            void OnResize(std::function<size_t(size_t, size_t)> CallBack)
+            {
                 _ResizeCallback = CallBack;
             }
 
@@ -131,14 +132,6 @@ namespace Core
                 _Capacity = Size;
             }
 
-            void Add(const T &Item)
-            {
-                _IncreaseCapacity();
-
-                _Content[(_First + _Length) % _Capacity] = Item;
-                _Length++;
-            }
-
             void Add(T &&Item)
             {
                 _IncreaseCapacity();
@@ -147,26 +140,73 @@ namespace Core
                 _Length++;
             }
 
+            void Add(const T &Item)
+            {
+                _IncreaseCapacity();
+
+                _Content[(_First + _Length) % _Capacity] = Item;
+                _Length++;
+            }
+
+            void Add(const T &Item, size_t Count)
+            {
+                _IncreaseCapacity(Count);
+
+                for (size_t i = 0; i < Count; i++) // optimize loop
+                {
+                    _Content[(_First + _Length + i) % _Capacity] = Item;
+                }
+
+                _Length += Count;
+            }
+
             void Add(const T *Items, size_t Count)
             {
                 _IncreaseCapacity(Count);
 
                 for (size_t i = 0; i < Count; i++)
                 {
-                    Add(Items[i]);
+                    _Content[(_First + _Length + i) % _Capacity] = Items[i];
                 }
+
+                _Length += Count;
+            }
+
+            void Add(T *Items, size_t Count)
+            {
+                _IncreaseCapacity(Count);
+
+                for (size_t i = 0; i < Count; i++)
+                {
+                    _Content[(_First + _Length + i) % _Capacity] = std::move(Items[i]);
+                }
+
+                _Length += Count;
             }
 
             void Remove(size_t Index)
             {
-                if (Index > _Length)
+                if (Index >= _Length)
                     throw std::out_of_range("");
 
                 _Length--;
 
-                for (size_t i = Index; i < _Length; i++)
+                if (Index == 0)
                 {
-                    _Content[(_First + i) % _Capacity] = std::move(_Content[(_First + i + 1) % _Capacity]);
+                    _Content[_First].~T();
+
+                    _First = (_First + 1) % _Capacity;
+                }
+                else if (Index == _Length)
+                {
+                    _Content[(_First + Index) % _Capacity].~T();
+                }
+                else
+                {
+                    for (size_t i = Index; i < _Length; i++)
+                    {
+                        _Content[(_First + i) % _Capacity] = std::move(_Content[(_First + i + 1) % _Capacity]);
+                    }
                 }
             }
 
@@ -174,14 +214,6 @@ namespace Core
             {
                 size_t Count = _Capacity - _Length;
 
-                for (size_t i = 0; i < Count; i++)
-                {
-                    Add(Item);
-                }
-            }
-
-            void Fill(const T &Item, size_t Count)
-            {
                 for (size_t i = 0; i < Count; i++)
                 {
                     Add(Item);
@@ -315,6 +347,28 @@ namespace Core
                 }
 
                 return result;
+            }
+
+            std::string Peek(size_t Size)
+            {
+                if (Size > _Capacity)
+                    throw std::out_of_range("");
+
+                std::string str; // Optimization needed
+
+                str.resize(Size * sizeof(T));
+
+                for (size_t i = 0; i < Size; i++)
+                {
+                    str += _Content[i];
+                }
+
+                return str;
+            }
+
+            std::string Peek()
+            {
+                return Peek(_Capacity);
             }
 
             std::string ToString(size_t Size)

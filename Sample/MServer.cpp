@@ -3,9 +3,37 @@
 #include <thread>
 
 #include "Iterable/List.cpp"
+#include "Iterable/Buffer.cpp"
 #include "Network/DNS.cpp"
 #include "Network/Address.cpp"
 #include "Network/Socket.cpp"
+#include "Network/HTTP.cpp"
+
+void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info);
+
+int main(int argc, char const *argv[])
+{
+    Core::Network::EndPoint Host(Core::Network::Address(Core::Network::Address::Any()), 8888);
+
+    Core::Network::Socket server(Core::Network::Socket::IPv4, Core::Network::Socket::TCP);
+
+    server.Bind(Host);
+
+    std::cout << Core::Network::DNS::HostName() << " is listenning on " << Host << std::endl;
+
+    server.Listen(10);
+
+    while (1)
+    {
+        Core::Network::EndPoint Info;
+
+        auto Client = server.Accept(Info);
+
+        std::thread handler(HandleClient, Client, Info);
+
+        handler.detach();
+    }
+}
 
 void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 {
@@ -41,18 +69,24 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
     std::cout << Info << " Says : " << std::endl
               << Request << std::endl;
 
-    Core::Iterable::Buffer Buffer(1024);
+    Core::Iterable::Buffer<char> Buffer(1024);
 
-    // std::string Content = "<body>hi there</body>";
-    std::string Content = "{\"Name\" : \"Nemesis\"}";
+    Core::Network::HTTP::Response Res;
 
-    Buffer << "HTTP/1.1 200 OK\r\n"
-              "Content-Type: text/plain\r\n"
-            //   "Content-Type: text/html; charset=UTF-8\r\n"
-              "Content-Type: application/json; charset=UTF-8\r\n"
-              "Connection: closed\r\n"
-              "Content-Length: " + std::to_string(Content.length()) + "\r\n\r\n"
-              + Content;
+    Res.Version = "1.1";
+    Res.Status = 200;
+    Res.Brief = "OK";
+    Res.Headers["Host"] = "ConfusionBox";
+    Res.Headers["Connection"] = "closed";
+    Res.Headers["Content-Type"] = "text/html; charset=UTF-8";
+    // Res.Headers["Content-Type"] = "text/plain";
+    // Res.Headers["Content-Type"] = "application/json; charset=UTF-8";
+    // Res.Headers["Content-Type"] = "application/json";
+
+    Res.Body = "<h1>Hi</h1>";
+
+    std::string ResponseText = Res.ToString();
+    Buffer.Add(ResponseText.c_str(), ResponseText.length());
 
     while (!Buffer.IsEmpty())
     {
@@ -62,28 +96,4 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
     }
 
     Client.Close();
-}
-
-int main(int argc, char const *argv[])
-{
-    Core::Network::EndPoint Host(Core::Network::Address(Core::Network::Address::Any()), 8888);
-
-    Core::Network::Socket server(Core::Network::Socket::IPv4, Core::Network::Socket::TCP);
-
-    server.Bind(Host);
-
-    std::cout << Core::Network::DNS::HostName() << " is listenning on " << Host << std::endl;
-
-    server.Listen(10);
-
-    while (1)
-    {
-        Core::Network::EndPoint Info;
-
-        auto Client = server.Accept(Info);
-
-        std::thread handler(HandleClient, Client, Info);
-
-        handler.detach();
-    }
 }

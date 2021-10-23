@@ -13,6 +13,7 @@
 #include "Base/Descriptor.cpp"
 
 #include "Iterable/Buffer.cpp"
+// #include "Iterable/Queue.cpp"
 
 // To do :
 //      - Error handling
@@ -186,6 +187,18 @@ namespace Core
             void Connect(const Address &address, short Port)
             {
                 Connect(EndPoint(address, Port));
+            }
+
+            bool IsConnected(){
+                char Data;
+                int Result = Receive(&Data, 1, DontWait | Peek);
+
+                if (Result < 0 && errno != EAGAIN)
+                {
+                    return false;
+                }
+
+                return true;
             }
 
             void Listen(int Count)
@@ -428,6 +441,32 @@ namespace Core
 
                 return *this;
             }
+
+            // Socket &operator<<(Iterable::Queue<char> &buffer)
+            // {
+            //     size_t len = buffer.Length();
+
+            //     char _Buffer[len];
+
+            //     for (size_t i = 0; i < len; i++)
+            //     {
+            //         _Buffer[i] = buffer[i];
+            //     }
+
+            //     int Result = write(_Handler, _Buffer, len);
+
+            //     // Error handling here
+
+            //     if (Result < 0)
+            //     {
+            //         std::cout << "operator<< : " << strerror(errno) << std::endl;
+            //         exit(-1);
+            //     }
+
+            //     buffer.Free(Result);
+
+            //     return *this;
+            // }
 
             Socket &operator>>(Iterable::Buffer<char> &buffer)
             {

@@ -1,43 +1,65 @@
 #include <iostream>
 #include <string>
 #include <cstring>
-
+#include <streambuf>
 #include "Iterable/List.cpp"
 #include "Iterable/Buffer.cpp"
 #include "Network/DNS.cpp"
 #include "Network/Socket.cpp"
+#include "Network/HTTP.cpp"
+#include "Iterable/Buffer.cpp"
+
+using namespace Core;
+using namespace std;
 
 int main(int argc, char const *argv[])
 {
-    std::cout << "Running on " << Core::Network::DNS::HostName() << std::endl;
+    cout << "Google is at " << "Running on " << Network::DNS::HostName() << endl;
 
-    auto result = Core::Network::DNS::Resolve("google.com");
+    auto result = Network::DNS::Resolve("google.com");
 
-    Core::Network::EndPoint Google(result[0], 80);
+    Network::EndPoint Google(result[0], 80);
 
-    std::cout << "Google is at " << Google << std::endl;
+    cout << "Google is at " << Google << endl;
 
-    Core::Network::Socket client(Core::Network::Socket::IPv4, Core::Network::Socket::TCP);
+    Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP);
 
     client.Connect(Google);
 
-    Core::Iterable::Buffer Buffer(1024);
+    if(!client.IsConnected()) return -1;
 
-    Buffer << "GET / HTTP/1.1\r\n"
-              "Host: ConfusionBox\r\n"
-              "Connecttion: closed\r\n\r\n";
+    Iterable::Buffer<char> Buffer(128);
+
+    Network::HTTP::Request Req;
+
+    Req.Type = "GET";
+    Req.Version = "1.1";
+    Req.Headers["Host"] = "ConfusionBox";
+    Req.Headers["Connection"] = "closed";
+
+    string requestText = Req.ToString();
+
+    Buffer.Add(requestText.c_str(), requestText.length());
 
     while (!Buffer.IsEmpty())
     {
         client << Buffer;
 
-        client.Await(Core::Network::Socket::Out);
+        client.Await(Network::Socket::Out);
     }
 
-    for (client.Await(Core::Network::Socket::In); client.Received() > 0; client.Await(Core::Network::Socket::In, 3000))
+    stringstream ss;
+
+    for (client.Await(Network::Socket::In); client.Received() > 0; client.Await(Network::Socket::In, 3000))
     {
-        std::cout << client;
+        ss << client;
     }
+
+    auto ResponseText = ss.str();
+
+    Network::HTTP::Response response = Network::HTTP::Response::From(ResponseText);
+
+    cout << response.ToString() << endl;
 
     client.Close();
 

@@ -31,7 +31,7 @@ namespace Core
 
             void _IncreaseCapacity(size_t Minimum = 1)
             {
-                if (!IsFull())
+                if (_Capacity - _Length >= Minimum)
                     return;
 
                 if (!_Growable)
@@ -45,9 +45,9 @@ namespace Core
 
             List() : _Capacity(0), _Length(0), _Content(new T[1]), _Growable(true) {}
 
-            List(size_t Capacity, bool Growable = true) : _Content(new T[Capacity]), _Capacity(Capacity), _Length(0), _Growable(Growable) {}
+            List(size_t Capacity, bool Growable = true) : _Capacity(Capacity), _Length(0), _Content(new T[Capacity]), _Growable(Growable) {}
 
-            List(T Array[], int Count, bool Growable = true) : _Content(new T[Count]), _Capacity(Count), _Length(Count), _Growable(Growable)
+            List(T *Array, int Count, bool Growable = true) : _Capacity(Count), _Length(Count), _Content(new T[Count]), _Growable(Growable)
             {
                 for (size_t i = 0; i < Count; i++)
                 {
@@ -55,7 +55,7 @@ namespace Core
                 }
             }
 
-            List(List &Other) : _Content(new T[Other._Capacity]), _Capacity(Other._Capacity), _Length(Other._Length), _Growable(Other._Growable)
+            List(List &Other) : _Capacity(Other._Capacity), _Length(Other._Length), _Content(new T[Other._Capacity]), _Growable(Other._Growable)
             {
                 for (size_t i = 0; i < Other._Length; i++)
                 {
@@ -92,7 +92,8 @@ namespace Core
                 return _ResizeCallback;
             }
 
-            void OnResize(std::function<size_t(size_t, size_t)> CallBack){
+            void OnResize(std::function<size_t(size_t, size_t)> CallBack)
+            {
                 _ResizeCallback = CallBack;
             }
 
@@ -160,16 +161,52 @@ namespace Core
                 return _Content[_Length - 1];
             }
 
+            void Add(T &&item)
+            {
+                _IncreaseCapacity();
+                _Content[_Length++] = std::move(item);
+            }
+
             void Add(const T &item)
             {
                 _IncreaseCapacity();
                 _Content[_Length++] = item;
             }
 
-            void Add(T &&item)
+            void Add(const T &Item, size_t Count)
             {
-                _IncreaseCapacity();
-                _Content[_Length++] = std::move(item);
+                _IncreaseCapacity(Count);
+
+                for (size_t i = 0; i < Count; i++)
+                {
+                    _Content[_Length + i] = Item;
+                }
+
+                _Length += Count;
+            }
+
+            void Add(T *Items, size_t Count)
+            {
+                _IncreaseCapacity(Count);
+
+                for (size_t i = 0; i < Count; i++)
+                {
+                    _Content[_Length + i] = std::move(Items[i]);
+                }
+
+                _Length += Count;
+            }
+
+            void Add(const T *Items, size_t Count)
+            {
+                _IncreaseCapacity(Count);
+
+                for (size_t i = 0; i < Count; i++)
+                {
+                    _Content[_Length + i] = Items[i];
+                }
+
+                _Length += Count;
             }
 
             void Fill(const T &Item)
@@ -178,13 +215,27 @@ namespace Core
                 {
                     _Content[i] = Item;
                 }
+
+                _Length = _Capacity;
             }
 
-            void Fill(const T &Item, size_t Count)
+            void Remove(size_t Index)
             {
-                for (size_t i = _Length; i < _Capacity; i++)
+                if (Index >= _Length)
+                    throw std::out_of_range("");
+
+                _Length--;
+
+                if (Index == _Length)
                 {
-                    _Content[i] = Item;
+                    _Content[Index].~T();
+                }
+                else
+                {
+                    for (size_t i = Index; i < _Length; i++)
+                    {
+                        _Content[i] = std::move(_Content[i + 1]);
+                    }
                 }
             }
 
@@ -198,26 +249,22 @@ namespace Core
                 return std::move(_Content[_Length]);
             }
 
-            void Remove(size_t Index)
+            void Take(T *Items, size_t Count) // Optimize this
             {
-                if (Index > _Length)
+                if (_Length < Count)
                     throw std::out_of_range("");
 
-                _Length--;
-
-                for (size_t i = Index; i < _Length; i++)
+                for (size_t i = 0; i < Count; i++)
                 {
-                    _Content[i] = std::move(_Content[i + 1]);
+                    Items[i] = Take();
                 }
             }
 
             bool Contains(T Item) const
             {
-                List<T> result(_Capacity);
-
-                for (T item : _Content)
+                for (int i = 0; i < _Length; i++)
                 {
-                    if (item == Item)
+                    if (_Content[i] == Item)
                         return true;
                 }
 
@@ -226,8 +273,6 @@ namespace Core
 
             bool Contains(T Item, int &Index) const
             {
-                List<T> result(_Capacity);
-
                 for (int i = 0; i < _Length; i++)
                 {
                     if (_Content[i] == Item)
@@ -250,7 +295,7 @@ namespace Core
 
             void ForEach(std::function<void(const T &)> Action) const
             {
-                for (int i = 0; i < _Length; i++)
+                for (size_t i = 0; i < _Length; i++)
                 {
                     Action(_Content[i]);
                 }
@@ -260,8 +305,10 @@ namespace Core
             {
                 List<T> result(_Capacity);
 
-                for (T item : _Content)
+                for (size_t i = 0; i < _Length; i++)
                 {
+                    T &item = _Content[i];
+
                     if (Condition(item))
                         result.Add(item);
                 }
@@ -274,8 +321,10 @@ namespace Core
             {
                 List<O> result(_Capacity);
 
-                for (T item : _Content)
+                for (size_t i = 0; i < _Length; i++)
                 {
+                    T &item = _Content[i];
+
                     result.Add(Transform(item));
                 }
 
@@ -328,7 +377,7 @@ namespace Core
                 return *this;
             }
 
-            bool operator==(const List &Other) noexcept
+            bool operator==(const List &Other) noexcept // Add more
             {
                 return this->_Content == Other->_Content;
             }

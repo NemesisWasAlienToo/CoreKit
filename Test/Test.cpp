@@ -17,44 +17,23 @@ using namespace std;
 
 int main(int argc, char const *argv[])
 {
-    Test::Log("Running on " + Network::DNS::HostName());
+    Iterable::Buffer<char> Buffer(10);
 
-    auto result = Network::DNS::Resolve("google.com");
+    Buffer.Add('b', 5);
 
-    Network::EndPoint Google(result[0], 80);
+    cout << Buffer.Peek() << endl;
 
-    std::cout << "Google is at " << Google << std::endl;
+    Buffer.Add('a', 5);
 
-    Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP);
+    cout << Buffer.Peek() << endl;
 
-    client.Connect(Google);
+    Buffer.Remove(1);
 
-    Iterable::Buffer<char> Buffer(128);
+    Buffer.Free(2);
 
-    Network::HTTP::Request Req;
+    Buffer.Add('c', 3);
 
-    Req.Type = "GET";
-    Req.Version = "1.1";
-    Req.Headers["Host"] = "ConfusionBox";
-    Req.Headers["Connection"] = "closed";
-
-    std::string requestText = Req.ToString();
-
-    Buffer.Add(requestText.c_str(), requestText.length());
-
-    while (!Buffer.IsEmpty())
-    {
-        client << Buffer;
-
-        client.Await(Network::Socket::Out);
-    }
-
-    for (client.Await(Network::Socket::In); client.Received() > 0; client.Await(Network::Socket::In, 3000))
-    {
-        std::cout << client;
-    }
-
-    client.Close();
+    cout << Buffer.Peek() << endl;
 
     return 0;
 }
