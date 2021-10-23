@@ -2,38 +2,29 @@
 #include <string>
 #include <cstring>
 #include <streambuf>
-#include "Iterable/List.cpp"
-#include "Iterable/Buffer.cpp"
-#include "Network/DNS.cpp"
-#include "Network/Socket.cpp"
-#include "Network/HTTP.cpp"
-#include "Cryptography/Digest.cpp"
-#include "Cryptography/Random.cpp"
 #include "Base/Test.cpp"
-#include "Iterable/Buffer.cpp"
+#include "Iterable/List.cpp"
+#include "Iterable/Queue.cpp"
 
 using namespace Core;
 using namespace std;
 
 int main(int argc, char const *argv[])
 {
-    Iterable::Buffer<char> Buffer(10);
+    Iterable::List<unsigned int> Numbers = Iterable::List<unsigned int>::Build(0, 9, [](size_t Index)
+                                                                   { return Index; });
 
-    Buffer.Add('b', 5);
+    Numbers.Remove(3);
 
-    cout << Buffer.Peek() << endl;
+    Numbers.Swap(1);
 
-    Buffer.Add('a', 5);
+    Numbers.Add(2);
 
-    cout << Buffer.Peek() << endl;
+    Numbers.Add(20);
 
-    Buffer.Remove(1);
+    std::cout << Numbers << std::endl;
 
-    Buffer.Free(2);
-
-    Buffer.Add('c', 3);
-
-    cout << Buffer.Peek() << endl;
+    std::cout << Numbers.Where([](const unsigned int& Item){ return  Item > 4U;}) << std::endl;
 
     return 0;
 }

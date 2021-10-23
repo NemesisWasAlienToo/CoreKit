@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef _FORCE_INLINE
+#define _FORCE_INLINE __attribute__((always_inline))
+#endif
+
 #include <iostream>
 #include <sstream>
 #include <functional>
@@ -38,6 +42,16 @@ namespace Core
                     throw std::out_of_range("");
 
                 Resize(_ResizeCallback(_Capacity, Minimum));
+            }
+
+            _FORCE_INLINE inline T &_ElementAt(size_t Index)
+            {
+                return _Content[Index];
+            }
+
+            _FORCE_INLINE inline const T &_ElementAt(size_t Index) const
+            {
+                return _Content[Index];
             }
 
         public:
@@ -107,9 +121,11 @@ namespace Core
                 _Growable = CanGrow;
             }
 
-            inline bool IsEmpty() { return _Length == 0; }
+            _FORCE_INLINE inline bool IsEmpty() { return _Length == 0; }
 
-            inline bool IsFull() { return _Length == _Capacity; }
+            _FORCE_INLINE inline bool IsFull() { return _Length == _Capacity; }
+
+            _FORCE_INLINE inline size_t IsFree() { return _Capacity - _Length; }
 
             // ### Public Functions
 
@@ -119,7 +135,7 @@ namespace Core
 
                 for (size_t i = 0; i < _Length; i++)
                 {
-                    _New[i] = std::move(_Content[i]);
+                    _New[i] = std::move(_ElementAt(i));
                 }
 
                 delete[] _Content;
@@ -134,7 +150,7 @@ namespace Core
                 if (_Length <= 0)
                     throw std::out_of_range("");
 
-                return _Content[0];
+                return _ElementAt(0);
             }
 
             const T &First() const
@@ -142,7 +158,7 @@ namespace Core
                 if (_Length <= 0)
                     throw std::out_of_range("");
 
-                return _Content[0];
+                return _ElementAt(0);
             }
 
             T &Last()
@@ -150,7 +166,7 @@ namespace Core
                 if (_Length <= 0)
                     throw std::out_of_range("");
 
-                return _Content[_Length - 1];
+                return _ElementAt(_Length - 1);
             }
 
             const T &Last() const
@@ -158,19 +174,23 @@ namespace Core
                 if (_Length <= 0)
                     throw std::out_of_range("");
 
-                return _Content[_Length - 1];
+                return _ElementAt(_Length - 1);
             }
 
-            void Add(T &&item)
+            void Add(T &&Item)
             {
                 _IncreaseCapacity();
-                _Content[_Length++] = std::move(item);
+
+                _ElementAt(_Length) = std::move(Item);
+                _Length++;
             }
 
-            void Add(const T &item)
+            void Add(const T &Item)
             {
                 _IncreaseCapacity();
-                _Content[_Length++] = item;
+
+                _ElementAt(_Length) = Item;
+                _Length++;
             }
 
             void Add(const T &Item, size_t Count)
@@ -179,7 +199,7 @@ namespace Core
 
                 for (size_t i = 0; i < Count; i++)
                 {
-                    _Content[_Length + i] = Item;
+                    _ElementAt(_Length + i) = Item;
                 }
 
                 _Length += Count;
@@ -191,7 +211,7 @@ namespace Core
 
                 for (size_t i = 0; i < Count; i++)
                 {
-                    _Content[_Length + i] = std::move(Items[i]);
+                    _ElementAt(_Length + i) = std::move(Items[i]);
                 }
 
                 _Length += Count;
@@ -203,23 +223,13 @@ namespace Core
 
                 for (size_t i = 0; i < Count; i++)
                 {
-                    _Content[_Length + i] = Items[i];
+                    _ElementAt(_Length + i) = Items[i];
                 }
 
                 _Length += Count;
             }
 
-            void Fill(const T &Item)
-            {
-                for (size_t i = _Length; i < _Capacity; i++)
-                {
-                    _Content[i] = Item;
-                }
-
-                _Length = _Capacity;
-            }
-
-            void Remove(size_t Index)
+            void Remove(size_t Index) // Not Compatiable
             {
                 if (Index >= _Length)
                     throw std::out_of_range("");
@@ -228,7 +238,7 @@ namespace Core
 
                 if (Index == _Length)
                 {
-                    _Content[Index].~T();
+                    _ElementAt(0).~T();
                 }
                 else
                 {
@@ -239,14 +249,24 @@ namespace Core
                 }
             }
 
-            T Take()
+            void Fill(const T &Item)
+            {
+                for (size_t i = _Length; i < _Capacity; i++)
+                {
+                    _ElementAt(i) = Item;
+                }
+
+                _Length = _Capacity;
+            }
+
+            T Take() // Not Compatiable
             {
                 if (_Length == 0)
                     throw std::out_of_range("");
 
                 _Length--;
 
-                return std::move(_Content[_Length]);
+                return std::move(_ElementAt(_Length));
             }
 
             void Take(T *Items, size_t Count) // Optimize this
@@ -260,11 +280,30 @@ namespace Core
                 }
             }
 
+            void Swap(size_t Index) // Not Compatiable
+            {
+                if (Index >= _Length)
+                    throw std::out_of_range("");
+
+                if (_Length - 1 == Index)
+                    return;
+
+                _Content[Index] = std::move(_Content[--_Length]);
+            }
+
+            void Swap(size_t First, size_t Second) // Not Compatiable
+            {
+                if (First >= _Length || Second >= _Length)
+                    throw std::out_of_range("");
+
+                std::swap(_Content[First], _Content[Second]);
+            }
+
             bool Contains(T Item) const
             {
                 for (int i = 0; i < _Length; i++)
                 {
-                    if (_Content[i] == Item)
+                    if (_ElementAt(i) == Item)
                         return true;
                 }
 
@@ -275,7 +314,7 @@ namespace Core
             {
                 for (int i = 0; i < _Length; i++)
                 {
-                    if (_Content[i] == Item)
+                    if (_ElementAt(i) == Item)
                     {
                         Index = i;
                         return true;
@@ -285,19 +324,19 @@ namespace Core
                 return false;
             }
 
-            void ForEach(std::function<void(int, const T &)> Action) const
-            {
-                for (int i = 0; i < _Length; i++)
-                {
-                    Action(i, _Content[i]);
-                }
-            }
-
             void ForEach(std::function<void(const T &)> Action) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
-                    Action(_Content[i]);
+                    Action(_ElementAt(i));
+                }
+            }
+
+            void ForEach(std::function<void(int, const T &)> Action) const
+            {
+                for (int i = 0; i < _Length; i++)
+                {
+                    Action(i, _ElementAt(i));
                 }
             }
 
@@ -307,7 +346,7 @@ namespace Core
 
                 for (size_t i = 0; i < _Length; i++)
                 {
-                    T &item = _Content[i];
+                    const T &item = _ElementAt(i);
 
                     if (Condition(item))
                         result.Add(item);
@@ -323,9 +362,7 @@ namespace Core
 
                 for (size_t i = 0; i < _Length; i++)
                 {
-                    T &item = _Content[i];
-
-                    result.Add(Transform(item));
+                    result.Add(Transform(_ElementAt(i)));
                 }
 
                 return result;
@@ -343,11 +380,25 @@ namespace Core
                 return ss.str();
             }
 
+            // ### Static Functions
+
+            static List<T> Build(size_t Start, size_t End, std::function<T(size_t)> Builder)
+            {
+                List<T> result((End - Start) + 1);
+
+                for (size_t i = Start; i <= End; i++)
+                {
+                    result.Add(Builder(i));
+                }
+
+                return result;
+            }
+
             // ### Operators
 
             T &operator[](size_t Index)
             {
-                if (Index > _Length)
+                if (Index >= _Length)
                     throw std::out_of_range("");
 
                 return _Content[Index];
@@ -355,7 +406,7 @@ namespace Core
 
             const T &operator[](size_t Index) const
             {
-                if (Index > _Length)
+                if (Index >= _Length)
                     throw std::out_of_range("");
 
                 return _Content[Index];
@@ -389,8 +440,10 @@ namespace Core
 
             friend std::ostream &operator<<(std::ostream &os, const List &list)
             {
-                list.ForEach([os](const T &Item)
-                             { os << Item << std::endl; });
+                for (size_t i = 0; i < list._Length; i++)
+                {
+                    os << "[" << i << "] : " << list._ElementAt(i) << '\n';
+                }
 
                 return os;
             }

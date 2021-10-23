@@ -28,7 +28,7 @@ int main(int argc, char const *argv[])
 
     if(!client.IsConnected()) return -1;
 
-    Iterable::Buffer<char> Buffer(128);
+    Iterable::Queue<char> Buffer(128);
 
     Network::HTTP::Request Req;
 

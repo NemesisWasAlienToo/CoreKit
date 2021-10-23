@@ -70,7 +70,7 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 
     std::cout << Info << " Says : " << std::endl << Req.ToString() << std::endl;
 
-    Core::Iterable::Buffer<char> Buffer(1024);
+    Core::Iterable::Queue<char> Buffer(1024);
 
     Core::Network::HTTP::Response Res;
 

@@ -88,8 +88,8 @@ namespace Core
 
                     auto HeadersList = _SplitString(_HeadersText, "\r\n");
 
-                    auto Info = HeadersList[0]; // Handle this later
-                    HeadersList.Remove(0);
+                    auto Info = std::move(HeadersList[0]);
+                    HeadersList.Swap(0);
 
                     int Pos1 = Info.find(' ');
 
@@ -108,7 +108,7 @@ namespace Core
 
                     ret.Body = std::move(_BodyText);
 
-                    ret.Headers["Content-Length"] = _BodyText.length();
+                    ret.Headers["Content-Length"] = ret.Body.length();
 
                     return ret;
                 }
@@ -144,27 +144,27 @@ namespace Core
 
                     auto HeadersList = _SplitString(_HeadersText, "\r\n");
 
-                    auto Info = HeadersList[0]; // Handle this later
+                    auto Info = std::move(HeadersList[0]);
                     HeadersList.Remove(0);
 
                     int Pos1 = Info.find(' ');
 
-                    ret.Version = std::move(Info.substr(5, Pos1 - 5));
+                    ret.Version = Info.substr(5, Pos1 - 5);
 
                     int Pos2 = Info.find(' ', ++Pos1);
 
                     ret.Status = std::stoul(Info.substr(Pos1, Pos2 - Pos1));
 
-                    ret.Brief = std::move(Info.substr(++Pos2));
+                    ret.Brief = Info.substr(++Pos2);
 
                     HeadersList.ForEach([&](const std::string &SingleHeader)
                                         {
                         auto KeyValue = _SplitString(SingleHeader, ": ");
-                        ret.Headers[KeyValue[0]] = std::move(KeyValue[1]); });
+                        ret.Headers[std::move(KeyValue[0])] = std::move(KeyValue[1]); });
 
                     ret.Body = std::move(_BodyText);
 
-                    ret.Headers["Content-Length"] = _BodyText.length();
+                    ret.Headers["Content-Length"] = ret.Body.length();
 
                     return ret;
                 }

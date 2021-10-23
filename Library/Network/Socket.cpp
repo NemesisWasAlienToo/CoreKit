@@ -12,8 +12,7 @@
 #include "Network/EndPoint.cpp"
 #include "Base/Descriptor.cpp"
 
-#include "Iterable/Buffer.cpp"
-// #include "Iterable/Queue.cpp"
+#include "Iterable/Queue.cpp"
 
 // To do :
 //      - Error handling
@@ -416,15 +415,15 @@ namespace Core
                 return *this;
             }
 
-            Socket &operator<<(Iterable::Buffer<char> &buffer)
+            Socket &operator<<(Iterable::Queue<char> &queue)
             {
-                size_t len = buffer.Length();
+                size_t len = queue.Length();
 
                 char _Buffer[len];
 
                 for (size_t i = 0; i < len; i++)
                 {
-                    _Buffer[i] = buffer[i];
+                    _Buffer[i] = queue[i];
                 }
 
                 int Result = write(_Handler, _Buffer, len);
@@ -437,40 +436,14 @@ namespace Core
                     exit(-1);
                 }
 
-                buffer.Free(Result);
+                queue.Free(Result);
 
                 return *this;
             }
 
-            // Socket &operator<<(Iterable::Queue<char> &buffer)
-            // {
-            //     size_t len = buffer.Length();
-
-            //     char _Buffer[len];
-
-            //     for (size_t i = 0; i < len; i++)
-            //     {
-            //         _Buffer[i] = buffer[i];
-            //     }
-
-            //     int Result = write(_Handler, _Buffer, len);
-
-            //     // Error handling here
-
-            //     if (Result < 0)
-            //     {
-            //         std::cout << "operator<< : " << strerror(errno) << std::endl;
-            //         exit(-1);
-            //     }
-
-            //     buffer.Free(Result);
-
-            //     return *this;
-            // }
-
-            Socket &operator>>(Iterable::Buffer<char> &buffer)
+            Socket &operator>>(Iterable::Queue<char> &queue)
             {
-                size_t len = buffer.Capacity() - buffer.Length();
+                size_t len = queue.Capacity() - queue.Length();
 
                 if (len == 0)
                     return *this;
@@ -489,7 +462,7 @@ namespace Core
 
                 for (size_t i = 0; i < len; i++)
                 {
-                    buffer.Add(_Buffer[i]); // ## Optimize later
+                    queue.Add(_Buffer[i]); // ## Optimize later
                 }
 
                 return *this;

@@ -66,10 +66,11 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
             Condition = true;
     }
 
-    std::cout << Info << " Says : " << std::endl
-              << Request << std::endl;
+    Core::Network::HTTP::Request Req = Core::Network::HTTP::Request::From(Request);
 
-    Core::Iterable::Buffer<char> Buffer(1024);
+    std::cout << Info << " Says : " << std::endl << Req.ToString() << std::endl;
+
+    Core::Iterable::Queue<char> Buffer(1024);
 
     Core::Network::HTTP::Response Res;
 
