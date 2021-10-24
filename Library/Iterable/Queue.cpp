@@ -425,14 +425,31 @@ namespace Core
 
             // ### Operators
 
-            Queue &operator=(Queue &Other) = delete;
+            // Queue &operator=(Queue &Other) = delete
+
+            Queue &operator=(const Queue &Other)
+            {
+                if (this == &Other)
+                    return *this;
+
+                _Capacity = Other._Capacity;
+                _First = 0;
+                _Length = Other._Length;
+
+                _Content = new T[Other._Capacity];
+
+                for (size_t i = 0; i < Other._Length; i++)
+                {
+                    _ElementAt(i) = Other._ElementAt(i);
+                }
+
+                return *this;
+            }
 
             Queue &operator=(Queue &&Other) noexcept
             {
                 if (this == &Other)
                     return *this;
-
-                delete[] _Content;
 
                 _Capacity = Other._Capacity;
                 _First = Other._First;

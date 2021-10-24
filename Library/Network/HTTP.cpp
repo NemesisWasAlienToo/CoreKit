@@ -145,7 +145,7 @@ namespace Core
                     auto HeadersList = _SplitString(_HeadersText, "\r\n");
 
                     auto Info = std::move(HeadersList[0]);
-                    HeadersList.Remove(0);
+                    HeadersList.Swap(0);
 
                     int Pos1 = Info.find(' ');
 

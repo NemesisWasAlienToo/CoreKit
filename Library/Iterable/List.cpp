@@ -238,13 +238,13 @@ namespace Core
 
                 if (Index == _Length)
                 {
-                    _ElementAt(0).~T();
+                    _ElementAt(Index).~T();
                 }
                 else
                 {
                     for (size_t i = Index; i < _Length; i++)
                     {
-                        _Content[i] = std::move(_Content[i + 1]);
+                        _ElementAt(i) = std::move(_ElementAt(i + 1));
                     }
                 }
             }
@@ -288,7 +288,7 @@ namespace Core
                 if (_Length - 1 == Index)
                     return;
 
-                _Content[Index] = std::move(_Content[--_Length]);
+                _ElementAt(Index) = std::move(_ElementAt(--_Length));
             }
 
             void Swap(size_t First, size_t Second) // Not Compatiable
@@ -296,7 +296,7 @@ namespace Core
                 if (First >= _Length || Second >= _Length)
                     throw std::out_of_range("");
 
-                std::swap(_Content[First], _Content[Second]);
+                std::swap(_ElementAt(First), _ElementAt(Second));
             }
 
             bool Contains(T Item) const
@@ -324,6 +324,22 @@ namespace Core
                 return false;
             }
 
+            void ForEach(std::function<void(T &)> Action)
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    Action(_ElementAt(i));
+                }
+            }
+
+            void ForEach(std::function<void(size_t, T &)> Action)
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    Action(i, _ElementAt(i));
+                }
+            }
+
             void ForEach(std::function<void(const T &)> Action) const
             {
                 for (size_t i = 0; i < _Length; i++)
@@ -332,7 +348,7 @@ namespace Core
                 }
             }
 
-            void ForEach(std::function<void(int, const T &)> Action) const
+            void ForEach(std::function<void(size_t, const T &)> Action) const
             {
                 for (int i = 0; i < _Length; i++)
                 {

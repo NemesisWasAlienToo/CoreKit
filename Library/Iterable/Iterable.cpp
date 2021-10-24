@@ -52,18 +52,19 @@ namespace Core
             // ### Virtual Functions
 
             virtual _FORCE_INLINE inline T &_ElementAt(size_t Index) { return _Content[Index]; }
+            virtual _FORCE_INLINE inline const T &_ElementAt(size_t Index) const { return _Content[Index]; }
 
             // ### Constructors
 
-            Iterable() : _Capacity(0), _Length(0), _Content(new T[1]), _Growable(true){}
+            Iterable() : _Capacity(0), _Length(0), _Content(new T[1]), _Growable(true) {}
 
-            Iterable(size_t Capacity, bool Growable = true) : _Capacity(Capacity), _Length(0), _Content(new T[Capacity]), _Growable(Growable){}
+            Iterable(size_t Capacity, bool Growable = true) : _Capacity(Capacity), _Length(0), _Content(new T[Capacity]), _Growable(Growable) {}
 
             Iterable(Iterable &Other) : _Capacity(Other._Capacity), _Length(Other._Length), _Content(new T[Other._Capacity]), _Growable(Other._Growable)
             {
                 for (size_t i = 0; i < Other._Length; i++)
                 {
-                    _Content[i] = Other._Content[(Other._First + i) % Other._Capacity];
+                    _Content[i] = Other._ElementAt(i);
                 }
             }
 
@@ -237,7 +238,7 @@ namespace Core
 
             // ### Pre-defined functions
 
-            void ForEach(std::function<void(const T &)> Action) const
+            virtual void ForEach(std::function<void(const T &)> Action) const
             {
                 for (int i = 0; i < _Length; i++)
                 {
@@ -261,7 +262,7 @@ namespace Core
 
                 for (size_t i = 0; i < _Length; i++)
                 {
-                    T &Item = _ElementAt(i);
+                    const T &Item = _ElementAt(i);
                     if (Condition(Item))
                         result.Add(Item);
                 }
@@ -328,7 +329,7 @@ namespace Core
                 return str;
             }
 
-            std::string ToString()
+            virtual std::string ToString()
             {
                 return ToString(_Length);
             }

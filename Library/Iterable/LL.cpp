@@ -13,37 +13,38 @@ namespace Core
     namespace Iterable
     {
         template <typename T>
-        class BB : public Iterable<T>
+        class LL : public Iterable<T>
         {
 
         private:
-            // ### Private variables
-
-            size_t _First = 0;
-
             // ### Private Functions
 
             _FORCE_INLINE inline T &_ElementAt(size_t Index)
             {
-                return this->_Content[(_First + Index) % this->_Capacity];
+                return this->_Content[Index];
             }
 
             _FORCE_INLINE inline const T &_ElementAt(size_t Index) const
             {
-                return this->_Content[(_First + Index) % this->_Capacity];
+                return this->_Content[Index];
             }
 
         public:
             // ### Constructors
 
-            BB() : Iterable<T>(), _First(0) {}
+            LL() : Iterable<T>() {}
 
-            BB(size_t Capacity, bool Growable = true) : Iterable<T>(Capacity, Growable), _First(0) {}
+            LL(size_t Capacity, bool Growable = true) : Iterable<T>(Capacity, Growable) {}
 
-            BB(BB &Other) : Iterable<T>(Other), _First(0) {}
+            LL(LL &Other) : Iterable<T>(Other) {}
 
-            BB(BB &&Other)
-            noexcept : Iterable<T>(std::move(Other)), _First(Other._First) {}
+            LL(LL &&Other)
+            noexcept : Iterable<T>(std::move(Other)) {}
+
+            ~LL()
+            {
+                delete[] this->_Content;
+            }
 
             // ### Public Functions
 
@@ -60,47 +61,37 @@ namespace Core
 
                 this->_Content = _New;
 
-                _First = 0;
-
                 this->_Capacity = Size;
             }
 
-            void Remove(size_t Index)
+            void Remove(size_t Index) // Not Compatiable
             {
                 if (Index >= this->_Length)
                     throw std::out_of_range("");
 
                 this->_Length--;
 
-                if (Index == 0)
+                if (Index == this->_Length)
                 {
                     _ElementAt(0).~T();
-
-                    _First = (_First + 1) % this->_Capacity;
-                }
-                else if (Index == this->_Length)
-                {
-                    _ElementAt(Index).~T();
                 }
                 else
                 {
                     for (size_t i = Index; i < this->_Length; i++)
                     {
-                        _ElementAt(i) = std::move(_ElementAt(i + 1));
+                        this->_Content[i] = std::move(this->_Content[i + 1]);
                     }
                 }
             }
 
-            T Take()
+            T Take() // Not Compatiable
             {
-                if (this->IsEmpty())
+                if (this->_Length == 0)
                     throw std::out_of_range("");
 
-                T Item = std::move(_ElementAt(0)); // OK?
                 this->_Length--;
-                _First = (_First + 1) % this->_Capacity;
 
-                return Item;
+                return std::move(_ElementAt(this->_Length));
             }
 
             std::string Peek(size_t Size)
@@ -125,14 +116,26 @@ namespace Core
                 return Peek(this->_Capacity);
             }
 
-            friend std::ostream &operator<<(std::ostream &os, BB &BB)
+            friend std::ostream &operator<<(std::ostream &os, const LL &list)
             {
-                while (!BB.IsEmpty())
+                for (size_t i = 0; i < list._Length; i++)
                 {
-                    os << BB.Take();
+                    os << "[" << i << "] : " << list._ElementAt(i) << '\n';
                 }
 
                 return os;
+            }
+
+            static LL<T> Build(size_t Start, size_t End, std::function<T(size_t)> Builder)
+            {
+                LL<T> result((End - Start) + 1);
+
+                for (size_t i = Start; i <= End; i++)
+                {
+                    result.Add(Builder(i));
+                }
+
+                return result;
             }
         };
     }

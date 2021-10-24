@@ -48,7 +48,7 @@ namespace Core
             }
         }
 
-        int Handler() { return _Handler; }
+        int Handler() const { return _Handler; }
 
         Descriptor &operator=(Descriptor &Other) = delete;
 
@@ -58,12 +58,12 @@ namespace Core
             return *this;
         }
 
-        inline bool operator==(const Descriptor &Other)
+        inline bool operator==(const Descriptor &Other) const
         {
             return Other._Handler == this->_Handler;
         }
 
-        inline bool operator!=(const Descriptor &Other)
+        inline bool operator!=(const Descriptor &Other) const
         {
             return Other._Handler != this->_Handler;
         }

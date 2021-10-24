@@ -298,7 +298,7 @@ namespace Core
                 return (struct sockaddr *)&addr;
             }
 
-            int Received()
+            int Received() const
             {
 
                 int Count = 0;
@@ -416,6 +416,32 @@ namespace Core
             }
 
             Socket &operator<<(Iterable::Queue<char> &queue)
+            {
+                size_t len = queue.Length();
+
+                char _Buffer[len];
+
+                for (size_t i = 0; i < len; i++)
+                {
+                    _Buffer[i] = queue[i];
+                }
+
+                int Result = write(_Handler, _Buffer, len);
+
+                // Error handling here
+
+                if (Result < 0)
+                {
+                    std::cout << "operator<< : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                queue.Free(Result);
+
+                return *this;
+            }
+
+            const Socket &operator<<(Iterable::Queue<char> &queue) const
             {
                 size_t len = queue.Length();
 
