@@ -188,7 +188,10 @@ namespace Core
                 if (Result == 0)
                     return;
 
-                for (size_t i = 0, j = 0; i < Result && j < _Length; j++)
+                int i = 0;
+                size_t j = 0;
+
+                for (; i < Result && j < _Length; j++)
                 {
                     auto &item = _Content[j];
 
