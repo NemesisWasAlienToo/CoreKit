@@ -87,6 +87,7 @@ namespace Core
             ~List()
             {
                 delete[] _Content;
+                _Content = nullptr;
             }
 
             // ### Properties
@@ -321,6 +322,7 @@ namespace Core
                     if (--_Length == Index)
                     {
                         _ElementAt(_Length).~T();
+                        // std::move(_ElementAt(_Length));
                     }
                     else
                     {
@@ -500,8 +502,6 @@ namespace Core
             {
                 if (this == &Other)
                     return *this;
-
-                delete[] _Content;
 
                 _Capacity = Other._Capacity;
                 _Length = Other._Length;

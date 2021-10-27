@@ -45,12 +45,7 @@ int main(int argc, char const *argv[])
 
     Poll.Add(client, Iterable::Poll::In);
 
-    if (!client.IsConnected())
-        return -1;
-
     Buffers.Add(Iterable::Queue<char>(1024));
-
-    Poll.ForEach([&](Network::Socket socket){});
 
     Poll.OnRead = [&](Network::Socket socket, size_t Index)
     {
@@ -64,6 +59,7 @@ int main(int argc, char const *argv[])
         }
         else
         {
+            // if (!socket.IsConnected())
             if (socket.Received() <= 0)
             {
                 socket.Close();

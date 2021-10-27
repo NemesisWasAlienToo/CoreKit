@@ -81,7 +81,10 @@ namespace Core
 
             // ### Destructor
 
-            ~Queue() { delete[] _Content; }
+            ~Queue() {
+                delete[] _Content;
+                _Content = nullptr;
+            }
 
             // ### Properties
 
