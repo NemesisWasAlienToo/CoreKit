@@ -18,7 +18,7 @@ namespace Core
         class Queue
         {
 
-        private:
+        protected:
             static_assert(std::is_move_assignable<T>::value, "T must be move assignable");
             static_assert(std::is_copy_assignable<T>::value, "T must be copy assignable");
 
@@ -62,7 +62,7 @@ namespace Core
         public:
             // ### Constructors
 
-            Queue() : _Capacity(0), _Length(0), _Content(new T[1]), _Growable(true), _First(0) {}
+            Queue() : _Capacity(1), _Length(0), _Content(new T[1]), _Growable(true), _First(0) {}
 
             Queue(size_t Capacity, bool Growable = true) : _Capacity(Capacity), _Length(0), _Content(new T[Capacity]), _Growable(Growable), _First(0) {}
 
@@ -88,6 +88,13 @@ namespace Core
             T *Content()
             {
                 return _Content;
+            }
+
+            T *Chunk(size_t &Size)
+            {
+                Size = std::min(_Capacity - _Length, _Length);
+
+                return &_Content[_First];
             }
 
             size_t Length()
@@ -205,21 +212,25 @@ namespace Core
 
                 _Length--;
 
-                if (Index == 0)
-                {
-                    _ElementAt(0).~T();
-
-                    _First = (_First + 1) % _Capacity;
-                }
-                else if (Index == _Length)
-                {
-                    _ElementAt(Index).~T();
-                }
-                else
+                if constexpr (std::is_arithmetic<T>::value)
                 {
                     for (size_t i = Index; i < _Length; i++)
                     {
                         _ElementAt(i) = std::move(_ElementAt(i + 1));
+                    }
+                }
+                else
+                {
+                    if (Index == _Length)
+                    {
+                        _ElementAt(Index).~T();
+                    }
+                    else
+                    {
+                        for (size_t i = Index; i < _Length; i++)
+                        {
+                            _ElementAt(i) = std::move(_ElementAt(i + 1));
+                        }
                     }
                 }
             }
@@ -246,31 +257,46 @@ namespace Core
                 return Item;
             }
 
-            void Take(T *Items, size_t Count)
+            void Take(T *Items, size_t Count) // Optimize this
             {
                 if (_Length < Count)
                     throw std::out_of_range("");
 
                 for (size_t i = 0; i < Count; i++)
                 {
-                    Items[i] = Take();
+                    Items[i] = std::move(_ElementAt(i));
                 }
+
+                _Length -= Count;
             }
 
             void Free() // Not Compatiable
             {
-                while (!IsEmpty())
+                if constexpr (!std::is_arithmetic<T>::value)
                 {
-                    Take();
+                    for (size_t i = 0; i < _Length; i++)
+                    {
+                        _ElementAt(i).~T();
+                    }
                 }
+
+                _Length = 0;
             }
 
             void Free(size_t Count) // Not Compatiable
             {
-                for (size_t i = 0; i < Count; i++)
+                if (_Length < Count)
+                    throw std::out_of_range("");
+
+                if constexpr (!std::is_arithmetic<T>::value)
                 {
-                    Take();
+                    for (size_t i = 0; i < Count; i++)
+                    {
+                        _ElementAt(i).~T();
+                    }
                 }
+
+                _Length -= Count;
             }
 
             T &First()
@@ -305,15 +331,59 @@ namespace Core
                 return _ElementAt(_Length - 1);
             }
 
-            void ForEach(std::function<void(const T &)> Action) const
+            void ForEach(std::function<void(T &)> Action)
             {
-                for (int i = 0; i < _Length; i++)
+                for (size_t i = 0; i < _Length; i++)
                 {
                     Action(_ElementAt(i));
                 }
             }
 
-            void ForEach(std::function<void(int, const T &)> Action) const
+            void ForEach(std::function<void(size_t, T &)> Action)
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    Action(i, _ElementAt(i));
+                }
+            }
+
+            Queue<T> Where(std::function<bool(T &)> Condition)
+            {
+                Queue<T> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    const T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                        result.Add(item);
+                }
+
+                return result;
+            }
+
+            template <typename O>
+            Queue<O> Map(std::function<O(T &)> Transform)
+            {
+                Queue<O> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    result.Add(Transform(_ElementAt(i)));
+                }
+
+                return result;
+            }
+
+            void ForEach(std::function<void(const T &)> Action) const
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    Action(_ElementAt(i));
+                }
+            }
+
+            void ForEach(std::function<void(size_t, const T &)> Action) const
             {
                 for (int i = 0; i < _Length; i++)
                 {
@@ -321,49 +391,19 @@ namespace Core
                 }
             }
 
-            //
-
             Queue<T> Where(std::function<bool(const T &)> Condition) const
             {
                 Queue<T> result(_Capacity);
 
                 for (size_t i = 0; i < _Length; i++)
                 {
-                    T &Item = _ElementAt(i);
-                    if (Condition(Item))
-                        result.Add(Item);
+                    const T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                        result.Add(item);
                 }
 
                 return result;
-            }
-
-            bool Contains(T Item) const
-            {
-                Queue<T> result(_Capacity);
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    if (_ElementAt(i) == Item)
-                        return true;
-                }
-
-                return false;
-            }
-
-            bool Contains(T Item, int &Index) const
-            {
-                Queue<T> result(_Capacity);
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    if (_ElementAt(i) == Item)
-                    {
-                        Index = i;
-                        return true;
-                    }
-                }
-
-                return false;
             }
 
             template <typename O>
@@ -425,8 +465,6 @@ namespace Core
 
             // ### Operators
 
-            // Queue &operator=(Queue &Other) = delete
-
             Queue &operator=(const Queue &Other)
             {
                 if (this == &Other)
@@ -479,13 +517,12 @@ namespace Core
             Queue &operator>>(T &Item)
             {
 
-                if (!IsEmpty())
-                    Item = Take();
+                Item = Take();
 
                 return *this;
             }
 
-            Queue &operator<<(T &Item)
+            Queue &operator<<(const T &Item)
             {
                 Add(Item);
 
@@ -497,6 +534,13 @@ namespace Core
                 Add(std::move(Item));
 
                 return *this;
+            }
+
+            friend Queue<char> &operator<<(Queue<char> &queue, const std::string &Message)
+            {
+                queue.Add(Message.c_str(), Message.length());
+
+                return queue;
             }
 
             friend std::ostream &operator<<(std::ostream &os, Queue &Queue)

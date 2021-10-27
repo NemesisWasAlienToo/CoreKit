@@ -4,13 +4,15 @@
 #include <string>
 #include <unistd.h>
 
+#include "Base/Descriptor.cpp"
+
 namespace Core{
     class File : public Descriptor
     {
     private:
         /* data */
     public:
-        enum AccessTestType{
+        enum TestType{
             CanRead = R_OK,
             CanWrite = W_OK,
             CanExecute = X_OK,
@@ -26,8 +28,8 @@ namespace Core{
         File() {}
         ~File() {}
 
-        static inline bool Exist(const std::string& Name, int AccessTests = F_OK){
-            return ( access( Name.c_str(), AccessTests ) != -1 );
+        static inline bool Exist(const std::string& Name, int Tests = F_OK){
+            return ( access( Name.c_str(), Tests ) != -1 );
         }
     };
 }

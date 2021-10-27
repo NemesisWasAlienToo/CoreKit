@@ -51,12 +51,12 @@ namespace Core
 
             // ### Virtual Functions
 
-            virtual _FORCE_INLINE inline T &_ElementAt(size_t Index) { return _Content[Index]; }
-            virtual _FORCE_INLINE inline const T &_ElementAt(size_t Index) const { return _Content[Index]; }
+            virtual _FORCE_INLINE inline T &_ElementAt(size_t Index) {return _Content[0];}
+            virtual _FORCE_INLINE inline const T &_ElementAt(size_t Index) const {return _Content[0];}
 
             // ### Constructors
 
-            Iterable() : _Capacity(0), _Length(0), _Content(new T[1]), _Growable(true) {}
+            Iterable() : _Capacity(1), _Length(0), _Content(new T[1]), _Growable(true) {}
 
             Iterable(size_t Capacity, bool Growable = true) : _Capacity(Capacity), _Length(0), _Content(new T[Capacity]), _Growable(Growable) {}
 
@@ -159,94 +159,83 @@ namespace Core
 
             virtual void Resize(size_t Size) {}
 
-            virtual void Add(T &&Item)
-            {
-                _IncreaseCapacity();
+            virtual void Add(T &&Item) {}
 
-                _ElementAt(_Length) = std::move(Item);
-                _Length++;
-            }
+            virtual void Add(const T &Item) {}
 
-            virtual void Add(const T &Item)
-            {
-                _IncreaseCapacity();
+            virtual void Add(const T &Item, size_t Count) {}
 
-                _ElementAt(_Length) = Item;
-                _Length++;
-            }
+            virtual void Add(T *Items, size_t Count) {}
 
-            virtual void Add(const T &Item, size_t Count)
-            {
-                _IncreaseCapacity(Count);
+            virtual void Add(const T *Items, size_t Count) {}
 
-                for (size_t i = 0; i < Count; i++) // optimize loop
-                {
-                    _ElementAt(_Length + i) = Item;
-                }
+            virtual void Fill(const T &Item) {}
 
-                _Length += Count;
-            }
+            virtual T Take() {return T();}
 
-            virtual void Add(T *Items, size_t Count)
-            {
-                _IncreaseCapacity(Count);
-
-                for (size_t i = 0; i < Count; i++)
-                {
-                    _ElementAt(_Length + i) = std::move(Items[i]);
-                }
-
-                _Length += Count;
-            }
-
-            virtual void Add(const T *Items, size_t Count)
-            {
-                _IncreaseCapacity(Count);
-
-                for (size_t i = 0; i < Count; i++)
-                {
-                    _ElementAt(_Length + i) = Items[i];
-                }
-
-                _Length += Count;
-            }
-
-            virtual void Fill(const T &Item)
-            {
-                for (size_t i = _Length; i < _Capacity; i++)
-                {
-                    _ElementAt(i) = Item;
-                }
-
-                _Length = _Capacity;
-            }
-
-            virtual T Take() {}
-
-            virtual void Take(T *Items, size_t Count)
-            {
-                if (_Length < Count)
-                    throw std::out_of_range("");
-
-                for (size_t i = 0; i < Count; i++)
-                {
-                    Items[i] = Take();
-                }
-            }
+            virtual void Take(T *Items, size_t Count) {}
 
             virtual void Remove(size_t Index) {}
 
+            void Swap(size_t Index){}
+
+            void Swap(size_t First, size_t Second){}
+
             // ### Pre-defined functions
 
-            virtual void ForEach(std::function<void(const T &)> Action) const
+            void ForEach(std::function<void(T &)> Action)
             {
-                for (int i = 0; i < _Length; i++)
+                for (size_t i = 0; i < _Length; i++)
                 {
                     Action(_ElementAt(i));
                 }
             }
 
-            void ForEach(std::function<void(int, const T &)> Action) const
+            void ForEach(std::function<void(size_t, T &)> Action)
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    Action(i, _ElementAt(i));
+                }
+            }
+
+            Iterable<T> Where(std::function<bool(T &)> Condition)
+            {
+                Iterable<T> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    const T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                        result.Add(item);
+                }
+
+                return result;
+            }
+
+            template <typename O>
+            Iterable<O> Map(std::function<O(T &)> Transform)
+            {
+                Iterable<O> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    result.Add(Transform(_ElementAt(i)));
+                }
+
+                return result;
+            }
+
+            void ForEach(std::function<void(const T &)> Action) const
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    Action(_ElementAt(i));
+                }
+            }
+
+            void ForEach(std::function<void(size_t, const T &)> Action) const
             {
                 for (int i = 0; i < _Length; i++)
                 {
@@ -254,49 +243,19 @@ namespace Core
                 }
             }
 
-            //
-
             Iterable<T> Where(std::function<bool(const T &)> Condition) const
             {
                 Iterable<T> result(_Capacity);
 
                 for (size_t i = 0; i < _Length; i++)
                 {
-                    const T &Item = _ElementAt(i);
-                    if (Condition(Item))
-                        result.Add(Item);
+                    const T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                        result.Add(item);
                 }
 
                 return result;
-            }
-
-            bool Contains(T Item) const
-            {
-                Iterable<T> result(_Capacity);
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    if (_ElementAt(i) == Item)
-                        return true;
-                }
-
-                return false;
-            }
-
-            bool Contains(T Item, int &Index) const
-            {
-                Iterable<T> result(_Capacity);
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    if (_ElementAt(i) == Item)
-                    {
-                        Index = i;
-                        return true;
-                    }
-                }
-
-                return false;
             }
 
             template <typename O>
@@ -312,22 +271,32 @@ namespace Core
                 return result;
             }
 
-            std::string ToString(size_t Size)
+            bool Contains(const T& Item) const
             {
-                if (Size > _Length)
-                    throw std::out_of_range("");
-
-                std::string str; // Optimization needed
-
-                str.resize(Size * sizeof(T));
-
-                for (size_t i = 0; i < Size; i++)
+                for (size_t i = 0; i < _Length; i++)
                 {
-                    str += _ElementAt(i);
+                    if (_ElementAt(i) == Item)
+                        return true;
                 }
 
-                return str;
+                return false;
             }
+
+            bool Contains(const T& Item, int &Index) const
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    if (_ElementAt(i) == Item)
+                    {
+                        Index = i;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            std::string ToString(size_t Size) {return "";}
 
             virtual std::string ToString()
             {
@@ -337,23 +306,6 @@ namespace Core
             // ### Operators
 
             // ### Pre-defined Operators
-
-            Iterable &operator=(Iterable &Other) = delete;
-
-            Iterable &operator=(Iterable &&Other) noexcept
-            {
-                if (this == &Other)
-                    return *this;
-
-                delete[] _Content;
-
-                _Capacity = Other._Capacity;
-                _Length = Other._Length;
-
-                std::swap(_Content, Other._Content);
-
-                return *this;
-            }
 
             T &operator[](const size_t &Index)
             {
@@ -380,7 +332,7 @@ namespace Core
                 return *this;
             }
 
-            Iterable &operator<<(T &Item)
+            Iterable &operator<<(const T &Item)
             {
                 Add(Item);
 

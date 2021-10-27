@@ -9,9 +9,8 @@
 #include <poll.h>
 #include <sys/ioctl.h>
 
-#include "Network/EndPoint.cpp"
 #include "Base/Descriptor.cpp"
-
+#include "Network/EndPoint.cpp"
 #include "Iterable/Queue.cpp"
 
 // To do :
@@ -38,10 +37,11 @@ namespace Core
                 TCP = SOCK_STREAM,
                 UDP = SOCK_DGRAM,
                 Raw = SOCK_RAW,
-                NonBlock = SOCK_NONBLOCK,
+                NonBlocking = SOCK_NONBLOCK,
             };
 
-            enum MessageFlags{
+            enum SocketMessage
+            {
                 CloseOnExec = MSG_CMSG_CLOEXEC,
                 DontWait = MSG_DONTWAIT,
                 ErrorQueue = MSG_ERRQUEUE,
@@ -90,17 +90,19 @@ namespace Core
 
             Socket(const Socket &Other) : Descriptor(Other) {}
 
+            Socket(const Descriptor &Other) : Descriptor(Other) {}
+
             bool Blocking(bool Value)
             {
                 int Result = 0;
 
                 int flags = fcntl(_Handler, F_GETFL, 0);
 
-                if (!(((_Type & NonBlock) == 0) ^ Value))
+                if (!(((_Type & NonBlocking) == 0) ^ Value))
                     return Value;
 
-                flags ^= NonBlock;
-                _Type ^= NonBlock;
+                flags ^= NonBlocking;
+                _Type ^= NonBlocking;
 
                 Result = fcntl(_Handler, F_SETFL, flags);
 
@@ -112,15 +114,15 @@ namespace Core
                     exit(-1);
                 }
 
-                return (_Type & NonBlock) == 0;
+                return (_Type & NonBlocking) == 0;
             }
 
-            bool Blocking()
+            bool Blocking() const
             {
-                return (_Type & NonBlock) == 0;
+                return (_Type & NonBlocking) == 0;
             }
 
-            void Bind(const EndPoint &Host)
+            void Bind(const EndPoint &Host) const
             {
 
                 struct sockaddr *SocketAddress;
@@ -150,12 +152,12 @@ namespace Core
                 }
             }
 
-            void Bind(const Address &address, short Port)
+            void Bind(const Address &address, short Port) const
             {
                 Bind(EndPoint(address, Port));
             }
 
-            void Connect(EndPoint Target)
+            void Connect(EndPoint Target) const
             {
 
                 struct sockaddr *SocketAddress;
@@ -183,16 +185,17 @@ namespace Core
                 }
             }
 
-            void Connect(const Address &address, short Port)
+            void Connect(const Address &address, short Port) const
             {
                 Connect(EndPoint(address, Port));
             }
 
-            bool IsConnected(){
+            bool IsConnected() const
+            {
                 char Data;
                 int Result = Receive(&Data, 1, DontWait | Peek);
 
-                if (Result < 0 && errno != EAGAIN)
+                if ((Result == 0 )|| (Result < 0 && errno != EAGAIN))
                 {
                     return false;
                 }
@@ -200,7 +203,7 @@ namespace Core
                 return true;
             }
 
-            void Listen(int Count)
+            void Listen(int Count) const
             {
                 int Result = listen(_Handler, Count);
 
@@ -213,7 +216,7 @@ namespace Core
                 }
             }
 
-            Socket Accept()
+            Socket Accept() const
             {
                 struct sockaddr_storage ClientAddress;
                 socklen_t Size;
@@ -233,7 +236,7 @@ namespace Core
                 return ClientDescriptor;
             }
 
-            Socket Accept(EndPoint &Peer)
+            Socket Accept(EndPoint &Peer) const
             {
                 struct sockaddr_storage ClientAddress;
                 socklen_t Size;
@@ -263,7 +266,7 @@ namespace Core
                 return ClientDescriptor;
             }
 
-            bool Closable()
+            bool Closable() const
             {
                 if (_Handler < 0)
                     return false;
@@ -281,7 +284,7 @@ namespace Core
                 return true;
             }
 
-            EndPoint Peer()
+            EndPoint Peer() const
             {
                 struct sockaddr_storage addr;
 
@@ -313,7 +316,7 @@ namespace Core
                 return Count;
             }
 
-            int Sending()
+            int Sending() const
             {
 
                 int Count = 0;
@@ -328,7 +331,7 @@ namespace Core
                 return Count;
             }
 
-            Event Await(Event Events, int TimeoutMS = -1)
+            Event Await(Event Events, int TimeoutMS = -1) const
             {
 
                 _POLLFD PollStruct = {.fd = _Handler, .events = Events};
@@ -348,17 +351,17 @@ namespace Core
                 return PollStruct.revents;
             }
 
-            size_t Send(char *Data, size_t Length, int Flags)
+            size_t Send(char *Data, size_t Length, int Flags) const
             {
                 return send(_Handler, Data, Length, Flags);
             }
 
-            size_t Receive(char *Data, size_t Length, int Flags)
+            size_t Receive(char *Data, size_t Length, int Flags) const
             {
                 return recv(_Handler, Data, Length, Flags);
             }
 
-            size_t SendTo(char *Data, size_t Length, EndPoint Target, int Flags = 0)
+            size_t SendTo(char *Data, size_t Length, EndPoint Target, int Flags = 0) const
             {
                 struct sockaddr_storage Client;
                 socklen_t len = Target.sockaddr((struct sockaddr *)&Client);
@@ -373,7 +376,7 @@ namespace Core
                 return Result;
             }
 
-            size_t ReceiveFrom(char *Data, size_t Length, EndPoint &Target, int Flags = 0)
+            size_t ReceiveFrom(char *Data, size_t Length, EndPoint &Target, int Flags = 0) const
             {
                 struct sockaddr_storage Client;
                 socklen_t len = sizeof(Client);
@@ -415,18 +418,18 @@ namespace Core
                 return *this;
             }
 
-            Socket &operator<<(Iterable::Queue<char> &queue)
+            const Socket &operator<<(const std::string &Message) const noexcept
             {
-                size_t len = queue.Length();
+                int Result = 0;
+                int Left = Message.length();
+                const char *str = Message.c_str();
 
-                char _Buffer[len];
-
-                for (size_t i = 0; i < len; i++)
+                while (Left > 0)
                 {
-                    _Buffer[i] = queue[i];
+                    Await(Out);
+                    Result = write(_Handler, str, Left);
+                    Left -= Result;
                 }
-
-                int Result = write(_Handler, _Buffer, len);
 
                 // Error handling here
 
@@ -435,8 +438,6 @@ namespace Core
                     std::cout << "operator<< : " << strerror(errno) << std::endl;
                     exit(-1);
                 }
-
-                queue.Free(Result);
 
                 return *this;
             }
@@ -467,12 +468,83 @@ namespace Core
                 return *this;
             }
 
-            Socket &operator>>(Iterable::Queue<char> &queue)
+            // Socket &operator<<(Iterable::Queue<char> &queue)
+            // {
+            //     size_t len = queue.Length();
+
+            //     char _Buffer[len];
+
+            //     for (size_t i = 0; i < len; i++)
+            //     {
+            //         _Buffer[i] = queue[i];
+            //     }
+
+            //     int Result = write(_Handler, _Buffer, len);
+
+            //     // Error handling here
+
+            //     if (Result < 0)
+            //     {
+            //         std::cout << "operator<< : " << strerror(errno) << std::endl;
+            //         exit(-1);
+            //     }
+
+            //     queue.Free(Result);
+
+            //     return *this;
+            // }
+            
+            Socket &operator<<(Iterable::Queue<char> &queue)
+            {
+                size_t len = queue.Length();
+
+                char * _Buffer = queue.Chunk(len);
+
+                int Result = write(_Handler, _Buffer, len);
+
+                // Error handling here
+
+                if (Result < 0)
+                {
+                    std::cout << "operator<< : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                queue.Free(Result);
+
+                return *this;
+            }
+
+            const Socket &operator>>(Iterable::Queue<char> &queue) const
             {
                 size_t len = queue.Capacity() - queue.Length();
 
                 if (len == 0)
                     return *this;
+
+                char _Buffer[len];
+
+                int Result = read(_Handler, _Buffer, len);
+
+                // Error handling here
+
+                if (Result < 0)
+                {
+                    std::cout << "operator<< : " << strerror(errno) << std::endl;
+                    exit(-1);
+                }
+
+                for (size_t i = 0; i < len; i++)
+                {
+                    queue.Add(_Buffer[i]); // ## Optimize later
+                }
+
+                return *this;
+            }
+
+            Socket &operator>>(Iterable::Queue<char> &queue)
+            {
+                size_t len = Received();
 
                 char _Buffer[len];
 
@@ -544,7 +616,8 @@ namespace Core
                 return *this;
             }
 
-            // // Maybe add rvalue later?
+            // Maybe add rvalue later?
+
             Socket &operator=(const Socket &Other) = delete;
 
             // Friend operators

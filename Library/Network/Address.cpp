@@ -61,10 +61,36 @@ namespace Core
                 std::memcpy(_Content, &(Other.__in6_u), sizeof Other.__in6_u);
             }
 
-            Address(AddressFamily Family, std::string Address) noexcept
+            Address(AddressFamily Family, const std::string &Address) // noexcept
             {
                 _Family = Family;
-                inet_pton(Family, Address.c_str(), _Content);
+                int Result = inet_pton(Family, Address.c_str(), _Content);
+
+                if (Result <= 0)
+                    throw std::invalid_argument("Provided address is not valid");
+            }
+
+            Address(const std::string &Address) // noexcept
+            {
+                int Result = inet_pton(IPv4, Address.c_str(), _Content);
+
+                if (Result > 0)
+                {
+                    _Family = IPv4;
+                    return;
+                }
+
+                Result = inet_pton(IPv6, Address.c_str(), _Content);
+
+                if (Result > 0)
+                {
+                    _Family = IPv6;
+                    return;
+                }
+                else
+                {
+                    throw std::invalid_argument("Provided address is not valid");
+                }
             }
 
             Address(const Address &Other) noexcept
@@ -159,9 +185,9 @@ namespace Core
             static Address Any(AddressFamily Family = IPv4)
             {
                 if (Family == IPv4)
-                    return INADDR_ANY;
+                    return (uint32_t)INADDR_ANY;
                 else if (Family == IPv6)
-                    return IN6ADDR_ANY_INIT;
+                    return (_IN6_ADDR)IN6ADDR_ANY_INIT;
                 else
                     throw std::invalid_argument(""); // For future uses
             }
@@ -169,9 +195,9 @@ namespace Core
             static Address Loop(AddressFamily Family = IPv4)
             {
                 if (Family == IPv4)
-                    return INADDR_LOOPBACK;
+                    return (uint32_t)INADDR_LOOPBACK;
                 else if (Family == IPv6)
-                    return IN6ADDR_LOOPBACK_INIT;
+                    return (_IN6_ADDR)IN6ADDR_LOOPBACK_INIT;
                 else
                     throw std::invalid_argument(""); // For future uses
             }

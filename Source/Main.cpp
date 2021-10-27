@@ -1,100 +1,67 @@
 #include <iostream>
 #include <string>
-#include <thread>
-
+#include <cstring>
+#include <streambuf>
 #include "Iterable/List.cpp"
-#include "Iterable/Buffer.cpp"
 #include "Network/DNS.cpp"
-#include "Network/Address.cpp"
 #include "Network/Socket.cpp"
 #include "Network/HTTP.cpp"
 
-void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info);
+using namespace Core;
+using namespace std;
 
 int main(int argc, char const *argv[])
 {
-    Core::Network::EndPoint Host(Core::Network::Address(Core::Network::Address::Any()), 8888);
+    cout << "Google is at " << "Running on " << Network::DNS::HostName() << endl;
 
-    Core::Network::Socket server(Core::Network::Socket::IPv4, Core::Network::Socket::TCP);
+    auto result = Network::DNS::Resolve("google.com");
 
-    server.Bind(Host);
+    Network::EndPoint Google(result[0], 80);
 
-    std::cout << Core::Network::DNS::HostName() << " is listenning on " << Host << std::endl;
+    cout << "Google is at " << Google << endl;
 
-    server.Listen(10);
+    Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP);
 
-    while (1)
-    {
-        Core::Network::EndPoint Info;
+    client.Connect(Google);
 
-        auto Client = server.Accept(Info);
+    if(!client.IsConnected()) return -1;
 
-        std::thread handler(HandleClient, Client, Info);
+    Iterable::Queue<char> Buffer(128);
 
-        handler.detach();
-    }
-}
+    Network::HTTP::Request Req;
 
-void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
-{
-    std::string Request;
+    Req.Type = "GET";
+    Req.Version = "1.1";
+    Req.Headers["Host"] = "ConfusionBox";
+    Req.Headers["Connection"] = "closed";
 
-    bool Condition = false;
+    string requestText = Req.ToString();
 
-    size_t Contet_Length = 0;
+    Buffer.Add(requestText.c_str(), requestText.length());
 
-    while (!Condition)
-    {
-        Client.Await(Core::Network::Socket::In);
-
-        if (Client.Received() <= 0)
-            return;
-
-        Client >> Request;
-
-        size_t pos = 0;
-
-        if ((pos = Request.find("Content-Length: ")) != std::string::npos)
-        {
-            std::string len = Request.substr(pos + 16);
-            len = len.substr(0, len.find("\r\n"));
-
-            Contet_Length = std::stoul(len);
-        }
-
-        if ((pos = Request.find("\r\n\r\n")) != std::string::npos && Request.substr(pos + 4).length() >= Contet_Length)
-            Condition = true;
-    }
-
-    Core::Network::HTTP::Request Req = Core::Network::HTTP::Request::From(Request);
-
-    std::cout << Info << " Says : " << std::endl << Req.ToString() << std::endl;
-
-    Core::Iterable::Queue<char> Buffer(1024);
-
-    Core::Network::HTTP::Response Res;
-
-    Res.Version = "1.1";
-    Res.Status = 200;
-    Res.Brief = "OK";
-    Res.Headers["Host"] = "ConfusionBox";
-    Res.Headers["Connection"] = "closed";
-    Res.Headers["Content-Type"] = "text/html; charset=UTF-8";
-    // Res.Headers["Content-Type"] = "text/plain";
-    // Res.Headers["Content-Type"] = "application/json; charset=UTF-8";
-    // Res.Headers["Content-Type"] = "application/json";
-
-    Res.Body = "<h1>Hi</h1>";
-
-    std::string ResponseText = Res.ToString();
-    Buffer.Add(ResponseText.c_str(), ResponseText.length());
+    // Send Request
 
     while (!Buffer.IsEmpty())
     {
-        Client << Buffer;
+        client << Buffer;
 
-        Client.Await(Core::Network::Socket::Out);
+        client.Await(Network::Socket::Out);
     }
 
-    Client.Close();
+    // Receive Response
+
+    for (client.Await(Network::Socket::In); client.Received() > 0; client.Await(Network::Socket::In, 3000))
+    {
+        client >> Buffer;
+    }
+
+    auto ResponseText = Buffer.ToString();
+
+    Network::HTTP::Response response = Network::HTTP::Response::From(ResponseText);
+
+    cout << response.ToString() << endl;
+
+    client.Close();
+
+    return 0;
 }

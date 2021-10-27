@@ -15,7 +15,7 @@ namespace Core
         template <typename T>
         class List
         {
-        private:
+        protected:
             static_assert(std::is_move_assignable<T>::value, "T must be move assignable");
             static_assert(std::is_copy_assignable<T>::value, "T must be copy assignable");
 
@@ -57,7 +57,7 @@ namespace Core
         public:
             // ### Constructors
 
-            List() : _Capacity(0), _Length(0), _Content(new T[1]), _Growable(true) {}
+            List() : _Capacity(1), _Length(0), _Content(new T[1]), _Growable(true) {}
 
             List(size_t Capacity, bool Growable = true) : _Capacity(Capacity), _Length(0), _Content(new T[Capacity]), _Growable(Growable) {}
 
@@ -91,12 +91,12 @@ namespace Core
 
             // ### Properties
 
-            int Length()
+            int Length() noexcept
             {
                 return _Length;
             }
 
-            size_t Capacity()
+            size_t Capacity() noexcept
             {
                 return _Capacity;
             }
@@ -111,7 +111,7 @@ namespace Core
                 _ResizeCallback = CallBack;
             }
 
-            bool Growable() const
+            bool Growable() const noexcept
             {
                 return _Growable;
             }
@@ -121,26 +121,33 @@ namespace Core
                 _Growable = CanGrow;
             }
 
-            _FORCE_INLINE inline bool IsEmpty() { return _Length == 0; }
+            _FORCE_INLINE inline bool IsEmpty() noexcept { return _Length == 0; }
 
-            _FORCE_INLINE inline bool IsFull() { return _Length == _Capacity; }
+            _FORCE_INLINE inline bool IsFull() noexcept { return _Length == _Capacity; }
 
-            _FORCE_INLINE inline size_t IsFree() { return _Capacity - _Length; }
+            _FORCE_INLINE inline size_t IsFree() noexcept { return _Capacity - _Length; }
 
             // ### Public Functions
 
             void Resize(size_t Size)
             {
-                T *_New = new T[Size];
-
-                for (size_t i = 0; i < _Length; i++)
+                if constexpr (std::is_arithmetic<T>::value)
                 {
-                    _New[i] = std::move(_ElementAt(i));
+                    _Content = (T *)std::realloc(_Content, Size);
                 }
+                else
+                {
+                    T *_New = new T[Size];
 
-                delete[] _Content;
+                    for (size_t i = 0; i < _Length; i++)
+                    {
+                        _New[i] = std::move(_ElementAt(i));
+                    }
 
-                _Content = _New;
+                    delete[] _Content;
+
+                    _Content = _New;
+                }
 
                 _Capacity = Size;
             }
@@ -236,15 +243,28 @@ namespace Core
 
                 _Length--;
 
-                if (Index == _Length)
+                if constexpr (std::is_arithmetic<T>::value)
                 {
-                    _ElementAt(Index).~T();
+                    if (Index != _Length)
+                    {
+                        for (size_t i = Index; i < _Length; i++)
+                        {
+                            _ElementAt(i) = _ElementAt(i + 1);
+                        }
+                    }
                 }
                 else
                 {
-                    for (size_t i = Index; i < _Length; i++)
+                    if (Index == _Length)
                     {
-                        _ElementAt(i) = std::move(_ElementAt(i + 1));
+                        _ElementAt(Index).~T();
+                    }
+                    else
+                    {
+                        for (size_t i = Index; i < _Length; i++)
+                        {
+                            _ElementAt(i) = std::move(_ElementAt(i + 1));
+                        }
                     }
                 }
             }
@@ -269,15 +289,19 @@ namespace Core
                 return std::move(_ElementAt(_Length));
             }
 
-            void Take(T *Items, size_t Count) // Optimize this
+            void Take(T *Items, size_t Count)
             {
                 if (_Length < Count)
                     throw std::out_of_range("");
 
-                for (size_t i = 0; i < Count; i++)
+                size_t _Length_ = _Length - Count;
+
+                for (size_t i = _Length_; i < _Length; i++)
                 {
-                    Items[i] = Take();
+                    Items[i] = std::move(_ElementAt(i));
                 }
+
+                _Length = _Length_;
             }
 
             void Swap(size_t Index) // Not Compatiable
@@ -285,10 +309,24 @@ namespace Core
                 if (Index >= _Length)
                     throw std::out_of_range("");
 
-                if (_Length - 1 == Index)
-                    return;
-
-                _ElementAt(Index) = std::move(_ElementAt(--_Length));
+                if constexpr (std::is_arithmetic<T>::value)
+                {
+                    if (--_Length != Index)
+                    {
+                        _ElementAt(Index) = std::move(_ElementAt(_Length));
+                    }
+                }
+                else
+                {
+                    if (--_Length == Index)
+                    {
+                        _ElementAt(_Length).~T();
+                    }
+                    else
+                    {
+                        _ElementAt(Index) = std::move(_ElementAt(_Length));
+                    }
+                }
             }
 
             void Swap(size_t First, size_t Second) // Not Compatiable
@@ -299,7 +337,7 @@ namespace Core
                 std::swap(_ElementAt(First), _ElementAt(Second));
             }
 
-            bool Contains(T Item) const
+            bool Contains(const T& Item) const
             {
                 for (int i = 0; i < _Length; i++)
                 {
@@ -310,7 +348,7 @@ namespace Core
                 return false;
             }
 
-            bool Contains(T Item, int &Index) const
+            bool Contains(const T& Item, int &Index) const
             {
                 for (int i = 0; i < _Length; i++)
                 {
@@ -338,6 +376,34 @@ namespace Core
                 {
                     Action(i, _ElementAt(i));
                 }
+            }
+
+            List<T> Where(std::function<bool(T &)> Condition)
+            {
+                List<T> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    const T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                        result.Add(item);
+                }
+
+                return result;
+            }
+
+            template <typename O>
+            List<O> Map(std::function<O(T &)> Transform)
+            {
+                List<O> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    result.Add(Transform(_ElementAt(i)));
+                }
+
+                return result;
             }
 
             void ForEach(std::function<void(const T &)> Action) const
@@ -452,6 +518,28 @@ namespace Core
             bool operator!=(const List &Other) noexcept
             {
                 return this->_Content != Other->_Content;
+            }
+
+            List &operator>>(T &Item)
+            {
+
+                Item = Take();
+
+                return *this;
+            }
+
+            List &operator<<(const T &Item)
+            {
+                Add(Item);
+
+                return *this;
+            }
+
+            List &operator<<(T &&Item)
+            {
+                Add(std::move(Item));
+
+                return *this;
             }
 
             friend std::ostream &operator<<(std::ostream &os, const List &list)

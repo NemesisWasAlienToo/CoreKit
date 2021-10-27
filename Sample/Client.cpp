@@ -3,11 +3,9 @@
 #include <cstring>
 #include <streambuf>
 #include "Iterable/List.cpp"
-#include "Iterable/Buffer.cpp"
 #include "Network/DNS.cpp"
 #include "Network/Socket.cpp"
 #include "Network/HTTP.cpp"
-#include "Iterable/Buffer.cpp"
 
 using namespace Core;
 using namespace std;
@@ -41,6 +39,8 @@ int main(int argc, char const *argv[])
 
     Buffer.Add(requestText.c_str(), requestText.length());
 
+    // Send Request
+
     while (!Buffer.IsEmpty())
     {
         client << Buffer;
@@ -48,14 +48,14 @@ int main(int argc, char const *argv[])
         client.Await(Network::Socket::Out);
     }
 
-    stringstream ss;
+    // Receive Response
 
     for (client.Await(Network::Socket::In); client.Received() > 0; client.Await(Network::Socket::In, 3000))
     {
-        ss << client;
+        client >> Buffer;
     }
 
-    auto ResponseText = ss.str();
+    auto ResponseText = Buffer.ToString();
 
     Network::HTTP::Response response = Network::HTTP::Response::From(ResponseText);
 
