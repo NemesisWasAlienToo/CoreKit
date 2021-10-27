@@ -37,12 +37,6 @@ namespace Core
             Span(T *Array, size_t Size) : _Content(Array), _Length(Size) {}
             Span(Span &&Other) : _Content(Other._Content), _Length(Other._Length) {}
 
-            ~Span()
-            {
-                delete[] _Content;
-                _Content = nullptr;
-            }
-
             bool Contains(const T &Item) const
             {
                 for (size_t i = 0; i < _Length; i++)
