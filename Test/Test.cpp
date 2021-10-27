@@ -47,6 +47,8 @@ int main(int argc, char const *argv[])
 
     Buffers.Add(Iterable::Queue<char>(1024));
 
+    Poll.ForEach([&](Network::Socket socket) {});
+
     Poll.OnRead = [&](Network::Socket socket, size_t Index)
     {
         if (socket == server)
@@ -59,7 +61,6 @@ int main(int argc, char const *argv[])
         }
         else
         {
-            // if (!socket.IsConnected())
             if (socket.Received() <= 0)
             {
                 socket.Close();
@@ -71,13 +72,14 @@ int main(int argc, char const *argv[])
             string Message;
             socket >> Message;
 
-            if(Message.find("END") != string::npos) Running = false;
+            if (Message.find("END") != string::npos)
+                Running = false;
 
             Buffers.ForEach([&](size_t index, Iterable::Queue<char> &Buffer)
                             {
                 if(index != Index - 1){
                     Buffer << Message;
-                    Poll(index + 1).events |= Iterable::Poll::Out;
+                    Poll[index + 1].Listen(Iterable::Poll::Out);
                 } });
         }
     };
@@ -90,7 +92,7 @@ int main(int argc, char const *argv[])
         }
         else
         {
-            Poll(Index).events ^= Iterable::Poll::Out;
+            Poll[Index].Ignore(Iterable::Poll::Out);
         }
     };
 

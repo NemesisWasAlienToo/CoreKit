@@ -496,11 +496,9 @@ namespace Core
             
             Socket &operator<<(Iterable::Queue<char> &queue)
             {
-                size_t len = queue.Length();
+                auto _Buffer = queue.Chunk();
 
-                char * _Buffer = queue.Chunk(len);
-
-                int Result = write(_Handler, _Buffer, len);
+                int Result = write(_Handler, _Buffer.Content(), _Buffer.Length());
 
                 // Error handling here
 

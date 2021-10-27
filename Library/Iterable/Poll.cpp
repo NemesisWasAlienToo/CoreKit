@@ -2,7 +2,7 @@
 
 #include <poll.h>
 
-#include "Iterable/List.cpp"
+#include "Iterable/Iterable.cpp"
 #include "Network/Socket.cpp"
 #include "Base/Descriptor.cpp"
 
@@ -10,12 +10,33 @@ namespace Core
 {
     namespace Iterable
     {
-        class Poll : public List<struct pollfd>
+        struct CPoll
+        {
+            int Descriptor;
+            short int Mask;
+            short int Events;
+
+            _FORCE_INLINE bool Happened(short int Masks)
+            {
+                return (Events & Masks) != 0;
+            }
+
+            _FORCE_INLINE void Listen(short int Masks)
+            {
+                Mask |= Masks;
+            }
+
+            _FORCE_INLINE void Ignore(short int Masks)
+            {
+                Mask &= ~Masks;
+            }
+        };
+
+        class Poll : public Iterable<CPoll>
         {
         private:
             // Types :
 
-            typedef struct pollfd _POLLFD;
             typedef std::function<void(Descriptor, size_t)> Callback;
 
         public:
@@ -34,10 +55,14 @@ namespace Core
 
             Poll() = default;
 
-            Poll(size_t Capacity) : List<struct pollfd>(Capacity) {}
-            Poll(Poll &Other) : List<struct pollfd>(Other), OnRead(Other.OnRead), OnWrite(Other.OnWrite), OnError(Other.OnError) {}
-            Poll(Poll &&Other) noexcept : List<struct pollfd>(std::move(Other)), OnRead(Other.OnRead), OnWrite(Other.OnWrite), OnError(Other.OnError) {}
+            Poll(size_t Capacity) : Iterable<CPoll>(Capacity) {}
+            Poll(Poll &Other) : Iterable<CPoll>(Other), OnRead(Other.OnRead), OnWrite(Other.OnWrite), OnError(Other.OnError) {}
+            Poll(Poll &&Other) noexcept : Iterable<CPoll>(std::move(Other)), OnRead(Other.OnRead), OnWrite(Other.OnWrite), OnError(Other.OnError) {}
 
+            void Resize(size_t Size) override {
+                this->_Content = (CPoll *)std::realloc(this->_Content, Size);
+            }
+            
             void Add(const Descriptor &Descriptor, Event Events)
             {
                 int Handler = Descriptor.Handler();
@@ -50,10 +75,37 @@ namespace Core
 
                 _IncreaseCapacity();
 
-                _POLLFD &Poll = _Content[_Length++];
-                Poll.fd = Descriptor.Handler();
-                Poll.events = Events;
+                CPoll &Poll = _Content[_Length++];
+                Poll.Descriptor = Descriptor.Handler();
+                Poll.Mask = Events;
+            }
 
+            void Add(CPoll &&Item) override
+            {
+                this->_IncreaseCapacity();
+
+                _ElementAt(this->_Length) = std::move(Item);
+                (this->_Length)++;
+            }
+
+            void Add(const CPoll &Item) override
+            {
+                this->_IncreaseCapacity();
+
+                _ElementAt(this->_Length) = Item;
+                (this->_Length)++;
+            }
+
+            void Add(const CPoll &Item, size_t Count) override
+            {
+                this->_IncreaseCapacity(Count);
+
+                for (size_t i = 0; i < Count; i++)
+                {
+                    _ElementAt(this->_Length + i) = Item;
+                }
+
+                this->_Length += Count;
             }
 
             void Remove(size_t Index) // Not Compatiable
@@ -99,7 +151,7 @@ namespace Core
             {
                 int Result;
 
-                Result = poll(_Content, _Length, TimeoutMS);
+                Result = poll((pollfd *)_Content, _Length, TimeoutMS);
 
                 // Error handling here
 
@@ -119,22 +171,22 @@ namespace Core
                 {
                     auto &item = _Content[j];
 
-                    if (item.revents)
+                    if (item.Events)
                     {
                         i++;
-                        Descriptor Descriptor(item.fd);
+                        Descriptor Descriptor(item.Descriptor);
 
-                        if ((item.revents & POLLIN) && (this->OnRead != NULL))
+                        if ((this->OnRead != NULL) && item.Happened(In))
                         {
                             this->OnRead(Descriptor, j);
                         }
 
-                        if ((item.revents & POLLOUT) && (this->OnWrite != NULL))
+                        if ((this->OnWrite != NULL) && item.Happened(Out))
                         {
                             this->OnWrite(Descriptor, j);
                         }
 
-                        if ((item.revents & POLLNVAL) && (this->OnError != NULL))
+                        if ((this->OnError != NULL) && item.Happened(Error))
                         {
                             this->OnError(Descriptor, j);
                         }
@@ -146,7 +198,7 @@ namespace Core
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
-                    Action(_ElementAt(i).fd);
+                    Action(_ElementAt(i).Descriptor);
                 }
             }
 
@@ -154,19 +206,66 @@ namespace Core
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
-                    Action(i, _ElementAt(i).fd);
+                    Action(i, _ElementAt(i).Descriptor);
                 }
             }
 
-            Descriptor operator[](size_t Index)
-            {
-                return _Content[Index].fd;
-            }
-
-            _POLLFD &operator()(int Index)
+            CPoll &operator[](size_t Index)
             {
                 return _Content[Index];
             }
+
+            Descriptor operator()(size_t Index)
+            {
+                return _Content[Index].Descriptor;
+            }
+
+            // void operator()(int TimeoutMS = -1)
+            // {
+            //     int Result;
+
+            //     Result = poll((pollfd *)_Content, _Length, TimeoutMS);
+
+            //     // Error handling here
+
+            //     if (Result == -1)
+            //     {
+            //         std::cout << "Error :" << strerror(errno) << std::endl;
+            //         exit(-1);
+            //     }
+
+            //     if (Result == 0)
+            //         return;
+
+            //     int i = 0;
+            //     size_t j = 0;
+
+            //     for (; i < Result && j < _Length; j++)
+            //     {
+            //         auto &item = _Content[j];
+
+            //         if (item.Events)
+            //         {
+            //             i++;
+            //             Descriptor Descriptor(item.Descriptor);
+
+            //             if ((this->OnRead != NULL) && item.Happened(In))
+            //             {
+            //                 this->OnRead(Descriptor, j);
+            //             }
+
+            //             if ((this->OnWrite != NULL) && item.Happened(Out))
+            //             {
+            //                 this->OnWrite(Descriptor, j);
+            //             }
+
+            //             if ((this->OnError != NULL) && item.Happened(Error))
+            //             {
+            //                 this->OnError(Descriptor, j);
+            //             }
+            //         }
+            //     }
+            // }
 
             Poll &operator=(Poll &Other) = delete;
 

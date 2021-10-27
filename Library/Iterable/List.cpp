@@ -1,254 +1,135 @@
 #pragma once
 
-#ifndef _FORCE_INLINE
-#define _FORCE_INLINE __attribute__((always_inline))
-#endif
-
 #include <iostream>
 #include <sstream>
 #include <functional>
+
+#include "Iterable.cpp"
 
 namespace Core
 {
     namespace Iterable
     {
         template <typename T>
-        class List
+        class List : public Iterable<T>
         {
         protected:
-            static_assert(std::is_move_assignable<T>::value, "T must be move assignable");
-            static_assert(std::is_copy_assignable<T>::value, "T must be copy assignable");
-
-            // ### Private variables
-
-            size_t _Capacity = 0;
-            size_t _Length = 0;
-            T *_Content = NULL;
-            bool _Growable = true;
-
-            std::function<size_t(size_t, size_t)> _ResizeCallback = [](size_t Current, size_t Minimum) -> size_t
-            {
-                return (Current * 2) + Minimum;
-            };
-
             // ### Private Functions
 
-            void _IncreaseCapacity(size_t Minimum = 1)
+            _FORCE_INLINE inline T &_ElementAt(size_t Index) override
             {
-                if (_Capacity - _Length >= Minimum)
-                    return;
-
-                if (!_Growable)
-                    throw std::out_of_range("");
-
-                Resize(_ResizeCallback(_Capacity, Minimum));
+                return this->_Content[Index];
             }
 
-            _FORCE_INLINE inline T &_ElementAt(size_t Index)
+            _FORCE_INLINE inline const T &_ElementAt(size_t Index) const override
             {
-                return _Content[Index];
-            }
-
-            _FORCE_INLINE inline const T &_ElementAt(size_t Index) const
-            {
-                return _Content[Index];
+                return this->_Content[Index];
             }
 
         public:
             // ### Constructors
 
-            List() : _Capacity(1), _Length(0), _Content(new T[1]), _Growable(true) {}
+            List() : Iterable<T>() {}
 
-            List(size_t Capacity, bool Growable = true) : _Capacity(Capacity), _Length(0), _Content(new T[Capacity]), _Growable(Growable) {}
+            List(size_t Capacity, bool Growable = true) : Iterable<T>(Capacity, Growable) {}
 
-            List(T *Array, int Count, bool Growable = true) : _Capacity(Count), _Length(Count), _Content(new T[Count]), _Growable(Growable)
-            {
-                for (size_t i = 0; i < Count; i++)
-                {
-                    _Content[i] = Array[i];
-                }
-            }
+            List(T *Array, int Count, bool Growable = true) : Iterable<T>(Array, Count, Growable) {}
 
-            List(List &Other) : _Capacity(Other._Capacity), _Length(Other._Length), _Content(new T[Other._Capacity]), _Growable(Other._Growable)
-            {
-                for (size_t i = 0; i < Other._Length; i++)
-                {
-                    _Content[i] = Other._Content[i];
-                }
-            }
+            List(List &Other) : Iterable<T>(Other) {}
 
-            List(List &&Other) noexcept : _Capacity(Other._Capacity), _Length(Other._Length), _Growable(Other._Growable)
-            {
-                std::swap(_Content, Other._Content);
-            }
-
-            // ### Destructor
-
-            ~List()
-            {
-                delete[] _Content;
-                _Content = nullptr;
-            }
+            List(List &&Other) noexcept : Iterable<T>(std::move(Other)) {}
 
             // ### Properties
 
-            int Length() noexcept
-            {
-                return _Length;
-            }
-
-            size_t Capacity() noexcept
-            {
-                return _Capacity;
-            }
-
-            std::function<size_t(size_t, size_t)> OnResize() const
-            {
-                return _ResizeCallback;
-            }
-
-            void OnResize(std::function<size_t(size_t, size_t)> CallBack)
-            {
-                _ResizeCallback = CallBack;
-            }
-
-            bool Growable() const noexcept
-            {
-                return _Growable;
-            }
-
-            void Growable(bool CanGrow) noexcept
-            {
-                _Growable = CanGrow;
-            }
-
-            _FORCE_INLINE inline bool IsEmpty() noexcept { return _Length == 0; }
-
-            _FORCE_INLINE inline bool IsFull() noexcept { return _Length == _Capacity; }
-
-            _FORCE_INLINE inline size_t IsFree() noexcept { return _Capacity - _Length; }
-
             // ### Public Functions
 
-            void Resize(size_t Size)
+            void Resize(size_t Size) override
             {
                 if constexpr (std::is_arithmetic<T>::value)
                 {
-                    _Content = (T *)std::realloc(_Content, Size);
+                    this->_Content = (T *)std::realloc(this->_Content, Size);
                 }
                 else
                 {
                     T *_New = new T[Size];
 
-                    for (size_t i = 0; i < _Length; i++)
+                    for (size_t i = 0; i < this->_Length; i++)
                     {
                         _New[i] = std::move(_ElementAt(i));
                     }
 
-                    delete[] _Content;
+                    delete[] this->_Content;
 
-                    _Content = _New;
+                    this->_Content = _New;
                 }
 
-                _Capacity = Size;
+                this->_Capacity = Size;
             }
 
-            T &First()
+            void Add(T &&Item) override
             {
-                if (_Length <= 0)
-                    throw std::out_of_range("");
+                this->_IncreaseCapacity();
 
-                return _ElementAt(0);
+                _ElementAt(this->_Length) = std::move(Item);
+                (this->_Length)++;
             }
 
-            const T &First() const
+            void Add(const T &Item) override
             {
-                if (_Length <= 0)
-                    throw std::out_of_range("");
+                this->_IncreaseCapacity();
 
-                return _ElementAt(0);
+                _ElementAt(this->_Length) = Item;
+                (this->_Length)++;
             }
 
-            T &Last()
+            void Add(const T &Item, size_t Count) override
             {
-                if (_Length <= 0)
-                    throw std::out_of_range("");
-
-                return _ElementAt(_Length - 1);
-            }
-
-            const T &Last() const
-            {
-                if (_Length <= 0)
-                    throw std::out_of_range("");
-
-                return _ElementAt(_Length - 1);
-            }
-
-            void Add(T &&Item)
-            {
-                _IncreaseCapacity();
-
-                _ElementAt(_Length) = std::move(Item);
-                _Length++;
-            }
-
-            void Add(const T &Item)
-            {
-                _IncreaseCapacity();
-
-                _ElementAt(_Length) = Item;
-                _Length++;
-            }
-
-            void Add(const T &Item, size_t Count)
-            {
-                _IncreaseCapacity(Count);
+                this->_IncreaseCapacity(Count);
 
                 for (size_t i = 0; i < Count; i++)
                 {
-                    _ElementAt(_Length + i) = Item;
+                    _ElementAt(this->_Length + i) = Item;
                 }
 
-                _Length += Count;
+                this->_Length += Count;
             }
 
-            void Add(T *Items, size_t Count)
+            void Add(T *Items, size_t Count) override
             {
-                _IncreaseCapacity(Count);
+                this->_IncreaseCapacity(Count);
 
                 for (size_t i = 0; i < Count; i++)
                 {
-                    _ElementAt(_Length + i) = std::move(Items[i]);
+                    _ElementAt(this->_Length + i) = std::move(Items[i]);
                 }
 
-                _Length += Count;
+                this->_Length += Count;
             }
 
-            void Add(const T *Items, size_t Count)
+            void Add(const T *Items, size_t Count) override
             {
-                _IncreaseCapacity(Count);
+                this->_IncreaseCapacity(Count);
 
                 for (size_t i = 0; i < Count; i++)
                 {
-                    _ElementAt(_Length + i) = Items[i];
+                    _ElementAt(this->_Length + i) = Items[i];
                 }
 
-                _Length += Count;
+                this->_Length += Count;
             }
 
-            void Remove(size_t Index) // Not Compatiable
+            void Remove(size_t Index) override
             {
-                if (Index >= _Length)
+                if (Index >= this->_Length)
                     throw std::out_of_range("");
 
-                _Length--;
+                this->_Length--;
 
                 if constexpr (std::is_arithmetic<T>::value)
                 {
-                    if (Index != _Length)
+                    if (Index != this->_Length)
                     {
-                        for (size_t i = Index; i < _Length; i++)
+                        for (size_t i = Index; i < this->_Length; i++)
                         {
                             _ElementAt(i) = _ElementAt(i + 1);
                         }
@@ -256,13 +137,13 @@ namespace Core
                 }
                 else
                 {
-                    if (Index == _Length)
+                    if (Index == this->_Length)
                     {
                         _ElementAt(Index).~T();
                     }
                     else
                     {
-                        for (size_t i = Index; i < _Length; i++)
+                        for (size_t i = Index; i < this->_Length; i++)
                         {
                             _ElementAt(i) = std::move(_ElementAt(i + 1));
                         }
@@ -270,195 +151,81 @@ namespace Core
                 }
             }
 
-            void Fill(const T &Item)
+            void Fill(const T &Item) override
             {
-                for (size_t i = _Length; i < _Capacity; i++)
+                for (size_t i = this->_Length; i < this->_Capacity; i++)
                 {
                     _ElementAt(i) = Item;
                 }
 
-                _Length = _Capacity;
+                this->_Length = this->_Capacity;
             }
 
-            T Take() // Not Compatiable
+            T Take() override
             {
-                if (_Length == 0)
+                if (this->_Length == 0)
                     throw std::out_of_range("");
 
-                _Length--;
+                this->_Length--;
 
-                return std::move(_ElementAt(_Length));
+                return std::move(_ElementAt(this->_Length));
             }
 
-            void Take(T *Items, size_t Count)
+            void Take(T *Items, size_t Count) override
             {
-                if (_Length < Count)
+                if (this->_Length < Count)
                     throw std::out_of_range("");
 
-                size_t _Length_ = _Length - Count;
+                size_t _Length_ = this->_Length - Count;
 
-                for (size_t i = _Length_; i < _Length; i++)
+                for (size_t i = _Length_; i < this->_Length; i++)
                 {
                     Items[i] = std::move(_ElementAt(i));
                 }
 
-                _Length = _Length_;
+                this->_Length = _Length_;
             }
 
-            void Swap(size_t Index) // Not Compatiable
+            void Swap(size_t Index) override
             {
-                if (Index >= _Length)
+                if (Index >= this->_Length)
                     throw std::out_of_range("");
 
                 if constexpr (std::is_arithmetic<T>::value)
                 {
-                    if (--_Length != Index)
+                    if (--(this->_Length) != Index)
                     {
-                        _ElementAt(Index) = std::move(_ElementAt(_Length));
+                        _ElementAt(Index) = std::move(_ElementAt(this->_Length));
                     }
                 }
                 else
                 {
-                    if (--_Length == Index)
+                    if (--(this->_Length) == Index)
                     {
-                        _ElementAt(_Length).~T();
-                        // std::move(_ElementAt(_Length));
+                        _ElementAt(this->_Length).~T();
                     }
                     else
                     {
-                        _ElementAt(Index) = std::move(_ElementAt(_Length));
+                        _ElementAt(Index) = std::move(_ElementAt(this->_Length));
                     }
                 }
             }
 
-            void Swap(size_t First, size_t Second) // Not Compatiable
+            void Swap(size_t First, size_t Second) override
             {
-                if (First >= _Length || Second >= _Length)
+                if (First >= this->_Length || Second >= this->_Length)
                     throw std::out_of_range("");
 
                 std::swap(_ElementAt(First), _ElementAt(Second));
-            }
-
-            bool Contains(const T& Item) const
-            {
-                for (int i = 0; i < _Length; i++)
-                {
-                    if (_ElementAt(i) == Item)
-                        return true;
-                }
-
-                return false;
-            }
-
-            bool Contains(const T& Item, int &Index) const
-            {
-                for (int i = 0; i < _Length; i++)
-                {
-                    if (_ElementAt(i) == Item)
-                    {
-                        Index = i;
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            void ForEach(std::function<void(T &)> Action)
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    Action(_ElementAt(i));
-                }
-            }
-
-            void ForEach(std::function<void(size_t, T &)> Action)
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    Action(i, _ElementAt(i));
-                }
-            }
-
-            List<T> Where(std::function<bool(T &)> Condition)
-            {
-                List<T> result(_Capacity);
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    const T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                        result.Add(item);
-                }
-
-                return result;
-            }
-
-            template <typename O>
-            List<O> Map(std::function<O(T &)> Transform)
-            {
-                List<O> result(_Capacity);
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    result.Add(Transform(_ElementAt(i)));
-                }
-
-                return result;
-            }
-
-            void ForEach(std::function<void(const T &)> Action) const
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    Action(_ElementAt(i));
-                }
-            }
-
-            void ForEach(std::function<void(size_t, const T &)> Action) const
-            {
-                for (int i = 0; i < _Length; i++)
-                {
-                    Action(i, _ElementAt(i));
-                }
-            }
-
-            List<T> Where(std::function<bool(const T &)> Condition) const
-            {
-                List<T> result(_Capacity);
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    const T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                        result.Add(item);
-                }
-
-                return result;
-            }
-
-            template <typename O>
-            List<O> Map(std::function<O(const T &)> Transform) const
-            {
-                List<O> result(_Capacity);
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    result.Add(Transform(_ElementAt(i)));
-                }
-
-                return result;
             }
 
             std::string ToString()
             {
                 std::stringstream ss;
 
-                for (size_t i = 0; i < _Length; i++)
+                for (size_t i = 0; i < this->_Length; i++)
                 {
-                    ss << _Content[i] << '\n';
+                    ss << this->_Content[i] << '\n';
                 }
 
                 return ss.str();
@@ -480,32 +247,28 @@ namespace Core
 
             // ### Operators
 
-            T &operator[](size_t Index)
-            {
-                if (Index >= _Length)
-                    throw std::out_of_range("");
+            List &operator=(List &Other){
+                this->_Capacity = Other._Capacity;
+                this->_Length = Other._Length;
+                this->_Content = new T[Other._Capacity];
+                this->_Growable = Other._Growable;
 
-                return _Content[Index];
+                for (size_t i = 0; i < Other._Length; i++)
+                {
+                    this->_Content[i] = Other._ElementAt(i);
+                }
             }
-
-            const T &operator[](size_t Index) const
-            {
-                if (Index >= _Length)
-                    throw std::out_of_range("");
-
-                return _Content[Index];
-            }
-
-            List &operator=(List &Other) = delete;
 
             List &operator=(List &&Other) noexcept
             {
                 if (this == &Other)
                     return *this;
 
-                _Capacity = Other._Capacity;
-                _Length = Other._Length;
-                std::swap(_Content, Other._Content);
+                delete[] this->_Content;
+
+                this->_Capacity = Other._Capacity;
+                this->_Length = Other._Length;
+                std::swap(this->_Content, Other._Content);
 
                 return *this;
             }
@@ -520,33 +283,11 @@ namespace Core
                 return this->_Content != Other->_Content;
             }
 
-            List &operator>>(T &Item)
+            friend std::ostream &operator<<(std::ostream &os, const List &List)
             {
-
-                Item = Take();
-
-                return *this;
-            }
-
-            List &operator<<(const T &Item)
-            {
-                Add(Item);
-
-                return *this;
-            }
-
-            List &operator<<(T &&Item)
-            {
-                Add(std::move(Item));
-
-                return *this;
-            }
-
-            friend std::ostream &operator<<(std::ostream &os, const List &list)
-            {
-                for (size_t i = 0; i < list._Length; i++)
+                for (size_t i = 0; i < List._Length; i++)
                 {
-                    os << "[" << i << "] : " << list._ElementAt(i) << '\n';
+                    os << "[" << i << "] : " << List._ElementAt(i) << '\n';
                 }
 
                 return os;

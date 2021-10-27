@@ -34,8 +34,6 @@ namespace Core
                 return (Current * 2) + Minimum;
             };
 
-            // ### Private Functions
-
             // ### Pre-defined Functions
 
             void _IncreaseCapacity(size_t Minimum = 1)
@@ -60,11 +58,19 @@ namespace Core
 
             Iterable(size_t Capacity, bool Growable = true) : _Capacity(Capacity), _Length(0), _Content(new T[Capacity]), _Growable(Growable) {}
 
+            Iterable(T *Array, size_t Count, bool Growable = true) : _Capacity(Count), _Length(0), _Content(new T[Count]), _Growable(Growable)
+            {
+                for (size_t i = 0; i < Count; i++)
+                {
+                    _ElementAt(i) = Array[i];
+                }
+            }
+
             Iterable(Iterable &Other) : _Capacity(Other._Capacity), _Length(Other._Length), _Content(new T[Other._Capacity]), _Growable(Other._Growable)
             {
                 for (size_t i = 0; i < Other._Length; i++)
                 {
-                    _Content[i] = Other._ElementAt(i);
+                    _ElementAt(i) = Other._ElementAt(i);
                 }
             }
 
@@ -75,7 +81,10 @@ namespace Core
 
             // ### Destructor
 
-            ~Iterable() { delete[] _Content; }
+            ~Iterable()  {
+                delete[] _Content;
+                _Content = nullptr;
+            }
 
         public:
             // ### Properties
@@ -177,9 +186,9 @@ namespace Core
 
             virtual void Remove(size_t Index) {}
 
-            void Swap(size_t Index){}
+            virtual void Swap(size_t Index){}
 
-            void Swap(size_t First, size_t Second){}
+            virtual void Swap(size_t First, size_t Second){}
 
             // ### Pre-defined functions
 
@@ -296,13 +305,6 @@ namespace Core
                 return false;
             }
 
-            std::string ToString(size_t Size) {return "";}
-
-            virtual std::string ToString()
-            {
-                return ToString(_Length);
-            }
-
             // ### Operators
 
             // ### Pre-defined Operators
@@ -326,8 +328,7 @@ namespace Core
             Iterable &operator>>(T &Item)
             {
 
-                if (!IsEmpty())
-                    Item = Take();
+                Item = Take();
 
                 return *this;
             }
