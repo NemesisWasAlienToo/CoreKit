@@ -16,9 +16,9 @@ namespace Core
         class DNS
         {
         private:
-        public:
             DNS() = default;
-
+            ~DNS(){}
+        public:
             // Static
 
             static Iterable::List<EndPoint> Resolve(const std::string &Domain, const std::string &Service, Address::AddressFamily Family = Address::IPv4, Socket::SocketType Type = Socket::TCP)
@@ -81,18 +81,36 @@ namespace Core
                 return addresses;
             }
 
-            // static std::string Name(EndPoint Target)
-            // {
-            //     struct sockaddr_storage _Target;
-            //     socklen_t len = Target.sockaddr_storage(&_Target);
+            static std::string Name(EndPoint Target)
+            {
+                struct sockaddr_storage _Target;
+                socklen_t len = Target.sockaddr_storage(&_Target);
 
-            //     char host[1024];
-            //     char serv[16];
+                char host[NI_MAXHOST];
 
-            //     int Result = getnameinfo((struct sockaddr *) &_Target, len, host, sizeof host, serv, sizeof serv, 0);
+                int Result = getnameinfo((struct sockaddr *) &_Target, len, host, sizeof host, NULL, 0, 0);
 
-            //     return host;
-            // }
+                if( Result != 0){
+                    throw std::invalid_argument(gai_strerror(Result));
+                }
+                
+                return host;
+            }
+
+            static std::string Service(EndPoint Target)
+            {
+                struct sockaddr_storage _Target;
+                socklen_t len = Target.sockaddr_storage(&_Target);
+                char serv[NI_MAXSERV];
+
+                int Result = getnameinfo((struct sockaddr *) &_Target, len, NULL, 0, serv, sizeof serv, 0);
+
+                if( Result != 0){
+                    throw std::invalid_argument(gai_strerror(Result));
+                }
+                
+                return serv;
+            }
 
             static Iterable::List<EndPoint> Host(const std::string &Service = "", Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP, bool Passive = false)
             {

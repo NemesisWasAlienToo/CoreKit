@@ -11,7 +11,7 @@ namespace Core
     class Descriptor
     {
     protected:
-        int _Handler = -1;
+        int _INode = -1;
 
     public:
         typedef short Event;
@@ -27,17 +27,17 @@ namespace Core
 
         Descriptor() = default;
 
-        Descriptor(int Handler) : _Handler(Handler) {}
+        Descriptor(int Handler) : _INode(Handler) {}
 
-        Descriptor(const Descriptor &Other) : _Handler(Other._Handler) {}
+        Descriptor(const Descriptor &Other) : _INode(Other._INode) {}
 
         void Close()
         {
-            if (_Handler < 0)
+            if (_INode < 0)
                 return;
 
-            int Result = close(_Handler);
-            _Handler = -1;
+            int Result = close(_INode);
+            _INode = -1;
 
             // Error handling here
 
@@ -48,24 +48,24 @@ namespace Core
             }
         }
 
-        int Handler() const { return _Handler; }
+        int Handler() const { return _INode; }
 
         Descriptor &operator=(Descriptor &Other) = delete;
 
         Descriptor &operator=(Descriptor &&Other)
         {
-            std::swap(_Handler, Other._Handler);
+            std::swap(_INode, Other._INode);
             return *this;
         }
 
         inline bool operator==(const Descriptor &Other) const
         {
-            return Other._Handler == this->_Handler;
+            return Other._INode == _INode;
         }
 
         inline bool operator!=(const Descriptor &Other) const
         {
-            return Other._Handler != this->_Handler;
+            return Other._INode != _INode;
         }
     };
 }

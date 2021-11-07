@@ -12,21 +12,21 @@ namespace Core
     {
         struct CPoll
         {
-            int Descriptor;
-            short int Mask;
-            short int Events;
+            int Descriptor = -1;
+            short int Mask = 0;
+            short int Events = 0;
 
-            _FORCE_INLINE bool Happened(short int Masks)
+            _FORCE_INLINE inline bool Happened(short int Masks)
             {
                 return (Events & Masks) != 0;
             }
 
-            _FORCE_INLINE void Listen(short int Masks)
+            _FORCE_INLINE inline void Set(short int Masks)
             {
                 Mask |= Masks;
             }
 
-            _FORCE_INLINE void Ignore(short int Masks)
+            _FORCE_INLINE inline void Reset(short int Masks)
             {
                 Mask &= ~Masks;
             }
@@ -84,7 +84,7 @@ namespace Core
             {
                 this->_IncreaseCapacity();
 
-                _ElementAt(this->_Length) = std::move(Item);
+                _ElementAt(this->_Length) = Item;
                 (this->_Length)++;
             }
 
@@ -96,6 +96,7 @@ namespace Core
                 (this->_Length)++;
             }
 
+            // ### We dont need this
             void Add(const CPoll &Item, size_t Count) override
             {
                 this->_IncreaseCapacity(Count);
@@ -108,7 +109,66 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Remove(size_t Index) // Not Compatiable
+            void Add(CPoll *Items, size_t Count) override
+            {
+                this->_IncreaseCapacity(Count);
+
+                for (size_t i = 0; i < Count; i++)
+                {
+                    _ElementAt(this->_Length + i) = Items[i];
+                }
+
+                this->_Length += Count;
+            }
+
+            void Add(const CPoll *Items, size_t Count) override
+            {
+                this->_IncreaseCapacity(Count);
+
+                for (size_t i = 0; i < Count; i++)
+                {
+                    _ElementAt(this->_Length + i) = Items[i];
+                }
+
+                this->_Length += Count;
+            }
+
+            void Fill(const CPoll &Item) override
+            {
+                for (size_t i = this->_Length; i < this->_Capacity; i++)
+                {
+                    _ElementAt(i) = Item;
+                }
+
+                this->_Length = this->_Capacity;
+            }
+
+            CPoll Take() override
+            {
+                if (this->_Length == 0)
+                    throw std::out_of_range("");
+
+                this->_Length--;
+
+                return _ElementAt(this->_Length);
+            }
+
+            void Take(CPoll *Items, size_t Count) override
+            {
+                if (this->_Length < Count)
+                    throw std::out_of_range("");
+
+                size_t _Length_ = this->_Length - Count;
+
+                for (size_t i = _Length_; i < this->_Length; i++)
+                {
+                    Items[i] = _ElementAt(i);
+                }
+
+                this->_Length = _Length_;
+            }
+
+            void Remove(size_t Index)
             {
                 if (Index >= _Length)
                     throw std::out_of_range("");
@@ -124,7 +184,7 @@ namespace Core
                 }
             }
 
-            void Swap(size_t Index) // Not Compatiable
+            void Swap(size_t Index)
             {
                 if (Index >= _Length)
                     throw std::out_of_range("");
@@ -139,7 +199,7 @@ namespace Core
                 }
             }
 
-            void Swap(size_t First, size_t Second) // Not Compatiable
+            void Swap(size_t First, size_t Second)
             {
                 if (First >= _Length || Second >= _Length)
                     throw std::out_of_range("");
@@ -147,13 +207,13 @@ namespace Core
                 std::swap(_ElementAt(First), _ElementAt(Second));
             }
 
+            // ### Additional functionalities
+
             void Await(int TimeoutMS = -1)
             {
                 int Result;
 
                 Result = poll((pollfd *)_Content, _Length, TimeoutMS);
-
-                // Error handling here
 
                 if (Result == -1)
                 {
@@ -220,62 +280,12 @@ namespace Core
                 return _Content[Index].Descriptor;
             }
 
-            // void operator()(int TimeoutMS = -1)
-            // {
-            //     int Result;
-
-            //     Result = poll((pollfd *)_Content, _Length, TimeoutMS);
-
-            //     // Error handling here
-
-            //     if (Result == -1)
-            //     {
-            //         std::cout << "Error :" << strerror(errno) << std::endl;
-            //         exit(-1);
-            //     }
-
-            //     if (Result == 0)
-            //         return;
-
-            //     int i = 0;
-            //     size_t j = 0;
-
-            //     for (; i < Result && j < _Length; j++)
-            //     {
-            //         auto &item = _Content[j];
-
-            //         if (item.Events)
-            //         {
-            //             i++;
-            //             Descriptor Descriptor(item.Descriptor);
-
-            //             if ((this->OnRead != NULL) && item.Happened(In))
-            //             {
-            //                 this->OnRead(Descriptor, j);
-            //             }
-
-            //             if ((this->OnWrite != NULL) && item.Happened(Out))
-            //             {
-            //                 this->OnWrite(Descriptor, j);
-            //             }
-
-            //             if ((this->OnError != NULL) && item.Happened(Error))
-            //             {
-            //                 this->OnError(Descriptor, j);
-            //             }
-            //         }
-            //     }
-            // }
-
             Poll &operator=(Poll &Other) = delete;
 
-            // Implement later
             Poll &operator=(Poll &&Other) noexcept
             {
                 if (this == &Other)
                     return *this;
-
-                delete[] _Content;
 
                 _Content = Other._Content;
                 _Capacity = Other._Capacity;

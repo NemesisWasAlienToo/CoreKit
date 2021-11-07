@@ -12,7 +12,8 @@ using namespace std;
 
 int main(int argc, char const *argv[])
 {
-    cout << "Google is at " << "Running on " << Network::DNS::HostName() << endl;
+    cout << "Google is at "
+         << "Running on " << Network::DNS::HostName() << endl;
 
     auto result = Network::DNS::Resolve("google.com");
 
@@ -24,7 +25,8 @@ int main(int argc, char const *argv[])
 
     client.Connect(Google);
 
-    if(!client.IsConnected()) return -1;
+    if (!client.IsConnected())
+        return -1;
 
     Iterable::Queue<char> Buffer(128);
 
@@ -54,6 +56,8 @@ int main(int argc, char const *argv[])
     {
         client >> Buffer;
     }
+
+    cout << client.IsConnected();
 
     auto ResponseText = Buffer.ToString();
 

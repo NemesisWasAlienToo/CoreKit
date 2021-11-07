@@ -64,9 +64,9 @@ namespace Core
         public:
             Socket()
             {
-                _Handler = socket(_Protocol, _Type, 0);
+                _INode = socket(_Protocol, _Type, 0);
 
-                if (_Handler < 0)
+                if (_INode < 0)
                 {
                     std::cout << "Error : " << strerror(errno) << std::endl;
                     exit(-1);
@@ -77,11 +77,11 @@ namespace Core
 
             Socket(SocketFamily Protocol, int Type = TCP) : _Protocol(Protocol), _Type(Type)
             {
-                _Handler = socket(Protocol, Type, 0);
+                _INode = socket(Protocol, Type, 0);
 
                 // Error handling here
 
-                if (_Handler < 0)
+                if (_INode < 0)
                 {
                     std::cout << "Init : " << strerror(errno) << std::endl;
                     exit(-1);
@@ -96,7 +96,7 @@ namespace Core
             {
                 int Result = 0;
 
-                int flags = fcntl(_Handler, F_GETFL, 0);
+                int flags = fcntl(_INode, F_GETFL, 0);
 
                 if (!(((_Type & NonBlocking) == 0) ^ Value))
                     return Value;
@@ -104,7 +104,7 @@ namespace Core
                 flags ^= NonBlocking;
                 _Type ^= NonBlocking;
 
-                Result = fcntl(_Handler, F_SETFL, flags);
+                Result = fcntl(_INode, F_SETFL, flags);
 
                 // Error handling here
 
@@ -139,9 +139,9 @@ namespace Core
                     Size = Host.sockaddr_in6((struct sockaddr_in6 *)SocketAddress);
                 }
 
-                setsockopt(_Handler, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+                setsockopt(_INode, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
 
-                Result = bind(_Handler, SocketAddress, Size);
+                Result = bind(_INode, SocketAddress, Size);
 
                 // Error handling here
 
@@ -174,7 +174,7 @@ namespace Core
                     Size = Target.sockaddr_in6((struct sockaddr_in6 *)SocketAddress);
                 }
 
-                int Result = connect(_Handler, SocketAddress, Size);
+                int Result = connect(_INode, SocketAddress, Size);
 
                 // Error handling here
 
@@ -195,7 +195,7 @@ namespace Core
                 char Data;
                 int Result = Receive(&Data, 1, DontWait | Peek);
 
-                if ((Result == 0 )|| (Result < 0 && errno != EAGAIN))
+                if ((Result == 0) || (Result < 0 && errno != EAGAIN))
                 {
                     return false;
                 }
@@ -205,7 +205,7 @@ namespace Core
 
             void Listen(int Count) const
             {
-                int Result = listen(_Handler, Count);
+                int Result = listen(_INode, Count);
 
                 // Error handling here
 
@@ -223,7 +223,7 @@ namespace Core
                 int ClientDescriptor;
 
                 Size = sizeof ClientAddress;
-                ClientDescriptor = accept(_Handler, (struct sockaddr *)&ClientAddress, &Size);
+                ClientDescriptor = accept(_INode, (struct sockaddr *)&ClientAddress, &Size);
 
                 // Error handling here
 
@@ -243,7 +243,7 @@ namespace Core
                 int ClientDescriptor, Result = 0;
 
                 Size = sizeof ClientAddress;
-                ClientDescriptor = accept(_Handler, (struct sockaddr *)&ClientAddress, &Size);
+                ClientDescriptor = accept(_INode, (struct sockaddr *)&ClientAddress, &Size);
 
                 // Error handling here
 
@@ -253,7 +253,7 @@ namespace Core
                     exit(-1);
                 }
 
-                if (fcntl(_Handler, F_GETFL, 0) & O_NONBLOCK)
+                if (fcntl(_INode, F_GETFL, 0) & O_NONBLOCK)
                     Result = fcntl(ClientDescriptor, F_SETFL, O_NONBLOCK);
 
                 if (Result < 0)
@@ -268,12 +268,12 @@ namespace Core
 
             bool Closable() const
             {
-                if (_Handler < 0)
+                if (_INode < 0)
                     return false;
 
                 int error = 0;
                 socklen_t len = sizeof(error);
-                int retval = getsockopt(_Handler, SOL_SOCKET, SO_ERROR, &error, &len);
+                int retval = getsockopt(_INode, SOL_SOCKET, SO_ERROR, &error, &len);
 
                 if (retval != 0 || error != 0)
                 {
@@ -290,7 +290,7 @@ namespace Core
 
                 socklen_t addrlen = sizeof addr;
 
-                int Result = getpeername(_Handler, (struct sockaddr *)&addr, &addrlen);
+                int Result = getpeername(_INode, (struct sockaddr *)&addr, &addrlen);
 
                 if (Result < 0)
                 {
@@ -305,7 +305,7 @@ namespace Core
             {
 
                 int Count = 0;
-                int Result = ioctl(_Handler, FIONREAD, &Count);
+                int Result = ioctl(_INode, FIONREAD, &Count);
 
                 if (Result < 0)
                 {
@@ -320,7 +320,7 @@ namespace Core
             {
 
                 int Count = 0;
-                int Result = ioctl(_Handler, TIOCOUTQ, &Count);
+                int Result = ioctl(_INode, TIOCOUTQ, &Count);
 
                 if (Result < 0)
                 {
@@ -334,7 +334,7 @@ namespace Core
             Event Await(Event Events, int TimeoutMS = -1) const
             {
 
-                _POLLFD PollStruct = {.fd = _Handler, .events = Events};
+                _POLLFD PollStruct = {.fd = _INode, .events = Events};
 
                 int Result = poll(&PollStruct, 1, TimeoutMS);
 
@@ -351,21 +351,21 @@ namespace Core
                 return PollStruct.revents;
             }
 
-            size_t Send(char *Data, size_t Length, int Flags) const
+            ssize_t Send(char *Data, size_t Length, int Flags = 0) const
             {
-                return send(_Handler, Data, Length, Flags);
+                return send(_INode, Data, Length, Flags);
             }
 
-            size_t Receive(char *Data, size_t Length, int Flags) const
+            ssize_t Receive(char *Data, size_t Length, int Flags = 0) const
             {
-                return recv(_Handler, Data, Length, Flags);
+                return recv(_INode, Data, Length, Flags);
             }
 
-            size_t SendTo(char *Data, size_t Length, EndPoint Target, int Flags = 0) const
+            ssize_t SendTo(char *Data, size_t Length, EndPoint Target, int Flags = 0) const
             {
                 struct sockaddr_storage Client;
                 socklen_t len = Target.sockaddr((struct sockaddr *)&Client);
-                int Result = sendto(_Handler, (const char *)Data, Length, Flags, (struct sockaddr *)&Client, len);
+                int Result = sendto(_INode, (const char *)Data, Length, Flags, (struct sockaddr *)&Client, len);
 
                 if (Result < 0)
                 {
@@ -376,12 +376,12 @@ namespace Core
                 return Result;
             }
 
-            size_t ReceiveFrom(char *Data, size_t Length, EndPoint &Target, int Flags = 0) const
+            ssize_t ReceiveFrom(char *Data, size_t Length, EndPoint &Target, int Flags = 0) const
             {
                 struct sockaddr_storage Client;
                 socklen_t len = sizeof(Client);
 
-                int Result = recvfrom(_Handler, Data, Length, Flags, (struct sockaddr *)&Client, &len);
+                int Result = recvfrom(_INode, Data, Length, Flags, (struct sockaddr *)&Client, &len);
 
                 if (Result < 0)
                 {
@@ -403,7 +403,7 @@ namespace Core
                 while (Left > 0)
                 {
                     Await(Out);
-                    Result = write(_Handler, str, Left);
+                    Result = write(_INode, str, Left);
                     Left -= Result;
                 }
 
@@ -418,7 +418,7 @@ namespace Core
                 return *this;
             }
 
-            const Socket &operator<<(const std::string &Message) const noexcept
+            const Socket &operator<<(const std::string &Message) const
             {
                 int Result = 0;
                 int Left = Message.length();
@@ -427,7 +427,7 @@ namespace Core
                 while (Left > 0)
                 {
                     Await(Out);
-                    Result = write(_Handler, str, Left);
+                    Result = write(_INode, str, Left);
                     Left -= Result;
                 }
 
@@ -444,16 +444,9 @@ namespace Core
 
             const Socket &operator<<(Iterable::Queue<char> &queue) const
             {
-                size_t len = queue.Length();
+                auto _Buffer = queue.Chunk();
 
-                char _Buffer[len];
-
-                for (size_t i = 0; i < len; i++)
-                {
-                    _Buffer[i] = queue[i];
-                }
-
-                int Result = write(_Handler, _Buffer, len);
+                int Result = write(_INode, _Buffer.Content(), _Buffer.Length());
 
                 // Error handling here
 
@@ -462,43 +455,19 @@ namespace Core
                     std::cout << "operator<< : " << strerror(errno) << std::endl;
                     exit(-1);
                 }
+
+                // ### Probably send more if can?
 
                 queue.Free(Result);
 
                 return *this;
             }
 
-            // Socket &operator<<(Iterable::Queue<char> &queue)
-            // {
-            //     size_t len = queue.Length();
-
-            //     char _Buffer[len];
-
-            //     for (size_t i = 0; i < len; i++)
-            //     {
-            //         _Buffer[i] = queue[i];
-            //     }
-
-            //     int Result = write(_Handler, _Buffer, len);
-
-            //     // Error handling here
-
-            //     if (Result < 0)
-            //     {
-            //         std::cout << "operator<< : " << strerror(errno) << std::endl;
-            //         exit(-1);
-            //     }
-
-            //     queue.Free(Result);
-
-            //     return *this;
-            // }
-            
             Socket &operator<<(Iterable::Queue<char> &queue)
             {
                 auto _Buffer = queue.Chunk();
 
-                int Result = write(_Handler, _Buffer.Content(), _Buffer.Length());
+                int Result = write(_INode, _Buffer.Content(), _Buffer.Length());
 
                 // Error handling here
 
@@ -507,6 +476,8 @@ namespace Core
                     std::cout << "operator<< : " << strerror(errno) << std::endl;
                     exit(-1);
                 }
+
+                // ### Probably send more if can?
 
                 queue.Free(Result);
 
@@ -515,14 +486,14 @@ namespace Core
 
             const Socket &operator>>(Iterable::Queue<char> &queue) const
             {
-                size_t len = queue.Capacity() - queue.Length();
+                size_t Size = Received();
 
-                if (len == 0)
+                if (Size <= 0)
                     return *this;
 
-                char _Buffer[len];
+                char _Buffer[Size];
 
-                int Result = read(_Handler, _Buffer, len);
+                int Result = read(_INode, _Buffer, Size);
 
                 // Error handling here
 
@@ -532,21 +503,21 @@ namespace Core
                     exit(-1);
                 }
 
-                for (size_t i = 0; i < len; i++)
-                {
-                    queue.Add(_Buffer[i]); // ## Optimize later
-                }
+                queue.Add(_Buffer, Size);
 
                 return *this;
             }
 
             Socket &operator>>(Iterable::Queue<char> &queue)
             {
-                size_t len = Received();
+                size_t Size = Received();
 
-                char _Buffer[len];
+                if (Size <= 0)
+                    return *this;
 
-                int Result = read(_Handler, _Buffer, len);
+                char _Buffer[Size];
+
+                int Result = read(_INode, _Buffer, Size);
 
                 // Error handling here
 
@@ -556,29 +527,25 @@ namespace Core
                     exit(-1);
                 }
 
-                for (size_t i = 0; i < len; i++)
-                {
-                    queue.Add(_Buffer[i]); // ## Optimize later
-                }
+                queue.Add(_Buffer, Size);
 
                 return *this;
             }
 
-            Socket &operator>>(std::string &Message) noexcept
+            Socket &operator>>(std::string &Message)
             {
-                char buffer[1024];
-                int Result = 0;
+                size_t Size = Received() + 1;
 
-                while ((Result = read(_Handler, buffer, 1024)) > 0)
-                {
-                    buffer[Result] = 0;
-                    Message.append(buffer);
+                if (Size <= 0)
+                    return *this;
 
-                    if (Result < 1024)
-                        break;
-                }
+                char buffer[Size];
 
-                // Error handling here
+                int Result = read(_INode, buffer, Size);
+
+                // Instead, can increase string size by
+                // avalable bytes in socket buffer
+                // and call read on c_str at the new memory index
 
                 if (Result < 0 && errno != EAGAIN)
                 {
@@ -586,24 +553,26 @@ namespace Core
                     exit(-1);
                 }
 
+                buffer[Result] = 0;
+                Message.append(buffer);
+
                 return *this;
             }
 
-            const Socket &operator>>(std::string &Message) const noexcept
+            const Socket &operator>>(std::string &Message) const
             {
-                char buffer[1024];
-                int Result = 0;
+                size_t Size = Received() + 1;
 
-                while ((Result = read(_Handler, buffer, 1024)) > 0)
-                {
-                    buffer[Result] = 0;
-                    Message.append(buffer);
+                if (Size <= 0)
+                    return *this;
 
-                    if (Result < 1024)
-                        break;
-                }
+                char buffer[Size];
 
-                // Error handling here
+                int Result = read(_INode, buffer, Size);
+
+                // Instead, can increase string size by
+                // avalable bytes in socket buffer
+                // and call read on c_str at the new memory index
 
                 if (Result < 0 && errno != EAGAIN)
                 {
@@ -611,7 +580,20 @@ namespace Core
                     exit(-1);
                 }
 
+                buffer[Result] = 0;
+                Message.append(buffer);
+
                 return *this;
+            }
+
+            inline bool operator==(const Socket &Other)
+            {
+                return Other._INode == _INode;
+            }
+
+            inline bool operator!=(const Socket &Other)
+            {
+                return Other._INode != _INode;
             }
 
             // Maybe add rvalue later?
