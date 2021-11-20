@@ -13,6 +13,7 @@ namespace Core
         private:
             T *_Content = nullptr;
             size_t _Length = 0;
+            bool _Free = true;
 
             _FORCE_INLINE inline T &_ElementAt(size_t Index)
             {
@@ -30,13 +31,32 @@ namespace Core
                 return _Content;
             }
 
+            void Content(T *Pointer)
+            {
+                _Content = Pointer;
+            }
+
             size_t Length()
             {
                 return _Length;
             }
 
-            Span(T *Array, size_t Size) : _Content(Array), _Length(Size) {}
-            Span(Span &&Other) : _Content(Other._Content), _Length(Other._Length) {}
+            Span(size_t Size, bool AutoFree = true) : _Content(new T[Size]), _Length(Size), _Free(AutoFree) {}
+            Span(T *Array, size_t Size, bool AutoFree = true) : _Content(Array), _Length(Size), _Free(AutoFree) {}
+            Span(Span &&Other) : _Content(Other._Content), _Length(Other._Length), _Free(Other._Free) {}
+            Span(const Span &Other) : _Content(new T[Other._Length]), _Length(Other._Length), _Free(Other._Free)
+            {
+                for (size_t i = 0; i < Other._Length; i++)
+                {
+                    _Content[i] = Other._Content[i];
+                }
+            }
+
+            ~Span()
+            {
+                if (_Free)
+                    Free();
+            }
 
             void Free()
             {
@@ -121,12 +141,30 @@ namespace Core
 
             bool operator==(const Span &Other) noexcept
             {
-                return this->_Content == Other->_Content;
+                if (_Content == Other._Content)
+                    return true;
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    if (_Content[i] != Other._Content[i])
+                        return false;
+                }
+
+                return true;
             }
 
             bool operator!=(const Span &Other) noexcept
             {
-                return this->_Content != Other->_Content;
+                if (_Content != Other._Content)
+                    return true;
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    if (_Content[i] == Other._Content[i])
+                        return false;
+                }
+                
+                return true;
             }
         };
     }

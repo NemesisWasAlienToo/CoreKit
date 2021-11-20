@@ -25,6 +25,8 @@ namespace Core
 
         enum PermissionType
         {
+            Sticky = S_ISVTX,
+
             UserID = S_ISUID,
             GroupID = S_ISGID,
 
@@ -42,6 +44,8 @@ namespace Core
             OtherWrite = S_IWOTH,
             OtherExecute = S_IXOTH,
             OtherAll = S_IRWXO,
+
+            EveryoneAll = OwnerAll | GroupAll | OtherAll,
         };
 
         enum FlagType
@@ -52,6 +56,8 @@ namespace Core
             CreateFile = O_CREAT,
             Append = O_APPEND,
             CloseOnExec = O_CLOEXEC,
+            // Directory = O_DIRECTORY,
+            NonBlocking = O_NONBLOCK,
         };
 
         enum SeekType
@@ -70,6 +76,10 @@ namespace Core
         File(int Handler) : Descriptor(Handler) {}
 
         File(const File &Other) : Descriptor(Other) {}
+
+        // ### Destructor
+
+        // ~File() {}
 
         // ### Functionalities
 
@@ -193,17 +203,6 @@ namespace Core
             }
 
             return static_cast<size_t>(Result);
-        }
-
-        void Close() const
-        {
-            int Result = close(_INode);
-
-            if (Result < 0)
-            {
-                std::cout << "Close : " << strerror(errno) << std::endl;
-                exit(-1);
-            }
         }
 
         // ### Operators

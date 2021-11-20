@@ -12,20 +12,15 @@ namespace Core
         ~Test() {}
 
     public:
-
-        // static constexpr char * Red = "";
-
-
-    // Black: \033[30m
-    // Red: \033[31m
-    // Green: \033[32m
-    // Yellow: \033[33m
-    // Blue: \033[34m
-    // Magenta: \033[35m
-    // Cyan: \033[36m
-    // White: \033[37m
-    // Reset: \033[0m
-
+        static constexpr char *Black = (char *)"\033[30m";
+        static constexpr char *Red = (char *)"\033[31m";
+        static constexpr char *Green = (char *)"\033[32m";
+        static constexpr char *Yellow = (char *)"\033[33m";
+        static constexpr char *Blue = (char *)"\033[34m";
+        static constexpr char *Magenta = (char *)"\033[35m";
+        static constexpr char *Cyan = (char *)"\033[36m";
+        static constexpr char *White = (char *)"\033[37m";
+        static constexpr char *Reset = (char *)"\033[0m";
 
         static void Assert(const std::string &Message, bool Result)
         {
@@ -35,29 +30,45 @@ namespace Core
                 std::cout << "\033[1;31mFailed\033[0m : " << Message << std::endl;
         }
 
-        // static void Warn(const std::string &Message, bool Result)
-        // {
-        //     if (Result)
-        //         std::cout << "\033[1;32mPassed\033[0m : " << Message << std::endl;
-        //     else
-        //         std::cout << "\033[1;31mFailed\033[0m : " << Message << std::endl;
-        // }
-
-        template <typename T>
-        static void Log(const T &Message)
+        static std::string DateTime()
         {
             time_t rawtime;
             struct tm *timeinfo;
-            char buffer[80];
+            char buffer[40];
 
             time(&rawtime);
             timeinfo = localtime(&rawtime);
 
-            strftime(buffer, 80, "%F %T", timeinfo);
+            strftime(buffer, 40, "%F %T", timeinfo);
 
-            std::cout << "\033[1;35m"
-                      << buffer
-                      << "\033[0m : " << Message << std::endl;
+            return buffer;
+        }
+
+        static std::ostream &Error()
+        {
+            std::cout << Red
+                      << DateTime() << " : "
+                      << Reset;
+
+            return std::cout;
+        }
+
+        static std::ostream &Warn()
+        {
+            std::cout << Yellow
+                      << DateTime() << " : "
+                      << Reset;
+
+            return std::cout;
+        }
+
+        static std::ostream &Log()
+        {
+            std::cout << Green
+                      << DateTime() << " : "
+                      << Reset;
+
+            return std::cout;
         }
     };
 }

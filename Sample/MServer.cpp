@@ -3,7 +3,7 @@
 #include <thread>
 
 #include "Iterable/List.cpp"
-#include "Iterable/Buffer.cpp"
+#include "Iterable/Queue.cpp"
 #include "Network/DNS.cpp"
 #include "Network/Address.cpp"
 #include "Network/Socket.cpp"

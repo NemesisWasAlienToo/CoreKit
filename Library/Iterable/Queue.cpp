@@ -54,7 +54,7 @@ namespace Core
 
             Span<T> Chunk()
             {
-                return Span<T>(&(this->_Content[_First]),std::min((this->_Capacity - this->_Length), this->_Length));
+                return Span<T>(&(this->_Content[_First]), std::min((this->_Capacity - this->_Length), this->_Length), false);
             }
 
             // ### Public Functions
@@ -271,12 +271,11 @@ namespace Core
 
             Queue &operator=(const Queue &Other)
             {
-                if (this == &Other)
-                    return *this;
-
                 this->_Capacity = Other._Capacity;
-                _First = 0;
                 this->_Length = Other._Length;
+                _First = 0;
+
+                delete[] this->_Content;
 
                 this->_Content = new T[Other._Capacity];
 
@@ -290,9 +289,6 @@ namespace Core
 
             Queue &operator=(Queue &&Other) noexcept
             {
-                if (this == &Other)
-                    return *this;
-
                 this->_Capacity = Other._Capacity;
                 _First = Other._First;
                 this->_Length = Other._Length;

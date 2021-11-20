@@ -81,7 +81,7 @@ int main(int argc, char const *argv[])
                             {
                 if(index != Index - 1){
                     Buffer << Message;
-                    Poll(index + 1).events |= Iterable::Poll::Out;
+                    Poll[index + 1].Set(Iterable::Poll::Out);
                 } });
         }
     };
@@ -94,7 +94,7 @@ int main(int argc, char const *argv[])
         }
         else
         {
-            Poll(Index).events ^= Iterable::Poll::Out;
+            Poll[Index].Reset(Iterable::Poll::Out);
         }
     };
 

@@ -95,7 +95,7 @@ namespace Core
 
             int sockaddr_storage(struct sockaddr_storage *SocketAddress) const
             {
-                if (SocketAddress->ss_family == Address::IPv4)
+                if (_Address.Family() == Address::IPv4)
                 {
                     return sockaddr_in((struct sockaddr_in *)SocketAddress);
                 }

@@ -37,7 +37,6 @@ namespace Core
                 return;
 
             int Result = close(_INode);
-            _INode = -1;
 
             // Error handling here
 
@@ -46,9 +45,11 @@ namespace Core
                 std::cout << "Error :" << strerror(errno) << std::endl;
                 exit(-1);
             }
+            
+            _INode = -1;
         }
 
-        int Handler() const { return _INode; }
+        int INode() const { return _INode; }
 
         Descriptor &operator=(Descriptor &Other) = delete;
 

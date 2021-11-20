@@ -65,7 +65,7 @@ namespace Core
             
             void Add(const Descriptor &Descriptor, Event Events)
             {
-                int Handler = Descriptor.Handler();
+                int Handler = Descriptor.INode();
 
                 if (Handler < 0)
                 {
@@ -76,9 +76,26 @@ namespace Core
                 _IncreaseCapacity();
 
                 CPoll &Poll = _Content[_Length++];
-                Poll.Descriptor = Descriptor.Handler();
+                Poll.Descriptor = Descriptor.INode();
                 Poll.Mask = Events;
             }
+
+            // void Add(const List<Descriptor> &Descriptors, Event Events)
+            // {
+            //     int Handler = Descriptor.INode();
+
+            //     if (Handler < 0)
+            //     {
+            //         std::cout << "Error : Invalid file descriptor (less than zero)" << std::endl;
+            //         exit(-1);
+            //     }
+
+            //     _IncreaseCapacity();
+
+            //     CPoll &Poll = _Content[_Length++];
+            //     Poll.Descriptor = Descriptor.INode();
+            //     Poll.Mask = Events;
+            // }
 
             void Add(CPoll &&Item) override
             {
@@ -280,7 +297,7 @@ namespace Core
                 return _Content[Index].Descriptor;
             }
 
-            Poll &operator=(Poll &Other) = delete;
+            Poll &operator=(const Poll &Other) = delete;
 
             Poll &operator=(Poll &&Other) noexcept
             {

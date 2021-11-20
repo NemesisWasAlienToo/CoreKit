@@ -190,6 +190,9 @@ namespace Core
 
             virtual void Swap(size_t First, size_t Second){}
 
+            // Squeeze somthing in between
+            // virtual void Squeeze(T Item, size_t Index)
+
             // ### Pre-defined functions
 
             void ForEach(std::function<void(T &)> Action)

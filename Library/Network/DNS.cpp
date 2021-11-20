@@ -17,7 +17,8 @@ namespace Core
         {
         private:
             DNS() = default;
-            ~DNS(){}
+            ~DNS() {}
+
         public:
             // Static
 
@@ -81,10 +82,10 @@ namespace Core
                 return addresses;
             }
 
-            static std::string Name(EndPoint Target)
+            static std::string Name(Address Target)
             {
                 struct sockaddr_storage _Target;
-                socklen_t len = Target.sockaddr_storage(&_Target);
+                socklen_t len = Network::EndPoint(Target, 0).sockaddr_storage(&_Target);
 
                 char host[NI_MAXHOST];
 
@@ -93,8 +94,13 @@ namespace Core
                 if( Result != 0){
                     throw std::invalid_argument(gai_strerror(Result));
                 }
-                
+
                 return host;
+            }
+
+            static std::string Name(std::string Target)
+            {
+                return Name(Network::Address(Target));
             }
 
             static std::string Service(EndPoint Target)
@@ -103,12 +109,13 @@ namespace Core
                 socklen_t len = Target.sockaddr_storage(&_Target);
                 char serv[NI_MAXSERV];
 
-                int Result = getnameinfo((struct sockaddr *) &_Target, len, NULL, 0, serv, sizeof serv, 0);
+                int Result = getnameinfo((struct sockaddr *)&_Target, len, NULL, 0, serv, sizeof serv, 0);
 
-                if( Result != 0){
+                if (Result != 0)
+                {
                     throw std::invalid_argument(gai_strerror(Result));
                 }
-                
+
                 return serv;
             }
 

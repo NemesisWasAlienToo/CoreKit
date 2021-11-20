@@ -247,11 +247,14 @@ namespace Core
 
             // ### Operators
 
-            List &operator=(List &Other){
+            List &operator=(const List &Other){
                 this->_Capacity = Other._Capacity;
                 this->_Length = Other._Length;
-                this->_Content = new T[Other._Capacity];
                 this->_Growable = Other._Growable;
+
+                delete[] this->_Content;
+
+                this->_Content = new T[Other._Capacity];
 
                 for (size_t i = 0; i < Other._Length; i++)
                 {
@@ -263,8 +266,6 @@ namespace Core
             {
                 if (this == &Other)
                     return *this;
-
-                delete[] this->_Content;
 
                 this->_Capacity = Other._Capacity;
                 this->_Length = Other._Length;

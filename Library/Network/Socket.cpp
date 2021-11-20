@@ -180,8 +180,7 @@ namespace Core
 
                 if (Result < 0 && errno != EINPROGRESS)
                 {
-                    std::cout << "Connect : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::invalid_argument(strerror(errno));
                 }
             }
 
