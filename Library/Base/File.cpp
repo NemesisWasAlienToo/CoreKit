@@ -47,6 +47,8 @@ namespace Core
             OtherAll = S_IRWXO,
 
             EveryoneAll = OwnerAll | GroupAll | OtherAll,
+
+            DefaultPermission = OwnerWrite | OwnerRead | GroupRead | GroupWrite | OtherRead,
         };
 
         enum FlagType
@@ -103,14 +105,8 @@ namespace Core
             return Result;
         }
 
-        static File Open(const std::string &Path, int Flags = 0, uint32_t Permissions = 0)
+        static File Open(const std::string &Path, int Flags = 0, uint32_t Permissions = DefaultPermission)
         {
-            if (Flags & Append)
-            {
-                if (!(Flags & (ReadWrite | WriteOnly)))
-                    throw std::invalid_argument("Append flag must come with write permission");
-            }
-
             int Result = open(Path.c_str(), Flags, Permissions);
 
             if (Result < 0)
@@ -129,6 +125,48 @@ namespace Core
             {
                 throw std::system_error(errno, std::generic_category());
             }
+        }
+
+        static std::string ReadAll(const std::string &Path)
+        {
+            auto file = Open(Path, ReadOnly);
+
+            size_t size = file.Size();
+            size_t len = 0;
+
+            char buffer[size + 1];
+
+            buffer[size] = 0;
+
+            while (len < size)
+            {
+                len += file.Read(&(buffer[len]), (size - len));
+            }
+
+            file.Close();
+
+            return buffer;
+        }
+
+        static void WriteAll(const std::string &Path, const std::string &Content, bool Create = true, uint32_t Permissions = DefaultPermission)
+        {
+            int flags = WriteOnly;
+
+            if (Create)
+                flags |= CreateFile;
+
+            auto file = Open(Path, flags, Permissions);
+
+            const char *buffer = Content.c_str();
+            size_t size = Content.length();
+            size_t len = 0;
+
+            while (len < size)
+            {
+                len += file.Write(&(buffer[len]), (size - len));
+            }
+
+            file.Close();
         }
 
         // void Run(const std::string& Path)

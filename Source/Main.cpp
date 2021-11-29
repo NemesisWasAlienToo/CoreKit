@@ -6,6 +6,7 @@
 // # User headers
 
 #include "Iterable/List.cpp"
+#include "Base/File.cpp"
 
 // # Usings
 
@@ -15,9 +16,11 @@ using namespace Core;
 
 int main(int argc, char const *argv[])
 {
-    auto a = 1 + false;
+    // auto a = 1 + false;
 
-    std::cout << a << std::endl;
+    File::WriteAll("TestFile", "Hello there.\nHello there again.");
+
+    std::cout << File::ReadAll("TestFile") << std::endl;
 
     return 0;
 }

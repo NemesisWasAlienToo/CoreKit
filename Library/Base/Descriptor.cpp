@@ -40,12 +40,26 @@ namespace Core
 
         auto Write(const void *Data, size_t Size)
         {
-            return write(_INode, Data, Size);
+            int Result = write(_INode, Data, Size);
+
+            if (Result < 0)
+            {
+                throw std::system_error(errno, std::generic_category());
+            }
+
+            return Result;
         }
 
         auto Read(void *Data, size_t Size)
         {
-            return read(_INode, Data, Size);
+            int Result = read(_INode, Data, Size);
+
+            if (Result < 0)
+            {
+                throw std::system_error(errno, std::generic_category());
+            }
+
+            return Result;
         }
 
         void Blocking(bool Value)
