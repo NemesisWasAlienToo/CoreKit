@@ -6,7 +6,6 @@
 // # User headers
 
 #include "Iterable/List.cpp"
-#include "Network/Socket.cpp"
 
 // # Usings
 
@@ -14,9 +13,11 @@ using namespace Core;
 
 // # Global variables
 
-Iterable::List<Network::Socket> Peers;
-
 int main(int argc, char const *argv[])
 {
+    auto a = 1 + false;
+
+    std::cout << a << std::endl;
+
     return 0;
 }

@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <sys/ioctl.h>
+#include <system_error>
 
 #include "Base/Descriptor.cpp"
 #include "Network/EndPoint.cpp"
@@ -50,32 +51,20 @@ namespace Core
                 Truncate = MSG_TRUNC,
                 WaitAll = MSG_WAITALL,
             };
-
-        private:
-            // Types :
-
-            typedef struct pollfd _POLLFD;
-
-            // Variables :
-
-            SocketFamily _Protocol = IPv4;
-            int _Type = TCP;
-
-        public:
+            
             Socket()
             {
-                _INode = socket(_Protocol, _Type, 0);
+                _INode = socket(IPv4, TCP, 0);
 
                 if (_INode < 0)
                 {
-                    std::cout << "Error : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
             }
 
             Socket(const int Handler) : Descriptor(Handler) {}
 
-            Socket(SocketFamily Protocol, int Type = TCP) : _Protocol(Protocol), _Type(Type)
+            Socket(SocketFamily Protocol, int Type = TCP)
             {
                 _INode = socket(Protocol, Type, 0);
 
@@ -83,44 +72,13 @@ namespace Core
 
                 if (_INode < 0)
                 {
-                    std::cout << "Init : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
             }
 
             Socket(const Socket &Other) : Descriptor(Other) {}
 
             Socket(const Descriptor &Other) : Descriptor(Other) {}
-
-            bool Blocking(bool Value)
-            {
-                int Result = 0;
-
-                int flags = fcntl(_INode, F_GETFL, 0);
-
-                if (!(((_Type & NonBlocking) == 0) ^ Value))
-                    return Value;
-
-                flags ^= NonBlocking;
-                _Type ^= NonBlocking;
-
-                Result = fcntl(_INode, F_SETFL, flags);
-
-                // Error handling here
-
-                if (Result < 0)
-                {
-                    std::cout << "Blocking : " << strerror(errno) << std::endl;
-                    exit(-1);
-                }
-
-                return (_Type & NonBlocking) == 0;
-            }
-
-            bool Blocking() const
-            {
-                return (_Type & NonBlocking) == 0;
-            }
 
             void Bind(const EndPoint &Host) const
             {
@@ -147,8 +105,7 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "Bind : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
             }
 
@@ -178,9 +135,9 @@ namespace Core
 
                 // Error handling here
 
-                if (Result < 0 && errno != EINPROGRESS)
+                if (Result < 0)
                 {
-                    throw std::invalid_argument(strerror(errno));
+                    throw std::system_error(errno, std::generic_category());
                 }
             }
 
@@ -210,8 +167,7 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "Listen : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
             }
 
@@ -228,8 +184,7 @@ namespace Core
 
                 if (ClientDescriptor < 0)
                 {
-                    std::cout << "Accept : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 return ClientDescriptor;
@@ -239,30 +194,28 @@ namespace Core
             {
                 struct sockaddr_storage ClientAddress;
                 socklen_t Size;
-                int ClientDescriptor, Result = 0;
+                int ClientDescriptor;
 
                 Size = sizeof ClientAddress;
                 ClientDescriptor = accept(_INode, (struct sockaddr *)&ClientAddress, &Size);
 
                 // Error handling here
 
-                if (ClientDescriptor < 0 && errno != EAGAIN)
+                if (ClientDescriptor < 0/* && errno != EAGAIN*/)
                 {
-                    std::cout << "Accept : " << strerror(errno) << std::endl;
-                    exit(-1);
-                }
-
-                if (fcntl(_INode, F_GETFL, 0) & O_NONBLOCK)
-                    Result = fcntl(ClientDescriptor, F_SETFL, O_NONBLOCK);
-
-                if (Result < 0)
-                {
-                    std::cout << "Accept : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 Peer = EndPoint((struct sockaddr *)&ClientAddress);
-                return ClientDescriptor;
+
+                // FIX : The descriptor will not have NonBlocking flag in its type
+
+                Socket Ret(ClientDescriptor);
+
+                if (fcntl(_INode, F_GETFL, 0) & O_NONBLOCK)
+                    Ret.Blocking(false);
+
+                return Ret;
             }
 
             bool Closable() const
@@ -276,11 +229,24 @@ namespace Core
 
                 if (retval != 0 || error != 0)
                 {
-                    std::cout << "Closable : " << strerror(errno) << std::endl;
-                    return false;
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 return true;
+            }
+
+            int Errors() const
+            {
+                int error = 0;
+                socklen_t len = sizeof(error);
+                int retval = getsockopt(_INode, SOL_SOCKET, SO_ERROR, &error, &len);
+
+                if (retval != 0)
+                {
+                    throw std::system_error(errno, std::generic_category());
+                }
+
+                return error;
             }
 
             EndPoint Peer() const
@@ -293,8 +259,7 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "Peer : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 return (struct sockaddr *)&addr;
@@ -304,12 +269,11 @@ namespace Core
             {
 
                 int Count = 0;
-                int Result = ioctl(_INode, FIONREAD, &Count);
+                int Result = ioctl(_INode, TIOCINQ, &Count);
 
                 if (Result < 0)
                 {
-                    std::cout << "Received : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 return Count;
@@ -323,31 +287,10 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "Sending : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 return Count;
-            }
-
-            Event Await(Event Events, int TimeoutMS = -1) const
-            {
-
-                _POLLFD PollStruct = {.fd = _INode, .events = Events};
-
-                int Result = poll(&PollStruct, 1, TimeoutMS);
-
-                if (Result < 0)
-                {
-                    std::cout << "Await : " << strerror(errno) << std::endl;
-                    return 0;
-                }
-                else if (Result == 0)
-                {
-                    return 0;
-                }
-
-                return PollStruct.revents;
             }
 
             ssize_t Send(char *Data, size_t Length, int Flags = 0) const
@@ -368,8 +311,7 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "ReceiveFrom : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 return Result;
@@ -384,8 +326,7 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "ReceiveFrom : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 Target = EndPoint(&Client);
@@ -393,7 +334,7 @@ namespace Core
                 return Result;
             }
 
-            Socket &operator<<(const std::string &Message) noexcept
+            Socket &operator<<(const std::string &Message)
             {
                 int Result = 0;
                 int Left = Message.length();
@@ -410,8 +351,7 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "operator<< : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 return *this;
@@ -434,8 +374,7 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "operator<< : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 return *this;
@@ -451,8 +390,7 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "operator<< : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 // ### Probably send more if can?
@@ -472,8 +410,7 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "operator<< : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 // ### Probably send more if can?
@@ -498,8 +435,7 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "operator<< : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 queue.Add(_Buffer, Size);
@@ -522,8 +458,7 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    std::cout << "operator<< : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 queue.Add(_Buffer, Size);
@@ -548,8 +483,7 @@ namespace Core
 
                 if (Result < 0 && errno != EAGAIN)
                 {
-                    std::cout << "operator>> " << errno << " : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 buffer[Result] = 0;
@@ -575,8 +509,7 @@ namespace Core
 
                 if (Result < 0 && errno != EAGAIN)
                 {
-                    std::cout << "operator>> " << errno << " : " << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 buffer[Result] = 0;

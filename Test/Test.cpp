@@ -14,19 +14,19 @@
 using namespace Core;
 using namespace std;
 
-void p1() { cout << "P1" << endl; }
-void p2() { cout << "P2" << endl; }
-
 int main(int argc, char const *argv[])
 {
-    Iterable::List<function<void(void)>> functions(2, false);
+    cout << "Google is at " << "Running on " << Network::DNS::HostName() << endl;
 
-    functions.Add(p1);
-    functions.Add(p2);
+    auto result = Network::DNS::Resolve("google.com");
 
-    functions.ForEach([](std::function<void (void)>& item){
-        item();
-    });
+    Network::EndPoint Google(result[0], 80);
+
+    cout << "Google is at " << Google << endl;
+
+    Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP);
+
+    client.Connect(Google);
 
     return 0;
 }

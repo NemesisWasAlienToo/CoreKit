@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <system_error>
 
 #include "Base/Descriptor.cpp"
 
@@ -83,16 +84,6 @@ namespace Core
 
         // ### Functionalities
 
-        auto Write(const void *Data, size_t Size)
-        {
-            return write(_INode, Data, Size);
-        }
-
-        auto Read(void *Data, size_t Size)
-        {
-            return read(_INode, Data, Size);
-        }
-
         // ### Static functions
 
         static inline bool Exist(const std::string &Name, int Tests = F_OK)
@@ -106,7 +97,7 @@ namespace Core
 
             if (Result < 0)
             {
-                throw std::invalid_argument(strerror(errno));
+                throw std::system_error(errno, std::generic_category());
             }
 
             return Result;
@@ -124,7 +115,7 @@ namespace Core
 
             if (Result < 0)
             {
-                throw std::invalid_argument(strerror(errno));
+                throw std::system_error(errno, std::generic_category());
             }
 
             return Result;
@@ -136,7 +127,7 @@ namespace Core
 
             if (Result < 0)
             {
-                throw std::invalid_argument(strerror(errno));
+                throw std::system_error(errno, std::generic_category());
             }
         }
 
@@ -155,8 +146,7 @@ namespace Core
 
             if (Result < 0)
             {
-                std::cout << "Received : " << strerror(errno) << std::endl;
-                exit(-1);
+                throw std::system_error(errno, std::generic_category());
             }
 
             return Count;
@@ -168,8 +158,7 @@ namespace Core
 
             if (Result < 0)
             {
-                std::cout << "Size : " << strerror(errno) << std::endl;
-                exit(-1);
+                throw std::system_error(errno, std::generic_category());
             }
 
             return static_cast<size_t>(Result);
@@ -183,8 +172,7 @@ namespace Core
 
             if (Result < 0)
             {
-                std::cout << "Size : " << strerror(errno) << std::endl;
-                exit(-1);
+                throw std::system_error(errno, std::generic_category());
             }
 
             Seek(static_cast<ssize_t>(CurPos));
@@ -198,8 +186,7 @@ namespace Core
 
             if (Result < 0)
             {
-                std::cout << "Size : " << strerror(errno) << std::endl;
-                exit(-1);
+                throw std::system_error(errno, std::generic_category());
             }
 
             return static_cast<size_t>(Result);
@@ -225,8 +212,7 @@ namespace Core
 
             if (Result < 0)
             {
-                std::cout << "operator<< : " << strerror(errno) << std::endl;
-                exit(-1);
+                throw std::system_error(errno, std::generic_category());
             }
 
             return *this;
@@ -244,13 +230,12 @@ namespace Core
             int Result = read(_INode, buffer, Size);
 
             // Instead, can increase string size by
-            // avalable bytes in socket buffer
+            // available bytes in socket buffer
             // and call read on c_str at the new memory index
 
             if (Result < 0 && errno != EAGAIN)
             {
-                std::cout << "operator>> " << errno << " : " << strerror(errno) << std::endl;
-                exit(-1);
+                throw std::system_error(errno, std::generic_category());
             }
 
             buffer[Result] = 0;
@@ -276,8 +261,7 @@ namespace Core
 
             if (Result < 0 && errno != EAGAIN)
             {
-                std::cout << "operator>> " << errno << " : " << strerror(errno) << std::endl;
-                exit(-1);
+                throw std::system_error(errno, std::generic_category());
             }
 
             buffer[Result] = 0;

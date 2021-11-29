@@ -74,7 +74,7 @@ namespace Core
 
                     Iterable::Span<char> Serialize()
                     {
-                        
+                        //
                     }
                 };
 
@@ -122,21 +122,45 @@ namespace Core
 
                     // ### Static functions
 
-                    static uint32_t Ping(Network::EndPoint Target, int TimeOut)
+                    static int Ping(Network::EndPoint Target, int TimeOut)
                     {
                         char Buffer = 0;
 
                         Network::Socket socket(Network::Socket::IPv4, Network::Socket::TCP | Network::Socket::NonBlocking);
 
-                        socket.Connect(Target);
+                        try
+                        {
+                            socket.Connect(Target);
+                        }
+                        catch(const std::exception& e)
+                        {
+                            std::cerr << e.what() << '\n';
+                            return -1;
+                        }
+
+                        int Result = socket.Await(Network::Socket::Out, TimeOut);
+
+                        if (Result = 0)
+                        {
+                            return -1;
+                        }
 
                         socket.Send(&Buffer, 1);
 
+                        // Save time
+
                         clock_t Time = clock();
 
-                        socket.Await(Network::Socket::In);
+                        Result = socket.Await(Network::Socket::In, TimeOut);
 
-                        Time -= clock();
+                        if (Result = 0)
+                        {
+                            return -1;
+                        }
+
+                        // Measure time
+
+                        Time = clock() - Time;
 
                         return Time / (CLOCKS_PER_SEC / 1000);
                     }

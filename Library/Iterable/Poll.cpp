@@ -1,6 +1,7 @@
 #pragma once
 
 #include <poll.h>
+#include <system_error>
 
 #include "Iterable/Iterable.cpp"
 #include "Network/Socket.cpp"
@@ -234,8 +235,7 @@ namespace Core
 
                 if (Result == -1)
                 {
-                    std::cout << "Error :" << strerror(errno) << std::endl;
-                    exit(-1);
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 if (Result == 0)

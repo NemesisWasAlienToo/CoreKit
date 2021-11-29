@@ -3,8 +3,8 @@ LIBRARY_DIR=Library
 BUILD_DIR=Build
 TEST_DIR=Test
 SAMPLE_DIR=Sample
-TARGET:=Socket.elf
-TEST_TARGET:=Test_Socket.elf
+TARGET:=CoreKit.elf
+TEST_TARGET:=Test_$(TARGET).elf
 
 CPP_SOURCES:=$(shell find $(SOURCE_DIR) -name '*.cpp')
 C_SOURCES:=$(shell find $(SOURCE_DIR) -name '*.c')

@@ -4,6 +4,7 @@
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <system_error>
 
 #include "Network/EndPoint.cpp"
 #include "Network/Socket.cpp"
@@ -79,7 +80,7 @@ namespace Core
 
                 freeaddrinfo(res);
 
-                return addresses;
+                return std::move(addresses);
             }
 
             static std::string Name(Address Target)
@@ -92,7 +93,7 @@ namespace Core
                 int Result = getnameinfo((struct sockaddr *) &_Target, len, host, sizeof host, NULL, 0, 0);
 
                 if( Result != 0){
-                    throw std::invalid_argument(gai_strerror(Result));
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 return host;
@@ -113,7 +114,7 @@ namespace Core
 
                 if (Result != 0)
                 {
-                    throw std::invalid_argument(gai_strerror(Result));
+                    throw std::system_error(errno, std::generic_category());
                 }
 
                 return serv;
@@ -176,7 +177,7 @@ namespace Core
 
                 freeaddrinfo(res);
 
-                return addresses;
+                return std::move(addresses);
             }
 
             static std::string HostName()
