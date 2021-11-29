@@ -16,9 +16,10 @@ using namespace Core;
 
 int main(int argc, char const *argv[])
 {
-    // auto a = 1 + false;
-
-    File::WriteAll("TestFile", "Hello there.\nHello there again.");
+    if (File::Exist("TestFile"))
+        File::AppendAll("TestFile", "No hello cuz it exists.");
+    else
+        File::WriteAll("TestFile", "Hello there.\nHello there again.");
 
     std::cout << File::ReadAll("TestFile") << std::endl;
 

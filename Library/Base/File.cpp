@@ -169,6 +169,22 @@ namespace Core
             file.Close();
         }
 
+        static void AppendAll(const std::string &Path, const std::string &Content)
+        {
+            auto file = Open(Path, WriteOnly | Append);
+
+            const char *buffer = Content.c_str();
+            size_t size = Content.length();
+            size_t len = 0;
+
+            while (len < size)
+            {
+                len += file.Write(&(buffer[len]), (size - len));
+            }
+
+            file.Close();
+        }
+
         // void Run(const std::string& Path)
         // {
         //     int execve(Path.c_str(), char *const argv[], char *const envp[]);
