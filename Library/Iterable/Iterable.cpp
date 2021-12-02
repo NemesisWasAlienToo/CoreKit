@@ -49,8 +49,8 @@ namespace Core
 
             // ### Virtual Functions
 
-            virtual _FORCE_INLINE inline T &_ElementAt(size_t Index) {return _Content[0];}
-            virtual _FORCE_INLINE inline const T &_ElementAt(size_t Index) const {return _Content[0];}
+            virtual _FORCE_INLINE inline T &_ElementAt(size_t Index) { return _Content[0]; }
+            virtual _FORCE_INLINE inline const T &_ElementAt(size_t Index) const { return _Content[0]; }
 
             // ### Constructors
 
@@ -81,7 +81,8 @@ namespace Core
 
             // ### Destructor
 
-            ~Iterable()  {
+            ~Iterable()
+            {
                 delete[] _Content;
                 _Content = nullptr;
             }
@@ -166,29 +167,29 @@ namespace Core
 
             // ### Virtual Functions
 
-            virtual void Resize(size_t Size) {}
+            virtual void Resize(size_t Size) = 0;
 
-            virtual void Add(T &&Item) {}
+            virtual void Add(T &&Item) = 0;
 
-            virtual void Add(const T &Item) {}
+            virtual void Add(const T &Item) = 0;
 
-            virtual void Add(const T &Item, size_t Count) {}
+            virtual void Add(const T &Item, size_t Count) = 0;
 
-            virtual void Add(T *Items, size_t Count) {}
+            virtual void Add(T *Items, size_t Count) = 0;
 
-            virtual void Add(const T *Items, size_t Count) {}
+            virtual void Add(const T *Items, size_t Count) = 0;
 
-            virtual void Fill(const T &Item) {}
+            virtual void Fill(const T &Item) = 0;
 
-            virtual T Take() {return T();}
+            virtual T Take() = 0;
 
-            virtual void Take(T *Items, size_t Count) {}
+            virtual void Take(T *Items, size_t Count) = 0;
 
-            virtual void Remove(size_t Index) {}
+            virtual void Remove(size_t Index) = 0;
 
-            virtual void Swap(size_t Index){}
+            virtual void Swap(size_t Index) = 0;
 
-            virtual void Swap(size_t First, size_t Second){}
+            virtual void Swap(size_t First, size_t Second) = 0;
 
             // Squeeze somthing in between
             // virtual void Squeeze(T Item, size_t Index)
@@ -283,7 +284,7 @@ namespace Core
                 return result;
             }
 
-            bool Contains(const T& Item) const
+            bool Contains(const T &Item) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -294,7 +295,7 @@ namespace Core
                 return false;
             }
 
-            bool Contains(const T& Item, int &Index) const
+            bool Contains(const T &Item, int &Index) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {

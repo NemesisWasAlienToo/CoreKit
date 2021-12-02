@@ -2,11 +2,12 @@
 
 #include <iostream>
 #include <string>
+#include <mutex>
 
 // # User headers
 
 #include "Iterable/List.cpp"
-#include "Base/File.cpp"
+#include "Base/DateTime.cpp"
 
 // # Usings
 
@@ -16,12 +17,7 @@ using namespace Core;
 
 int main(int argc, char const *argv[])
 {
-    if (File::Exist("TestFile"))
-        File::AppendAll("TestFile", "No hello cuz it exists.");
-    else
-        File::WriteAll("TestFile", "Hello there.\nHello there again.");
-
-    std::cout << File::ReadAll("TestFile") << std::endl;
+    std::cout << DateTime::Test() << std::endl;
 
     return 0;
 }

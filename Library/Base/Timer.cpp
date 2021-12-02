@@ -2,11 +2,8 @@
 
 #include <iostream>
 #include <string>
-#include <unistd.h>
 #include <poll.h>
 #include <sys/timerfd.h>
-#include <sstream>
-#include <iomanip>
 #include <system_error>
 
 #include "Base/Descriptor.cpp"
