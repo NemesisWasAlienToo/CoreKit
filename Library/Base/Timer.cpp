@@ -53,7 +53,7 @@ namespace Core
 
         void Set(Duration Initial, Duration Periodic)
         {
-            struct itimerspec _Duration = {0, 0};
+            struct itimerspec _Duration = {{0, 0}, {0, 0}};
 
             Initial.Fill(_Duration.it_value);
             Periodic.Fill(_Duration.it_interval);
@@ -69,6 +69,16 @@ namespace Core
             struct itimerspec _Duration = {0, 0};
 
             duration.Fill(_Duration.it_value);
+
+            if (timerfd_settime(_INode, 0, &_Duration, NULL) < 0)
+            {
+                throw std::system_error(errno, std::generic_category());
+            }
+        }
+
+        void Stop()
+        {
+            struct itimerspec _Duration = {0, 0};
 
             if (timerfd_settime(_INode, 0, &_Duration, NULL) < 0)
             {
