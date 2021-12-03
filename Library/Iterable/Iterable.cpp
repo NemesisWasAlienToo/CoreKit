@@ -49,8 +49,8 @@ namespace Core
 
             // ### Virtual Functions
 
-            virtual _FORCE_INLINE inline T &_ElementAt(size_t Index) = 0;
-            virtual _FORCE_INLINE inline const T &_ElementAt(size_t Index) const = 0;
+            virtual _FORCE_INLINE inline T &_ElementAt(size_t Index) { return _Content[Index]; }
+            virtual _FORCE_INLINE inline const T &_ElementAt(size_t Index) const { return _Content[Index]; }
 
             // ### Constructors
 
@@ -163,33 +163,29 @@ namespace Core
                 return _ElementAt(_Length - 1);
             }
 
-            // ### Public Functions
+            virtual void Resize(size_t Size) {}
 
-            // ### Virtual Functions
+            virtual void Add(T &&Item) {}
 
-            virtual void Resize(size_t Size) = 0;
+            virtual void Add(const T &Item) {}
 
-            virtual void Add(T &&Item) = 0;
+            virtual void Add(const T &Item, size_t Count) {}
 
-            virtual void Add(const T &Item) = 0;
+            virtual void Add(T *Items, size_t Count) {}
 
-            virtual void Add(const T &Item, size_t Count) = 0;
+            virtual void Add(const T *Items, size_t Count) {}
 
-            virtual void Add(T *Items, size_t Count) = 0;
+            virtual void Fill(const T &Item) {}
 
-            virtual void Add(const T *Items, size_t Count) = 0;
+            virtual T Take() {return T();}
 
-            virtual void Fill(const T &Item) = 0;
+            virtual void Take(T *Items, size_t Count) {}
 
-            virtual T Take() = 0;
+            virtual void Remove(size_t Index) {}
 
-            virtual void Take(T *Items, size_t Count) = 0;
+            virtual void Swap(size_t Index) {}
 
-            virtual void Remove(size_t Index) = 0;
-
-            virtual void Swap(size_t Index) = 0;
-
-            virtual void Swap(size_t First, size_t Second) = 0;
+            virtual void Swap(size_t First, size_t Second){}
 
             // Squeeze somthing in between
             // virtual void Squeeze(T Item, size_t Index)
