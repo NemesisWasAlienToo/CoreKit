@@ -49,8 +49,8 @@ namespace Core
 
             // ### Virtual Functions
 
-            virtual _FORCE_INLINE inline T &_ElementAt(size_t Index) { return _Content[0]; }
-            virtual _FORCE_INLINE inline const T &_ElementAt(size_t Index) const { return _Content[0]; }
+            virtual _FORCE_INLINE inline T &_ElementAt(size_t Index) = 0;
+            virtual _FORCE_INLINE inline const T &_ElementAt(size_t Index) const = 0;
 
             // ### Constructors
 
