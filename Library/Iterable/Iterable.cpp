@@ -177,7 +177,7 @@ namespace Core
 
             virtual void Fill(const T &Item) {}
 
-            virtual T Take() {return T();}
+            virtual T Take() { return T(); }
 
             virtual void Take(T *Items, size_t Count) {}
 
@@ -185,10 +185,15 @@ namespace Core
 
             virtual void Swap(size_t Index) {}
 
-            virtual void Swap(size_t First, size_t Second){}
+            virtual void Swap(size_t First, size_t Second) {}
 
-            // Squeeze somthing in between
-            // virtual void Squeeze(T Item, size_t Index)
+            // ### To be implemented
+
+            virtual void Add(const Iterable<T> &Other) {}
+
+            virtual void Trim() {}
+
+            virtual void Squeeze(T Item, size_t Index) {}
 
             // ### Pre-defined functions
 

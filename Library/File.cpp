@@ -8,14 +8,12 @@
 #include <sys/ioctl.h>
 #include <system_error>
 
-#include "Base/Descriptor.cpp"
+#include "Descriptor.cpp"
 
 namespace Core
 {
     class File : public Descriptor
     {
-    private:
-        /* data */
     public:
         enum TestType
         {
@@ -59,8 +57,14 @@ namespace Core
             CreateFile = O_CREAT,
             Append = O_APPEND,
             CloseOnExec = O_CLOEXEC,
-            // Directory = O_DIRECTORY,
             NonBlocking = O_NONBLOCK,
+            Directory = O_DIRECTORY,
+#ifdef O_BINARY
+            Binary = O_BINARY,
+#endif
+#ifdef O_TEXT
+            Text = O_TEXT,
+#endif
         };
 
         enum SeekType
@@ -79,12 +83,6 @@ namespace Core
         File(int Handler) : Descriptor(Handler) {}
 
         File(const File &Other) : Descriptor(Other) {}
-
-        // ### Destructor
-
-        // ~File() {}
-
-        // ### Functionalities
 
         // ### Static functions
 
@@ -247,6 +245,20 @@ namespace Core
         }
 
         // ### Operators
+
+        File &operator<<(const char Message)
+        {
+            int Result = write(_INode, &Message, 1);
+
+            // Error handling here
+
+            if (Result < 0)
+            {
+                throw std::system_error(errno, std::generic_category());
+            }
+
+            return *this;
+        }
 
         File &operator<<(const std::string &Message)
         {

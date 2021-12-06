@@ -33,6 +33,8 @@ int main(int argc, char const *argv[])
 
         handler.detach();
     }
+
+    server.Close();
 }
 
 void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
