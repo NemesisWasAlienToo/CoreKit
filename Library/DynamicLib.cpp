@@ -34,6 +34,8 @@ namespace Core
             }
         }
 
+        DynamicLib(const DynamicLib& other) = delete;
+
         ~DynamicLib()
         {
             dlclose(_Handle);
@@ -58,7 +60,7 @@ namespace Core
         // ### Functionalities
 
         template <typename T>
-        T *Symbol(const std::string &Name)
+        T *Symbol(const std::string &Name) const
         {
             char *error = dlerror();
             auto ret = dlsym(_Handle, Name.c_str());
@@ -70,5 +72,14 @@ namespace Core
 
             return (T *)ret;
         }
+
+        void Close()
+        {
+            dlclose(_Handle);
+        }
+
+        // ### operators
+
+        DynamicLib& operator=(const DynamicLib& Other) = delete;
     };
 }
