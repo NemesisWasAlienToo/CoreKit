@@ -247,7 +247,8 @@ namespace Core
 
             // ### Operators
 
-            List &operator=(const List &Other){
+            List &operator=(const List &Other)
+            {
                 this->_Capacity = Other._Capacity;
                 this->_Length = Other._Length;
                 this->_Growable = Other._Growable;
@@ -286,6 +287,8 @@ namespace Core
 
             friend std::ostream &operator<<(std::ostream &os, const List &List)
             {
+                // Check for << opeartor
+
                 for (size_t i = 0; i < List._Length; i++)
                 {
                     os << "[" << i << "] : " << List._ElementAt(i) << '\n';

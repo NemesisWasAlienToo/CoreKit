@@ -1,7 +1,6 @@
 #pragma once
 
 #include <iostream>
-#include <functional>
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -91,7 +90,7 @@ namespace Core
             return (access(Name.c_str(), Tests) != -1);
         }
 
-        static File Create(const std::string &Path, uint32_t Permissions)
+        static void Create(const std::string &Path, uint32_t Permissions = DefaultPermission)
         {
             int Result = creat(Path.c_str(), Permissions);
 
@@ -100,7 +99,7 @@ namespace Core
                 throw std::system_error(errno, std::generic_category());
             }
 
-            return Result;
+            close(Result);
         }
 
         static File Open(const std::string &Path, int Flags = 0, uint32_t Permissions = DefaultPermission)
