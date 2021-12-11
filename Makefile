@@ -4,7 +4,7 @@ BUILD_DIR=Build
 TEST_DIR=Test
 SAMPLE_DIR=Sample
 TARGET:=CoreKit.elf
-TEST_TARGET:=Test_$(TARGET).elf
+TEST_TARGET:=Test_$(TARGET)
 
 CPP_SOURCES:=$(shell find $(SOURCE_DIR) -name '*.cpp')
 C_SOURCES:=$(shell find $(SOURCE_DIR) -name '*.c')

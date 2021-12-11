@@ -80,7 +80,7 @@ namespace Core
 
                 freeaddrinfo(res);
 
-                return std::move(addresses);
+                return addresses;
             }
 
             static std::string Name(Address Target)
@@ -177,7 +177,7 @@ namespace Core
 
                 freeaddrinfo(res);
 
-                return std::move(addresses);
+                return addresses;
             }
 
             static std::string HostName()

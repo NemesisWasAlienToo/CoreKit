@@ -80,7 +80,7 @@ namespace Core
 
         File() = default;
 
-        File(int Handler) : Descriptor(Handler) {}
+        File(int INode) : Descriptor(INode) {}
 
         File(const File &Other) : Descriptor(Other) {}
 

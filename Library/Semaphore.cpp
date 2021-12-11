@@ -3,54 +3,31 @@
 #include <iostream>
 #include <unistd.h>
 #include <poll.h>
-#include <sys/eventfd.h>
 #include <system_error>
-
-#include "Descriptor.cpp"
 
 namespace Core
 {
-    class Event : public Descriptor
+    class Semaphore
     {
     public:
-        enum EventFlags
-        {
-            CloseOnExec = EFD_CLOEXEC,
-            NonBlocking = EFD_NONBLOCK,
-            Semaphore = EFD_SEMAPHORE,
-        };
 
         // ### Constructors
 
-        Event()
+        Semaphore()
         {
-            int Result = eventfd(0, 0);
-
-            if (Result < 0)
-            {
-                throw std::system_error(errno, std::generic_category());
-            }
-
-            _INode = Result;
+            
         }
 
-        Event(int Handler) : Descriptor(Handler) {}
+        Semaphore(int Handler) : Descriptor(Handler) {}
 
-        Event(int Value, int Flags = 0)
+        Semaphore(int Value, int Flags = 0)
         {
-            int Result = eventfd(Value, Flags);
-
-            if (Result < 0)
-            {
-                throw std::system_error(errno, std::generic_category());
-            }
-
-            _INode = Result;
+            
         }
 
-        Event(const Event &Other) : Descriptor(Other) {}
+        Semaphore(const Semaphore &Other) : Descriptor(Other) {}
 
-        ~Event() { Close(); }
+        ~Semaphore() { Close(); }
 
         // ### Functionalitues
 
@@ -66,7 +43,7 @@ namespace Core
 
         uint64_t Await(int TimeoutMS = -1) const
         {
-            _POLLFD PollStruct = {.fd = _INode, .events = In};
+            _POLLFD PollStruct = {.fd = _INode, .Semaphores = In};
 
             int Result = poll(&PollStruct, 1, TimeoutMS);
 

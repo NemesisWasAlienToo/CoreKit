@@ -293,6 +293,36 @@ namespace Core
                 return Count;
             }
 
+            int ReceiveBufferSize() const
+            {
+                unsigned int Size = 0;
+                socklen_t len = sizeof Size;
+
+                int Result = getsockopt(_INode, SOL_SOCKET, SO_RCVBUF, &Size, &len);
+
+                if (Result < 0)
+                {
+                    throw std::system_error(errno, std::generic_category());
+                }
+
+                return Size;
+            }
+
+            int SendBufferSize() const
+            {
+                unsigned int Size = 0;
+                socklen_t len = sizeof Size;
+
+                int Result = getsockopt(_INode, SOL_SOCKET, SO_SNDBUF, &Size, &len);
+
+                if (Result < 0)
+                {
+                    throw std::system_error(errno, std::generic_category());
+                }
+
+                return Size;
+            }
+
             ssize_t Send(char *Data, size_t Length, int Flags = 0) const
             {
                 return send(_INode, Data, Length, Flags);
