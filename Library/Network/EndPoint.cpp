@@ -73,11 +73,16 @@ namespace Core
                 _Scope = SocketAddress.sin6_scope_id;
             }
 
-            EndPoint(const Address &EndPointAddress, int Port) : _Address(EndPointAddress) {
+            EndPoint(const Address &EndPointAddress, unsigned short Port) : _Address(EndPointAddress)
+            {
                 _Port = htons(Port);
             }
 
             EndPoint(const EndPoint &Othere) : _Address(Othere._Address), _Port(Othere._Port), _Flow(Othere._Flow), _Scope(Othere._Scope) {}
+
+            // Must add
+
+            // EndPoint(std::string& Content){}
 
             // Functions :
 
@@ -137,8 +142,8 @@ namespace Core
             Address &address() { return _Address; }
             const Address &address() const { return _Address; }
 
-            int port() { return _Port; } const
-            int port(int Port)
+            int port() { return _Port; }
+            const int port(int Port)
             {
                 _Port = Port;
                 return _Port;
@@ -166,6 +171,58 @@ namespace Core
                 _Port = Port;
                 _Scope = Scope;
                 _Flow = Flow;
+            }
+
+            // Operators
+
+            // Maybe add scope and flow later?
+
+            inline bool operator>(const EndPoint &Other)
+            {
+                if (_Address > Other._Address && _Port > Other._Port)
+                    return true;
+                else
+                    return false;
+            }
+
+            inline bool operator<(const EndPoint &Other)
+            {
+                if (_Address < Other._Address && _Port < Other._Port)
+                    return true;
+                else
+                    return false;
+            }
+
+            inline bool operator==(const EndPoint &Other)
+            {
+                if (_Address == Other._Address && _Port == Other._Port)
+                    return true;
+                else
+                    return false;
+            }
+
+            inline bool operator!=(const EndPoint &Other)
+            {
+                if (_Address == Other._Address && _Port == Other._Port)
+                    return false;
+                else
+                    return true;
+            }
+
+            inline bool operator>=(const EndPoint &Other)
+            {
+                if (_Address >= Other._Address && _Port >= Other._Port)
+                    return true;
+                else
+                    return false;
+            }
+
+            inline bool operator<=(const EndPoint &Other)
+            {
+                if (_Address <= Other._Address && _Port <= Other._Port)
+                    return true;
+                else
+                    return false;
             }
 
             friend std::ostream &operator<<(std::ostream &os, const EndPoint &tc)

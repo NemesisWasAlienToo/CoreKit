@@ -174,6 +174,84 @@ namespace Core
 
             // Operators :
 
+            inline bool operator>(const Address& Other)
+            {
+                for (size_t i = 15; i >= 0; i--)
+                {
+                    if (_Content[i] > Other._Content[i])
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            inline bool operator<(const Address& Other)
+            {
+                for (size_t i = 15; i >= 0; i--)
+                {
+                    if (_Content[i] < Other._Content[i])
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            inline bool operator==(const Address& Other)
+            {
+                for (size_t i = 15; i >= 0; i--)
+                {
+                    if (_Content[i] != Other._Content[i])
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            inline bool operator!=(const Address& Other)
+            {
+                for (size_t i = 15; i >= 0; i--)
+                {
+                    if (_Content[i] != Other._Content[i])
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            inline bool operator>=(const Address& Other)
+            {
+                for (size_t i = 15; i >= 0; i--)
+                {
+                    if (_Content[i] < Other._Content[i])
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            inline bool operator<=(const Address& Other)
+            {
+                for (size_t i = 15; i >= 0; i--)
+                {
+                    if (_Content[i] > Other._Content[i])
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
             friend std::ostream &operator<<(std::ostream &os, const Address &tc)
             {
                 char str[INET6_ADDRSTRLEN] = {0};

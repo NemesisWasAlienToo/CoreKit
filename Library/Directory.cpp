@@ -38,12 +38,15 @@ namespace Core
 
             enum Types
             {
-                Directory = DT_DIR,
+                Unknown = DT_UNKNOWN,
                 FIFO = DT_FIFO,
-                Socket = DT_SOCK,
-                Link = DT_LNK,
-                Block = DT_BLK,
                 Char = DT_CHR,
+                Directory = DT_DIR,
+                Block = DT_BLK,
+                Regular = DT_REG,
+                Link = DT_LNK,
+                Socket = DT_SOCK,
+                WhiteOut = DT_WHT,
             };
 
             // # Variables
@@ -58,18 +61,54 @@ namespace Core
 
             Entry() = default;
 
-            Entry(unsigned long _INode, std::string _Name, uint8_t _Type, off_t _Offset, unsigned short _Length) : 
-            INode(_INode), Name(_Name), Type(_Type), Offset(_Offset), Length(_Length) {}
+            Entry(unsigned long _INode, std::string _Name, uint8_t _Type, off_t _Offset, unsigned short _Length) : INode(_INode), Name(_Name), Type(_Type), Offset(_Offset), Length(_Length) {}
 
-            Entry(Entry&& Other) : 
-            INode(Other.INode), Name(std::move(Other.Name)), Type(Other.Type), Offset(Other.Offset), Length(Other.Length) {}
+            Entry(Entry &&Other) : INode(Other.INode), Name(std::move(Other.Name)), Type(Other.Type), Offset(Other.Offset), Length(Other.Length) {}
 
-            Entry(const Entry& Other) : 
-            INode(Other.INode), Name(Other.Name), Type(Other.Type), Offset(Other.Offset), Length(Other.Length) {}
+            Entry(const Entry &Other) : INode(Other.INode), Name(Other.Name), Type(Other.Type), Offset(Other.Offset), Length(Other.Length) {}
+
+            // Static functions
+
+            inline std::string TypeName() const
+            {
+                switch (Type)
+                {
+                case Types::Unknown:
+                    return "Unknown";
+                    break;
+                case Types::FIFO:
+                    return "FIFO";
+                    break;
+                case Types::Char:
+                    return "Char Device";
+                    break;
+                case Types::Directory:
+                    return "Directory";
+                    break;
+                case Types::Block:
+                    return "Block Device";
+                    break;
+                case Types::Regular:
+                    return "Regular File";
+                    break;
+                case Types::Link:
+                    return "Symbolic Link";
+                    break;
+                case Types::Socket:
+                    return "Socket";
+                    break;
+                case Types::WhiteOut:
+                    return "Whiteout";
+                    break;
+                default:
+                    return "";
+                    break;
+                }
+            }
 
             // Move string
 
-            Entry& operator=(Entry&& Other)
+            Entry &operator=(Entry &&Other)
             {
                 INode = Other.INode;
                 Name = std::move(Other.Name);
@@ -79,7 +118,7 @@ namespace Core
                 return *this;
             }
 
-            Entry& operator=(const Entry& Other)
+            Entry &operator=(const Entry &Other)
             {
                 INode = Other.INode;
                 Name = Other.Name;
@@ -159,7 +198,7 @@ namespace Core
             }
         }
 
-        static void ChangeDirectory(const std::string& Path)
+        static void ChangeDirectory(const std::string &Path)
         {
             int Result = chdir(Path.c_str());
 
@@ -177,6 +216,17 @@ namespace Core
             {
                 throw std::system_error(errno, std::generic_category());
             }
+        }
+
+        static Iterable::List<Entry> List(size_t Buffersize = 1024)
+        {
+            auto dir = Directory::Open(".");
+
+            auto _ls = dir.Entries(Buffersize);
+
+            dir.Close();
+
+            return _ls;
         }
 
         static Directory Open(const std::string &Path)

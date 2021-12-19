@@ -32,6 +32,7 @@ namespace Core
 
         Descriptor() = default;
 
+        // @todo check the Handler value to be > 0 ?
         Descriptor(int Handler) : _INode(Handler) {}
 
         Descriptor(const Descriptor &Other) : _INode(Other._INode) {}
@@ -124,9 +125,9 @@ namespace Core
 
         // ### Peroperties
 
-        int INode() const { return _INode; }
+        inline int INode() const { return _INode; }
 
-        Descriptor &operator=(Descriptor &Other) = delete;
+        Descriptor &operator=(const Descriptor &Other) = delete;
 
         Descriptor &operator=(Descriptor &&Other)
         {

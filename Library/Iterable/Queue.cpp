@@ -298,12 +298,12 @@ namespace Core
                 return *this;
             }
 
-            friend Queue<char> &operator<<(Queue<char> &queue, const std::string &Message)
-            {
-                queue.Add(Message.c_str(), Message.length());
+            // friend Queue<char> &operator<<(Queue<char> &queue, const std::string &Message)
+            // {
+            //     queue.Add(Message.c_str(), Message.length());
 
-                return queue;
-            }
+            //     return queue;
+            // }
 
             friend std::ostream &operator<<(std::ostream &os, Queue &Queue)
             {

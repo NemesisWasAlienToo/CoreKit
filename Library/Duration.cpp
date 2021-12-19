@@ -17,7 +17,7 @@ namespace Core
 
         Duration() = default;
 
-        Duration(time_t seconds, time_t milliseconds = 0, time_t microseconds = 0, time_t nanoseconds = 0, bool periodic = false) : Seconds(seconds), Milliseconds(milliseconds), Microseconds(microseconds), Nanoseconds(nanoseconds) {}
+        Duration(time_t seconds, time_t milliseconds = 0, time_t microseconds = 0, time_t nanoseconds = 0) : Seconds(seconds), Milliseconds(milliseconds), Microseconds(microseconds), Nanoseconds(nanoseconds) {}
 
         Duration(itimerspec ITimeSpec)
         {

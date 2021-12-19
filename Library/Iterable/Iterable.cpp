@@ -79,6 +79,8 @@ namespace Core
                 std::swap(_Content, Other._Content);
             }
 
+        public:
+
             // ### Destructor
 
             ~Iterable()
@@ -86,8 +88,7 @@ namespace Core
                 delete[] _Content;
                 _Content = nullptr;
             }
-
-        public:
+            
             // ### Properties
 
             T *Content()
@@ -163,6 +164,13 @@ namespace Core
                 return _ElementAt(_Length - 1);
             }
 
+            T* Tail()
+            {
+                return &_ElementAt(_Length);
+            }
+
+            // Functions
+
             virtual void Resize(size_t Size) {}
 
             virtual void Add(T &&Item) {}
@@ -219,7 +227,7 @@ namespace Core
 
                 for (size_t i = 0; i < _Length; i++)
                 {
-                    const T &item = _ElementAt(i);
+                    T &item = _ElementAt(i);
 
                     if (Condition(item))
                         result.Add(item);

@@ -191,16 +191,18 @@ namespace Core
                 if (Index >= this->_Length)
                     throw std::out_of_range("");
 
+                --(this->_Length);
+
                 if constexpr (std::is_arithmetic<T>::value)
                 {
-                    if (--(this->_Length) != Index)
+                    [[likely]] if (this->_Length != Index)
                     {
                         _ElementAt(Index) = std::move(_ElementAt(this->_Length));
                     }
                 }
                 else
                 {
-                    if (--(this->_Length) == Index)
+                    [[unlikely]] if (this->_Length == Index)
                     {
                         _ElementAt(this->_Length).~T();
                     }
@@ -261,6 +263,8 @@ namespace Core
                 {
                     this->_Content[i] = Other._ElementAt(i);
                 }
+
+                return *this;
             }
 
             List &operator=(List &&Other) noexcept
@@ -284,6 +288,13 @@ namespace Core
             {
                 return this->_Content != Other->_Content;
             }
+
+            // friend List<char> &operator<<(List<char> &list, const std::string &Message)
+            // {
+            //     list.Add(Message.c_str(), Message.length());
+
+            //     return list;
+            // }
 
             friend std::ostream &operator<<(std::ostream &os, const List &List)
             {
