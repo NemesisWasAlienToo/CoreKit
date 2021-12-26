@@ -174,35 +174,43 @@ namespace Core
 
             // Operators :
 
-            inline bool operator>(const Address& Other)
+            inline bool operator>(const Address &Other) const
             {
-                for (size_t i = 15; i >= 0; i--)
+                for (int i = 0; i <= 15; i++)
                 {
                     if (_Content[i] > Other._Content[i])
                     {
                         return true;
                     }
-                }
-
-                return false;
-            }
-
-            inline bool operator<(const Address& Other)
-            {
-                for (size_t i = 15; i >= 0; i--)
-                {
-                    if (_Content[i] < Other._Content[i])
+                    else if(_Content[i] < Other._Content[i])
                     {
-                        return true;
+                        return false;
                     }
                 }
 
                 return false;
             }
 
-            inline bool operator==(const Address& Other)
+            inline bool operator<(const Address &Other) const
             {
-                for (size_t i = 15; i >= 0; i--)
+                for (int i = 0; i <= 15; i++)
+                {
+                    if (_Content[i] < Other._Content[i])
+                    {
+                        return true;
+                    }
+                    else if(_Content[i] > Other._Content[i])
+                    {
+                        return false;
+                    }
+                }
+
+                return false;
+            }
+
+            inline bool operator==(const Address &Other) const
+            {
+                for (int i = 0; i <= 15; i++)
                 {
                     if (_Content[i] != Other._Content[i])
                     {
@@ -213,9 +221,9 @@ namespace Core
                 return true;
             }
 
-            inline bool operator!=(const Address& Other)
+            inline bool operator!=(const Address &Other) const
             {
-                for (size_t i = 15; i >= 0; i--)
+                for (int i = 0; i <= 15; i++)
                 {
                     if (_Content[i] != Other._Content[i])
                     {
@@ -226,9 +234,9 @@ namespace Core
                 return false;
             }
 
-            inline bool operator>=(const Address& Other)
+            inline bool operator>=(const Address &Other) const
             {
-                for (size_t i = 15; i >= 0; i--)
+                for (int i = 0; i <= 15; i++)
                 {
                     if (_Content[i] < Other._Content[i])
                     {
@@ -239,9 +247,9 @@ namespace Core
                 return true;
             }
 
-            inline bool operator<=(const Address& Other)
+            inline bool operator<=(const Address &Other) const
             {
-                for (size_t i = 15; i >= 0; i--)
+                for (int i = 0; i <= 15; i++)
                 {
                     if (_Content[i] > Other._Content[i])
                     {

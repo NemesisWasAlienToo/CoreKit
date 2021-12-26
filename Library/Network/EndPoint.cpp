@@ -80,9 +80,16 @@ namespace Core
 
             EndPoint(const EndPoint &Othere) : _Address(Othere._Address), _Port(Othere._Port), _Flow(Othere._Flow), _Scope(Othere._Scope) {}
 
-            // Must add
+            EndPoint(const std::string& Content)
+            {
+                int Seprator = Content.find(':');
 
-            // EndPoint(std::string& Content){}
+                std::string IP = Content.substr(0, Seprator);
+                std::string Port = Content.substr(Seprator + 1);
+
+                _Address = Address(IP);
+                _Port = htons(std::stoi(Port));
+            }
 
             // Functions :
 
@@ -177,23 +184,43 @@ namespace Core
 
             // Maybe add scope and flow later?
 
-            inline bool operator>(const EndPoint &Other)
+            inline bool operator>(const EndPoint &Other) const
             {
-                if (_Address > Other._Address && _Port > Other._Port)
+                if(_Address > Other._Address)
+                {
                     return true;
-                else
+                }
+                else if(_Address < Other._Address)
+                {
                     return false;
+                }
+                else
+                {
+                    if(_Port <= Other._Port)  return false;
+                }
+                
+                return true;
             }
 
-            inline bool operator<(const EndPoint &Other)
+            inline bool operator<(const EndPoint &Other) const
             {
-                if (_Address < Other._Address && _Port < Other._Port)
-                    return true;
-                else
+                if(_Address > Other._Address)
+                {
                     return false;
+                }
+                else if(_Address < Other._Address)
+                {
+                    return true;
+                }
+                else
+                {
+                    if(_Port >= Other._Port)  return false;
+                }
+                
+                return true;
             }
 
-            inline bool operator==(const EndPoint &Other)
+            inline bool operator==(const EndPoint &Other) const
             {
                 if (_Address == Other._Address && _Port == Other._Port)
                     return true;
@@ -201,29 +228,29 @@ namespace Core
                     return false;
             }
 
-            inline bool operator!=(const EndPoint &Other)
+            inline bool operator!=(const EndPoint &Other) const
             {
-                if (_Address == Other._Address && _Port == Other._Port)
-                    return false;
-                else
-                    return true;
-            }
-
-            inline bool operator>=(const EndPoint &Other)
-            {
-                if (_Address >= Other._Address && _Port >= Other._Port)
+                if (_Address != Other._Address || _Port != Other._Port)
                     return true;
                 else
                     return false;
             }
 
-            inline bool operator<=(const EndPoint &Other)
-            {
-                if (_Address <= Other._Address && _Port <= Other._Port)
-                    return true;
-                else
-                    return false;
-            }
+            // inline bool operator>=(const EndPoint &Other) const
+            // {
+            //     if (_Address >= Other._Address && _Port >= Other._Port)
+            //         return true;
+            //     else
+            //         return false;
+            // }
+
+            // inline bool operator<=(const EndPoint &Other) const
+            // {
+            //     if (_Address <= Other._Address && _Port<= Other._Port)
+            //         return true;
+            //     else
+            //         return false;
+            // }
 
             friend std::ostream &operator<<(std::ostream &os, const EndPoint &tc)
             {

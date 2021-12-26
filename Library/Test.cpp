@@ -39,28 +39,34 @@ namespace Core
             return buffer;
         }
 
-        std::ostream &Error()
+        std::ostream &Error(const std::string & Title)
         {
             std::cout << Red
-                      << DateTime() << " : "
+                      << "["
+                      << DateTime() << "] "
+                      << Title << " : "
                       << Reset;
 
             return std::cout;
         }
 
-        std::ostream &Warn()
+        std::ostream &Warn(const std::string & Title)
         {
             std::cout << Yellow
-                      << DateTime() << " : "
+                      << "["
+                      << DateTime() << "] "
+                      << Title << " : "
                       << Reset;
 
             return std::cout;
         }
 
-        std::ostream &Log()
+        std::ostream &Log(const std::string & Title)
         {
             std::cout << Green
-                      << DateTime() << " : "
+                      << "["
+                      << DateTime() << "] "
+                      << Title << " : "
                       << Reset;
 
             return std::cout;

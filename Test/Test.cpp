@@ -2,8 +2,9 @@
 #include <string>
 #include <thread>
 #include <functional>
-#include <map>
+#include <mutex>
 
+#include <DateTime.cpp>
 #include <Test.cpp>
 #include <File.cpp>
 #include <Timer.cpp>
@@ -13,114 +14,54 @@
 #include <Iterable/Poll.cpp>
 #include <Network/DNS.cpp>
 #include <Network/Socket.cpp>
+#include <Network/DHT/Server.cpp>
+#include <Network/DHT/Handler.cpp>
+#include <Network/DHT/Chord.cpp>
 
 using namespace Core;
 
-// Handlers
-
-// @todo Needs a mutex
-
-Iterable::List<std::function<void(void *)>> Handlers;
-
-// Request Queue
-
-// @todo Needs a mutex
-
-Iterable::Queue<Iterable::Queue<char>> Requests;
-
-// @todo Thread pool
-
-//
-
-// tasks
-
-struct Request
-{
-    Iterable::Queue<char> Buffer;
-    Network::EndPoint Peer;
-    unsigned char Ready = false;
-};
-
-void Query(Network::EndPoint Peer, std::string Id, std::function<void(Network::EndPoint)> Callback)
-{
-    // Write packet
-
-    std::cout << Id << std::endl;
-
-    // Add Handler
-
-    Handlers.Add([Callback](void *Args)
-                 {
-        // Cast Argus
-
-        std::string& Respons = *(std::string *)Args;
-
-        // Build result from response
-
-        Network::EndPoint Result;
-
-        // Delete Response
-
-        delete &Respons;
-
-        // Execute Callback
-
-        Callback(Result); });
-}
-
 int main(int argc, char const *argv[])
 {
-    Iterable::List<Request> Sends;
-    Iterable::List<Request> Receives;
+    // Init EndPoint
 
-    Network::EndPoint Host(Network::Address::Any(Network::Address::IPv4), 8888);
+    Network::EndPoint EndPoint("0.0.0.0:8888");
 
-    Network::Socket server(Network::Socket::IPv4, Network::Socket::UDP);
+    // Init Key
 
-    server.Bind(Host);
+    Network::DHT::Key Identity(32, 0);
 
-    std::cout << Network::DNS::HostName() << " is listenning on " << Host << std::endl;
+    // Log End Point
 
-    Network::Socket::Event Events = Network::Socket::In;
+    Test::Log(Network::DNS::HostName()) << EndPoint << std::endl;
 
-    while (true)
+    // Run the server
+
+    Network::DHT::Chord::Runner Chord(Identity, EndPoint);
+
+    // Chord.Bootstrap();
+
+    Chord.Run();
+
+    std::string _loop;
+
+    while (_loop != "exit")
     {
-        Network::EndPoint Target;
+        // Perform Route
 
-        if (Sends.Length() != 0)
-            Events |= Network::Socket::Out;
-
-        auto Event = server.Await(Events);
-
-        if (Event & Network::Socket::In)
-        {
-            // Read identifier
-
-            char Identifier[8];
-
-            server.ReceiveFrom(Identifier, 8, Target, Network::Socket::Peek);
-
-            // Check if it has pending request
-            Receives.Where([Target](Request &Item) -> bool
-                           { return true; });
-
-            if (true)
+        Chord.Route(
+            Network::EndPoint("127.0.0.1:4444"),
+            Identity,
+            [](auto Result)
             {
-                //
-            }
-            else
-            {
-                Iterable::Queue<char> Buffer;
+                std::cout << "Routed to : " << Result << std::endl;
+            });
 
-                //
-            }
-        }
+        std::cout << "Waiting for commands, master" << std::endl;
 
-        if (Event & Network::Socket::Out)
-        {
-            //
-        }
+        std::cin >> _loop;
     }
+
+    Chord.Stop();
 
     return 0;
 }

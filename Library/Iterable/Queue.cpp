@@ -46,9 +46,13 @@ namespace Core
 
             Queue(T *Array, int Count, bool Growable = true) : Iterable<T>(Array, Count, Growable), _First(0) {}
 
-            Queue(Queue &Other) : Iterable<T>(Other), _First(0) {}
+            Queue(const Queue &Other) : Iterable<T>(Other), _First(0) {}
 
             Queue(Queue &&Other) noexcept : Iterable<T>(std::move(Other)), _First(Other._First) {}
+
+            // ### Destructor
+
+            ~Queue() = default;
 
             // ### Properties
 
@@ -59,7 +63,7 @@ namespace Core
 
             // ### Public Functions
 
-            void Resize(size_t Size) override
+            void Resize(size_t Size)
             {
                 T *_New = new T[Size];
 
@@ -77,7 +81,7 @@ namespace Core
                 this->_Capacity = Size;
             }
 
-            void Add(T &&Item) override
+            void Add(T &&Item)
             {
                 this->_IncreaseCapacity();
 
@@ -85,7 +89,7 @@ namespace Core
                 this->_Length++;
             }
 
-            void Add(const T &Item) override
+            void Add(const T &Item)
             {
                 this->_IncreaseCapacity();
 
@@ -93,7 +97,7 @@ namespace Core
                 this->_Length++;
             }
 
-            void Add(const T &Item, size_t Count) override
+            void Add(const T &Item, size_t Count)
             {
                 this->_IncreaseCapacity(Count);
 
@@ -105,7 +109,19 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Add(T *Items, size_t Count) override
+            void Add(T &&Item, size_t Count)
+            {
+                this->_IncreaseCapacity(Count);
+
+                for (size_t i = 0; i < Count; i++)
+                {
+                    _ElementAt(this->_Length + i) = std::forward<T>(Item);
+                }
+
+                this->_Length += Count;
+            }
+
+            void Add(T *Items, size_t Count)
             {
                 this->_IncreaseCapacity(Count);
 
@@ -117,7 +133,7 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Add(const T *Items, size_t Count) override
+            void Add(const T *Items, size_t Count)
             {
                 this->_IncreaseCapacity(Count);
 
@@ -129,7 +145,7 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Remove(size_t Index) override
+            void Remove(size_t Index)
             {
                 if (Index >= this->_Length)
                     throw std::out_of_range("");
@@ -159,7 +175,7 @@ namespace Core
                 }
             }
 
-            void Fill(const T &Item) override
+            void Fill(const T &Item)
             {
                 for (size_t i = this->_Length; i < this->_Capacity; i++)
                 {
@@ -169,7 +185,7 @@ namespace Core
                 this->_Length = this->_Capacity;
             }
 
-            T Take()  override
+            T Take() 
             {
                 if (this->IsEmpty())
                     throw std::out_of_range("");
@@ -181,7 +197,7 @@ namespace Core
                 return Item;
             }
 
-            void Take(T *Items, size_t Count)  override
+            void Take(T *Items, size_t Count)
             {
                 if (this->_Length < Count)
                     throw std::out_of_range("");
@@ -250,13 +266,15 @@ namespace Core
                 if (Size > this->_Length)
                     throw std::out_of_range("");
 
-                std::string str; // Optimization needed
+                // @todo Cahange to steam and display object
+
+                std::string str;
 
                 str.resize(Size * sizeof(T));
 
                 for (size_t i = 0; i < Size; i++)
                 {
-                    str += _ElementAt(i);
+                    str[i] = _ElementAt(i);
                 }
 
                 return str;

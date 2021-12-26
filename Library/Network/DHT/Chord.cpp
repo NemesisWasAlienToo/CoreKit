@@ -2,13 +2,15 @@
 
 #include <iostream>
 #include <string>
-#include <type_traits>
-#include <time.h>
+#include <thread>
 
 #include "Network/EndPoint.cpp"
-#include "Network/Socket.cpp"
+#include "Network/DHT/Key.cpp"
+#include "Network/DHT/Server.cpp"
+#include "Network/DHT/Handler.cpp"
+#include "Network/DHT/Node.cpp"
 #include "Iterable/List.cpp"
-#include "Iterable/Span.cpp"
+#include "Test.cpp"
 
 using namespace Core;
 
@@ -20,84 +22,6 @@ namespace Core
         {
             namespace Chord
             {
-                template <uint16_t Length>
-                struct Key
-                {
-                    // ### Guards
-
-                    static_assert(Length % 8 == 0, "Length must be a multiple of byte");
-
-                    // ### Constants
-
-                    constexpr static uint16_t Size = Length;
-
-                    // ### Variables
-
-                    char Data[Length / 8];
-
-                    // ### Functions
-
-                    void CopyFrom(char *Source)
-                    {
-                        for (size_t i = 0; i < Size; i++)
-                        {
-                            Data[i] = Source[i];
-                        }
-                    }
-
-                    void CopyTo(char *Destination)
-                    {
-                        for (size_t i = 0; i < Size; i++)
-                        {
-                            Destination[i] = Data[i];
-                        }
-                    }
-                };
-
-                template <typename TKey>
-                struct Request
-                {
-                    enum RequestType
-                    {
-                        Ping = 0,
-                        Survey,
-                        Get,
-                        Set,
-                    };
-
-                    uint8_t Type;
-                    TKey Key;
-                    void *Data;
-
-                    Request() = default;
-                    Request(uint8_t type, TKey key, void *data = NULL) : Type(type), Key(key), Data(data) {}
-
-                    Iterable::Span<char> Serialize()
-                    {
-                        //
-                    }
-                };
-
-                template <typename TKey>
-                struct Node
-                {
-                    // ### Types
-
-                    typedef uint32_t NodeStatus;
-
-                    enum StatusTypes
-                    {
-                        Avalaivle = 0,
-                    };
-
-                    // ### Variables
-
-                    TKey Id;
-                    Network::EndPoint Peer;
-                    NodeStatus Status;
-                };
-
-                template <typename TKey>
                 class Runner
                 {
                 private:
@@ -105,102 +29,233 @@ namespace Core
 
                     // ### Variables
 
+                    enum class Operations : unsigned char
+                    {
+                        Ping = 0,
+                        Query,
+                        Set,
+                        Get,
+                        Data,
+                        Deliver,
+                        Flood,
+                    };
+
+                    Key Id;
+
+                    Network::DHT::Server Server;
+
+                    Network::DHT::Handler Handler;
+
+                    Iterable::List<std::thread> Pool;
+
+                    Iterable::List<Node> Nodes;
+
+                    std::function<void()> _PoolTask =
+                        [this]()
+                    {
+                        // Clear running event
+
+                        while (Server.State == Network::DHT::Server::States::Running)
+                        {
+                            Network::DHT::Request Request;
+                            std::function<void(Network::DHT::Request &)> Task;
+
+                            // Pick one request
+
+                            if (!Server.Take(Request))
+                                continue;
+
+                            // Pick one task or default task
+
+                            Handler.Take(Request.Peer, Task);
+
+                            // Execute task
+
+                            Task(Request);
+                        }
+
+                        Server.Ready.Emit(1);
+
+                        std::cout << "Thread exited" << std::endl;
+                    };
+
+                    std::function<void(Network::DHT::Request &)> _Default =
+                        [this](Network::DHT::Request &Request)
+                    {
+                        Test::Log(Request.Peer.ToString()) << Request.Buffer << std::endl;
+                    };
+
                 public:
                     // ### Constructors
 
-                    Runner() {}
+                    Runner() = default;
 
-                    Network::EndPoint Route(TKey Key)
-                    {
-                        //
-                    }
-
-                    Network::EndPoint Flood(TKey Key)
-                    {
-                        //
-                    }
+                    Runner(Key id, const Network::EndPoint &EndPoint, size_t ThreadCount = 1) : Id(id), Server(EndPoint),
+                                                                                                Handler(_Default), Pool(ThreadCount, false) {}
 
                     // ### Static functions
 
-                    static int Ping(Network::EndPoint Target, int TimeOut)
+                    Network::EndPoint DefaultEndPoint()
                     {
-                        char Buffer = 0;
-
-                        Network::Socket socket(Network::Socket::IPv4, Network::Socket::TCP | Network::Socket::NonBlocking);
-
-                        try
-                        {
-                            socket.Connect(Target);
-                        }
-                        catch(const std::exception& e)
-                        {
-                            std::cerr << e.what() << '\n';
-                            return -1;
-                        }
-
-                        int Result = socket.Await(Network::Socket::Out, TimeOut);
-
-                        if (Result = 0)
-                        {
-                            return -1;
-                        }
-
-                        socket.Send(&Buffer, 1);
-
-                        // Save time
-
-                        clock_t Time = clock();
-
-                        Result = socket.Await(Network::Socket::In, TimeOut);
-
-                        if (Result = 0)
-                        {
-                            return -1;
-                        }
-
-                        // Measure time
-
-                        Time = clock() - Time;
-
-                        return Time / (CLOCKS_PER_SEC / 1000);
+                        return Network::EndPoint("127.0.0.1:8888");
                     }
 
-                    static Network::EndPoint Survey(const Network::EndPoint &Target, const TKey &Id)
+                    // ### Functionalities
+
+                    void Await()
                     {
-                        // Form request
-
-                        // std::tuple
-
-                        Network::Socket socket(Network::Socket::IPv4, Network::Socket::TCP | Network::Socket::NonBlocking);
-
-                        socket.Connect(Target);
-
-                        size_t Size = sizeof(size_t) + sizeof(TKey) + 1;
-
-                        uint8_t Packet[Size];
-
-                        socket.Await(Network::Socket::Out);
-
-                        // Send request
-
-                        // Read response
-
-                        // Format response
-
-                        socket.Close();
-
-                        // return response;
+                        // Wait for out tasks to be done
                     }
 
-                    static Network::EndPoint Get(Network::EndPoint Target)
+                    inline void GetInPool()
                     {
-                        //
+                        _PoolTask();
                     }
 
-                    static Network::EndPoint Set(Network::EndPoint Target)
+                    void Run()
                     {
-                        //
+                        // Start the udp serializer server
+
+                        Server.Run();
+
+                        // Setup thread pool task
+
+                        Pool.Add(std::thread(_PoolTask), Pool.Capacity());
                     }
+
+                    void Stop()
+                    {
+                        // Stop the server
+
+                        Server.Stop();
+
+                        // Join threads
+
+                        Pool.ForEach(
+                            [](std::thread &Thread)
+                            {
+                                Thread.join();
+                            });
+
+                        // Clear event
+
+                        Server.Ready.Listen();
+                    }
+
+                    // Network requests
+
+                    Node &Closest(Key key)
+                    {
+                        size_t Index;
+
+                        for (size_t i = 0; i < Nodes.Length() && Nodes[i].Id < key; i++) {}
+
+                        return Nodes[Index - 1];
+                    }
+
+                    void Query(Network::EndPoint Peer, Key Id, std::function<void(Network::EndPoint)> Callback)
+                    {
+                        // @todo set handler before write to detect in progress request
+                        // Write packet
+
+                        Network::DHT::Request req;
+
+                        std::string _Id = Id.ToString();
+
+                        req.Peer = Peer;
+                        req.Buffer.Add(_Id.c_str(), _Id.length());
+
+                        Server.Put(std::move(req));
+
+                        // Add Handler
+
+                        auto Result = Handler.Put(
+                            Peer,
+                            DateTime::FromNow(/* Timeout */),
+                            [this, Callback](Network::DHT::Request &request)
+                            {
+                                auto Response = request.Buffer.ToString();
+
+                                try
+                                {
+                                    Callback(Response);
+                                }
+                                catch (const std::exception &e)
+                                {
+                                    Test::Warn(e.what()) << Response << std::endl;
+                                }
+                            });
+
+                        if (!Result)
+                            std::cout << "Handler already exists" << std::endl;
+                    }
+
+                    void Route(Network::EndPoint Peer, Key Id, std::function<void(Network::EndPoint)> Callback)
+                    {
+                        Query(
+                            Peer,
+                            Id,
+                            [this, Peer, Id, Callback](Network::EndPoint Response)
+                            {
+                                if (Peer == Response)
+                                    Callback(Peer);
+                                else
+                                    Route(Response, Id, Callback);
+                            });
+                    }
+
+                    void Route(Key Id, std::function<void(Network::EndPoint)> Callback)
+                    {
+                        const auto &Peer = Closest(Id).EndPoint;
+
+                        Route(
+                            Peer,
+                            Id,
+                            [this, Peer, Id, Callback](Network::EndPoint Response)
+                            {
+                                if (Peer == Response)
+                                    Callback(Peer);
+                                else
+                                    Route(Response, Id, Callback);
+                            });
+                    }
+
+                    void Bootstrap(Network::EndPoint Peer, size_t NthNeighbor)
+                    {
+                        auto Neighbor = Id.Neighbor(NthNeighbor);
+
+                        Route(
+                            Peer,
+                            Neighbor,
+                            [this, NthNeighbor](Network::EndPoint Response)
+                            {
+                                Nodes.Add(Node(Id, Response));
+
+                                // @todo also not all nodes exist and need to be routed
+
+                                Bootstrap(Closest(Id).EndPoint, NthNeighbor - 1);
+                            });
+                    }
+
+                    void Bootstrap()
+                    {
+                        Bootstrap(Closest(Id).EndPoint, Id.Size);
+                    }
+
+                    // int Ping(Network::EndPoint Target, int TimeOut)
+                    // {
+                    //     //
+                    // }
+
+                    // Network::EndPoint Get(Network::EndPoint Target)
+                    // {
+                    //     //
+                    // }
+
+                    // Network::EndPoint Set(Network::EndPoint Target)
+                    // {
+                    //     //
+                    // }
                 };
             }
         }

@@ -36,7 +36,7 @@ namespace Core
 
         Event(int Handler) : Descriptor(Handler) {}
 
-        Event(int Value, int Flags = 0)
+        Event(int Value, int Flags)
         {
             int Result = eventfd(Value, Flags);
 
@@ -64,27 +64,23 @@ namespace Core
             }
         }
 
-        uint64_t Await(int TimeoutMS = -1) const
+        int Await(int TimeoutMS = -1) const
         {
             _POLLFD PollStruct = {.fd = _INode, .events = In};
 
-            int Result = poll(&PollStruct, 1, TimeoutMS);
+            int Result =  poll(&PollStruct, 1, TimeoutMS);
 
             if (Result < 0)
             {
                 throw std::system_error(errno, std::generic_category());
             }
-            else if (Result == 0)
-            {
-                return 0;
-            }
 
-            return Value();
+            return Result;
         }
 
         // TryAwait
 
-        uint64_t Value() const
+        uint64_t Listen() const
         {
             uint64_t Value;
 

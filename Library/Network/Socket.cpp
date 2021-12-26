@@ -265,7 +265,7 @@ namespace Core
                 return (struct sockaddr *)&addr;
             }
 
-            int Received() const
+            size_t Received() const
             {
 
                 int Count = 0;
@@ -279,7 +279,7 @@ namespace Core
                 return Count;
             }
 
-            int Sending() const
+            size_t Sending() const
             {
 
                 int Count = 0;
@@ -293,7 +293,7 @@ namespace Core
                 return Count;
             }
 
-            int ReceiveBufferSize() const
+            size_t ReceiveBufferSize() const
             {
                 unsigned int Size = 0;
                 socklen_t len = sizeof Size;
@@ -308,7 +308,7 @@ namespace Core
                 return Size;
             }
 
-            int SendBufferSize() const
+            size_t SendBufferSize() const
             {
                 unsigned int Size = 0;
                 socklen_t len = sizeof Size;
@@ -323,7 +323,7 @@ namespace Core
                 return Size;
             }
 
-            ssize_t Send(char *Data, size_t Length, int Flags = 0) const
+            ssize_t Send(const char *Data, size_t Length, int Flags = 0) const
             {
                 return send(_INode, Data, Length, Flags);
             }
@@ -333,7 +333,7 @@ namespace Core
                 return recv(_INode, Data, Length, Flags);
             }
 
-            ssize_t SendTo(char *Data, size_t Length, EndPoint Target, int Flags = 0) const
+            ssize_t SendTo(const char *Data, size_t Length, EndPoint Target, int Flags = 0) const
             {
                 struct sockaddr_storage Client;
                 socklen_t len = Target.sockaddr((struct sockaddr *)&Client);

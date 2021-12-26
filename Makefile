@@ -57,6 +57,9 @@ $(BUILD_DIR):
 run:
 	@$(BUILD_DIR)/$(TARGET) $(RUN_ARGS)
 
+runtest:
+	@$(BUILD_DIR)/$(TEST_TARGET) $(RUN_ARGS)
+
 clean:
 	rm -Rf $(BUILD_DIR)
 

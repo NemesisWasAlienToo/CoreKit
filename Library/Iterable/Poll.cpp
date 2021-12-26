@@ -17,6 +17,11 @@ namespace Core
             short int Mask = 0;
             short int Events = 0;
 
+            _FORCE_INLINE inline bool HasEvent()
+            {
+                return Events != 0;
+            }
+
             _FORCE_INLINE inline bool Happened(short int Masks)
             {
                 return (Events & Masks) != 0;
@@ -60,7 +65,7 @@ namespace Core
             Poll(Poll &Other) : Iterable<CPoll>(Other), OnRead(Other.OnRead), OnWrite(Other.OnWrite), OnError(Other.OnError) {}
             Poll(Poll &&Other) noexcept : Iterable<CPoll>(std::move(Other)), OnRead(Other.OnRead), OnWrite(Other.OnWrite), OnError(Other.OnError) {}
 
-            void Resize(size_t Size) override {
+            void Resize(size_t Size) {
                 this->_Content = (CPoll *)std::realloc(this->_Content, Size);
             }
             
@@ -98,7 +103,7 @@ namespace Core
             //     Poll.Mask = Events;
             // }
 
-            void Add(CPoll &&Item) override
+            void Add(CPoll &&Item)
             {
                 this->_IncreaseCapacity();
 
@@ -106,7 +111,7 @@ namespace Core
                 (this->_Length)++;
             }
 
-            void Add(const CPoll &Item) override
+            void Add(const CPoll &Item)
             {
                 this->_IncreaseCapacity();
 
@@ -115,7 +120,7 @@ namespace Core
             }
 
             // ### We dont need this
-            void Add(const CPoll &Item, size_t Count) override
+            void Add(const CPoll &Item, size_t Count)
             {
                 this->_IncreaseCapacity(Count);
 
@@ -127,7 +132,7 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Add(CPoll *Items, size_t Count) override
+            void Add(CPoll *Items, size_t Count)
             {
                 this->_IncreaseCapacity(Count);
 
@@ -139,7 +144,7 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Add(const CPoll *Items, size_t Count) override
+            void Add(const CPoll *Items, size_t Count)
             {
                 this->_IncreaseCapacity(Count);
 
@@ -151,7 +156,7 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Fill(const CPoll &Item) override
+            void Fill(const CPoll &Item)
             {
                 for (size_t i = this->_Length; i < this->_Capacity; i++)
                 {
@@ -161,7 +166,7 @@ namespace Core
                 this->_Length = this->_Capacity;
             }
 
-            CPoll Take() override
+            CPoll Take()
             {
                 if (this->_Length == 0)
                     throw std::out_of_range("");
@@ -171,7 +176,7 @@ namespace Core
                 return _ElementAt(this->_Length);
             }
 
-            void Take(CPoll *Items, size_t Count) override
+            void Take(CPoll *Items, size_t Count)
             {
                 if (this->_Length < Count)
                     throw std::out_of_range("");

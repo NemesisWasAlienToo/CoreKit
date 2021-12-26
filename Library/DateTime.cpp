@@ -7,11 +7,15 @@ namespace Core
 {
     class DateTime
     {
-        private:
+    private:
         int Day = 0;
         int Month = 0;
         int Year = 0;
-        public:
+
+    public:
+
+        // Static functions
+
         static std::string Now()
         {
             time_t rawtime;
@@ -41,5 +45,11 @@ namespace Core
 
             return buffer;
         }
+
+        static DateTime FromNow(){} // <---- Fix
+
+        // Funtionality
+
+        bool Epired(){ return false; } // <---- Fix
     };
 }
