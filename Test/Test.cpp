@@ -24,11 +24,11 @@ int main(int argc, char const *argv[])
 {
     // Init EndPoint
 
-    Network::EndPoint EndPoint("0.0.0.0:8888");
+    const Network::EndPoint EndPoint("0.0.0.0:8888");
 
     // Init Key
 
-    Network::DHT::Key Identity(32, 0);
+    Network::DHT::Key Identity("ff", 32);
 
     // Log End Point
 
@@ -36,29 +36,59 @@ int main(int argc, char const *argv[])
 
     // Run the server
 
-    Network::DHT::Chord::Runner Chord(Identity, EndPoint);
+    Network::DHT::Chord::Runner Chord(Identity, EndPoint, 1, 60);
 
     // Chord.Bootstrap();
 
     Chord.Run();
 
-    std::string _loop;
+    std::string Command = "";
 
-    while (_loop != "exit")
+    while (Command != "exit")
     {
         // Perform Route
 
-        Chord.Route(
-            Network::EndPoint("127.0.0.1:4444"),
-            Identity,
-            [](auto Result)
-            {
-                std::cout << "Routed to : " << Result << std::endl;
-            });
+        if(Command == "ping")
+        {
+            Chord.Ping(
+                Network::EndPoint("127.0.0.1:4444"),
+                [](double Result)
+                {
+                    Test::Log("Ping") << Result << "s" << std::endl;
+                });
+        }
+        else if(Command == "query")
+        {
+            Chord.Query(
+                Network::EndPoint("127.0.0.1:4444"),
+                Identity,
+                [](Network::EndPoint Result)
+                {
+                    Test::Log("Query") << Result << std::endl;
+                });
+        }
+        else if(Command == "route")
+        {
+            Chord.Route(
+                Network::EndPoint("127.0.0.1:4444"),
+                Identity,
+                [](Network::EndPoint Result)
+                {
+                    Test::Log("Routed") << Result << std::endl;
+                });
+        }
+        else if(Command == "set")
+        {
+            //
+        }
+        else if(Command == "get")
+        {
+            //
+        }
 
-        std::cout << "Waiting for commands, master" << std::endl;
+        std::cout << "Waiting for command, master : " << std::endl;
 
-        std::cin >> _loop;
+        std::cin >> Command;
     }
 
     Chord.Stop();

@@ -26,21 +26,6 @@ namespace Core
             }
 
         public:
-            T *Content() const
-            {
-                return _Content;
-            }
-
-            void Content(T *Pointer)
-            {
-                _Content = Pointer;
-            }
-
-            size_t Length()
-            {
-                return _Length;
-            }
-
             Span(size_t Size, bool AutoFree = true) : _Content(new T[Size]), _Length(Size), _Free(AutoFree) {}
             Span(T *Array, size_t Size, bool AutoFree = true) : _Content(Array), _Length(Size), _Free(AutoFree) {}
             Span(Span &&Other) : _Content(Other._Content), _Length(Other._Length), _Free(Other._Free) {}
@@ -56,6 +41,16 @@ namespace Core
             {
                 if (_Free)
                     Free();
+            }
+
+            T *Content() const
+            {
+                return _Content;
+            }
+
+            size_t Length() const
+            {
+                return _Length;
             }
 
             void Free()
@@ -137,7 +132,30 @@ namespace Core
                 return _ElementAt(Index);
             }
 
-            Span &operator=(const Span &Other) = delete;
+            Span &operator=(const Span &Other)
+            {
+                _Free = Other._Free;
+                _Length = Other._Length;
+
+                delete[] _Content;
+                _Content = new T[_Length];
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    _Content[i] = Other._Content[i];
+                }
+
+                return *this;
+            }
+
+            Span &operator=(Span &&Other)
+            {
+                _Free = Other._Free;
+                _Length = Other._Length;
+                std::swap(_Content, Other._Content);
+
+                return *this;
+            }
 
             bool operator==(const Span &Other) noexcept
             {

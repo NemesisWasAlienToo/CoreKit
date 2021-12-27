@@ -79,7 +79,7 @@ int main(int argc, char const *argv[])
 
             Buffer[len] = 0;
 
-            std::cout << Target << " Said " << &Buffer[8] << std::endl;
+            std::cout << Target << " Said (" << len - 9 << ") " << &Buffer[9] << std::endl;
 
             char Signiture[8] = {'C', 'H', 'R', 'D', 0, 0, 0, 0};
 

@@ -147,7 +147,7 @@ namespace Core
                     Runner = std::thread(
                         [this]()
                         {
-                            std::cout << "Spawning runner" << std::endl;
+                            Test::Log("Server") << "Spawning runner" << std::endl;
                             Funtionality();
                         });
                 }

@@ -10,7 +10,9 @@
 #include "Network/DHT/Handler.cpp"
 #include "Network/DHT/Node.cpp"
 #include "Iterable/List.cpp"
+#include "Conversion/Serializer.cpp"
 #include "Test.cpp"
+#include "Duration.cpp"
 
 using namespace Core;
 
@@ -29,7 +31,7 @@ namespace Core
 
                     // ### Variables
 
-                    enum class Operations : unsigned char
+                    enum class Operations : char
                     {
                         Ping = 0,
                         Query,
@@ -86,12 +88,16 @@ namespace Core
                     };
 
                 public:
+                    // ### Public Variables
+
+                    time_t TimeOut;
+
                     // ### Constructors
 
                     Runner() = default;
 
-                    Runner(Key id, const Network::EndPoint &EndPoint, size_t ThreadCount = 1) : Id(id), Server(EndPoint),
-                                                                                                Handler(_Default), Pool(ThreadCount, false) {}
+                    Runner(Key id, const Network::EndPoint &EndPoint, size_t ThreadCount = 1, time_t Timeout = 60) : Id(id), Server(EndPoint),
+                                                                                                                     Handler(_Default), Pool(ThreadCount, false), TimeOut(Timeout) {}
 
                     // ### Static functions
 
@@ -148,30 +154,22 @@ namespace Core
                     {
                         size_t Index;
 
-                        for (size_t i = 0; i < Nodes.Length() && Nodes[i].Id < key; i++) {}
+                        for (size_t i = 0; i < Nodes.Length() && Nodes[i].Id < key; i++)
+                        {
+                        }
 
                         return Nodes[Index - 1];
                     }
 
+                    // @todo Add on fail callback and bool return value for functions
+
                     void Query(Network::EndPoint Peer, Key Id, std::function<void(Network::EndPoint)> Callback)
                     {
-                        // @todo set handler before write to detect in progress request
-                        // Write packet
-
-                        Network::DHT::Request req;
-
-                        std::string _Id = Id.ToString();
-
-                        req.Peer = Peer;
-                        req.Buffer.Add(_Id.c_str(), _Id.length());
-
-                        Server.Put(std::move(req));
-
                         // Add Handler
 
                         auto Result = Handler.Put(
                             Peer,
-                            DateTime::FromNow(/* Timeout */),
+                            DateTime::FromNow(TimeOut),
                             [this, Callback](Network::DHT::Request &request)
                             {
                                 auto Response = request.Buffer.ToString();
@@ -187,7 +185,24 @@ namespace Core
                             });
 
                         if (!Result)
-                            std::cout << "Handler already exists" << std::endl;
+                        {
+                            Test::Error("Ping") << "Handler already exists" << std::endl;
+                            return;
+                        }
+
+                        Network::DHT::Request req(Peer, (Id.Size * 2) + 1);
+
+                        Network::Serializer Serializer(req.Buffer); // <-- @todo Add CHRD header here
+
+                        // Form request
+
+                        Serializer << static_cast<char>(Operations::Query);
+
+                        Serializer << Id.ToString();
+
+                        Server.Put(std::move(req));
+
+                        // return true;
                     }
 
                     void Route(Network::EndPoint Peer, Key Id, std::function<void(Network::EndPoint)> Callback)
@@ -220,42 +235,144 @@ namespace Core
                             });
                     }
 
-                    void Bootstrap(Network::EndPoint Peer, size_t NthNeighbor)
+                    void Bootstrap(Network::EndPoint Peer, size_t NthNeighbor, std::function<void()> Callback)
                     {
                         auto Neighbor = Id.Neighbor(NthNeighbor);
 
                         Route(
                             Peer,
                             Neighbor,
-                            [this, NthNeighbor](Network::EndPoint Response)
+                            [this, NthNeighbor, Callback](Network::EndPoint Response)
                             {
                                 Nodes.Add(Node(Id, Response));
 
                                 // @todo also not all nodes exist and need to be routed
 
-                                Bootstrap(Closest(Id).EndPoint, NthNeighbor - 1);
+                                Bootstrap(Closest(Id).EndPoint, NthNeighbor - 1, Callback);
                             });
                     }
 
-                    void Bootstrap()
+                    void Bootstrap(std::function<void()> Callback)
                     {
-                        Bootstrap(Closest(Id).EndPoint, Id.Size);
+                        Bootstrap(Closest(Id).EndPoint, Id.Size, Callback);
                     }
 
-                    // int Ping(Network::EndPoint Target, int TimeOut)
-                    // {
-                    //     //
-                    // }
+                    void Ping(Network::EndPoint Peer, std::function<void(double)> Callback /*, std::function<void(size_t)> OnFail*/)
+                    {
+                        auto SendTime = DateTime::Now();
 
-                    // Network::EndPoint Get(Network::EndPoint Target)
-                    // {
-                    //     //
-                    // }
+                        auto Result = Handler.Put(
+                            Peer,
+                            DateTime::FromNow(TimeOut),
+                            [this, Callback, SendTime](Network::DHT::Request &request)
+                            {
+                                // @todo check retuened id as well
 
-                    // Network::EndPoint Set(Network::EndPoint Target)
-                    // {
-                    //     //
-                    // }
+                                Callback(DateTime::Now() - SendTime);
+                            });
+
+                        if (!Result)
+                        {
+                            Test::Error("Ping") << "Handler already exists" << std::endl;
+                            return;
+                        }
+
+                        // @todo Add CHRD tag here?
+
+                        Network::DHT::Request req(Peer, (Id.Size * 2) + 1); // <-- Check buffer init size
+
+                        Network::Serializer Serializer(req.Buffer); // <-- @todo Add CHRD header here
+
+                        // Form request
+
+                        Serializer << static_cast<char>(Operations::Ping);
+
+                        Serializer << Id.ToString();
+
+                        Server.Put(std::move(req));
+                    }
+
+                    void Get(Network::EndPoint Target, Key key, std::function<void(Iterable::Queue<char> &Data)> Callback)
+                    {
+                        auto Result = Handler.Put(
+                            Target,
+                            DateTime::FromNow(TimeOut),
+                            [this, Callback](Network::DHT::Request &request)
+                            {
+                                // @todo check retuened id as well
+
+                                Callback(request.Buffer);
+                            });
+
+                        if (!Result)
+                        {
+                            Test::Error("Ping") << "Handler already exists" << std::endl;
+                            return;
+                        }
+
+                        // @todo Add CHRD tag here?
+
+                        Network::DHT::Request req(Target, (Id.Size * 2) + 1);
+
+                        Network::Serializer Serializer(req.Buffer); // <-- @todo Add CHRD header here
+
+                        // Form request
+
+                        Serializer << static_cast<char>(Operations::Get);
+
+                        Serializer << Id.ToString();
+
+                        Server.Put(std::move(req));
+                    }
+
+                    void Get(Key key, std::function<void(Iterable::Queue<char> &Data)> Callback)
+                    {
+                        Route(
+                            key,
+                            [this, key, Callback](auto Target)
+                            {
+                                Get(Target, key, Callback);
+                            });
+                    }
+
+                    void Set(Network::EndPoint Target, Key key, const Iterable::Span<char>& Data, std::function<void()> Callback)
+                    {
+                        auto Result = Handler.Put(
+                            Target,
+                            DateTime::FromNow(TimeOut),
+                            [this, Callback](Network::DHT::Request &request)
+                            {
+                                Callback();
+                            });
+
+                        if (!Result)
+                        {
+                            Test::Error("Ping") << "Handler already exists" << std::endl;
+                            return;
+                        }
+
+                        // @todo Add CHRD tag here?
+
+                        Network::DHT::Request req(Target, (Id.Size * 2) + 1);
+
+                        Network::Serializer Serializer(req.Buffer); // <-- @todo Add CHRD header here
+
+                        // Form request
+
+                        Serializer << static_cast<char>(Operations::Set) << Id.ToString() << Data;
+
+                        Server.Put(std::move(req));
+                    }
+
+                    void Set(Key key, Iterable::Span<char>& Data, std::function<void()> Callback)
+                    {
+                        Route(
+                            key,
+                            [this, key, Data, Callback](auto Target)
+                            {
+                                Set(Target, key, Data, Callback);
+                            });
+                    }
                 };
             }
         }

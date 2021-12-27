@@ -15,6 +15,8 @@ namespace Core
         {
             struct Key
             {
+                // @todo maybr add endianness?
+                
                 // ### Constants
 
                 size_t Size = 0;
@@ -84,6 +86,20 @@ namespace Core
                     Result.Set(nth);
 
                     return *this + Result;
+                }
+
+                bool Bit(size_t Number)
+                {
+                    if (Number == 0)
+                        throw std::invalid_argument("Zero th bit is meaningless");
+
+                    Number--;
+
+                    size_t Index = Number / 8;
+
+                    size_t Shift = Number % 8;
+
+                    return Data[(Size - 1) - Index] & (1 << Shift);
                 }
 
                 void Set(size_t Number)

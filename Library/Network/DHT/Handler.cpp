@@ -83,6 +83,8 @@ namespace Core
 
                 bool Take(const Network::EndPoint &EndPoint, Callback &Routine)
                 {
+                    // @todo Optimize access
+
                     std::lock_guard Lock(_Lock);
 
                     if (!Has(EndPoint))

@@ -39,37 +39,30 @@ namespace Core
             return buffer;
         }
 
-        std::ostream &Error(const std::string & Title)
+        std::ostream &Colored(const char *Color, const std::string &Title)
         {
-            std::cout << Red
+            std::cout << Color
                       << "["
-                      << DateTime() << "] "
+                      << DateTime::Now() << "] "
                       << Title << " : "
                       << Reset;
 
             return std::cout;
         }
 
-        std::ostream &Warn(const std::string & Title)
+        inline std::ostream &Error(const std::string & Title)
         {
-            std::cout << Yellow
-                      << "["
-                      << DateTime() << "] "
-                      << Title << " : "
-                      << Reset;
-
-            return std::cout;
+            return Colored(Red, Title);
         }
 
-        std::ostream &Log(const std::string & Title)
+        inline std::ostream &Warn(const std::string & Title)
         {
-            std::cout << Green
-                      << "["
-                      << DateTime() << "] "
-                      << Title << " : "
-                      << Reset;
+            return Colored(Yellow, Title);
+        }
 
-            return std::cout;
+        inline std::ostream &Log(const std::string & Title)
+        {
+            return Colored(Green, Title);
         }
     };
 }
