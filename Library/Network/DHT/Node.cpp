@@ -39,6 +39,28 @@ namespace Core
                 Node() = default;
 
                 Node(Key id, Network::EndPoint endPoint) : Id(id), EndPoint(endPoint), Status(Status::Available) {}
+
+                Node(Node&& Other) : Id(std::move(Other.Id)), EndPoint(Other.EndPoint), Status(Other.Status) {}
+                
+                Node(const Node& Other) : Id(Other.Id), EndPoint(Other.EndPoint), Status(Other.Status) {}
+
+                Node& operator=(Node&& Other)
+                {
+                    Id = std::move(Other.Id);
+                    EndPoint = Other.EndPoint;
+                    Status = Other.Status;
+
+                    return *this;
+                }
+
+                Node& operator=(const Node& Other)
+                {
+                    Id = Other.Id;
+                    EndPoint = Other.EndPoint;
+                    Status = Other.Status;
+
+                    return *this;
+                }
             };
         }
     }

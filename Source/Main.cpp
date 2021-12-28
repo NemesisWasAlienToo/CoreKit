@@ -10,8 +10,11 @@
 #include "File.cpp"
 #include "DynamicLib.cpp"
 #include "Iterable/List.cpp"
+#include "Iterable/Span.cpp"
 #include <Network/DNS.cpp>
 #include <Network/Socket.cpp>
+#include <Conversion/Serializer.cpp>
+#include <Conversion/Hex.cpp>
 
 // # Usings
 
@@ -79,7 +82,7 @@ int main(int argc, char const *argv[])
 
             Buffer[len] = 0;
 
-            std::cout << Target << " Said (" << len - 9 << ") " << &Buffer[9] << std::endl;
+            std::cout << Target << " Said (" << len - 9 << ") " << Conversion::Hex::From(&Buffer[9], len - 9) << std::endl;
 
             char Signiture[8] = {'C', 'H', 'R', 'D', 0, 0, 0, 0};
 

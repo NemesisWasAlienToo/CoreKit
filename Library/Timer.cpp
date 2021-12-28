@@ -32,8 +32,8 @@ namespace Core
         // ### Constructors
 
         Timer(int Handler) : Descriptor(Handler) {}
-
-        Timer(TimerTypes Type, int Flags = 0)
+        
+        Timer(TimerTypes Type, int Flags)
         {
             int Result = timerfd_create(Type, Flags);
 

@@ -87,7 +87,7 @@ namespace Core
             return (fcntl(_INode, F_GETFL, 0) & O_NONBLOCK) == 0;
         }
 
-        virtual Event Await(Event Events, int TimeoutMS = -1) const
+        Event Await(Event Events, int TimeoutMS = -1) const
         {
 
             _POLLFD PollStruct = {.fd = _INode, .events = Events};

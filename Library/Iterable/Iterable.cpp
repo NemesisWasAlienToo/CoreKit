@@ -242,18 +242,6 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Add(T &&Item, size_t Count)
-            {
-                this->_IncreaseCapacity(Count);
-
-                for (size_t i = 0; i < Count; i++)
-                {
-                    _ElementAt(this->_Length + i) = std::forward<T>(Item);
-                }
-
-                this->_Length += Count;
-            }
-
             void Add(T *Items, size_t Count)
             {
                 this->_IncreaseCapacity(Count);
@@ -278,7 +266,7 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Squeeze(T &&Item, size_t Index)
+            void Squeeze(T &&Item, size_t Index) // @todo Add perfect forwarding
             {
                 if (this->_Length <= Index)
                     throw std::out_of_range("");
@@ -349,7 +337,7 @@ namespace Core
             {
                 for (size_t i = this->_Length; i < this->_Capacity; i++)
                 {
-                    _ElementAt(i) = Item;
+                    _ElementAt(i) = T(Item);
                 }
 
                 this->_Length = this->_Capacity;
@@ -506,6 +494,22 @@ namespace Core
 
                     if (Condition(item))
                         return _ElementAt(i);
+                }
+
+                throw std::out_of_range("No such item");
+            }
+
+            T &FirstWhere(size_t& Index, std::function<bool(T &)> Condition)
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                    {
+                        Index = i;
+                        return _ElementAt(i);
+                    }
                 }
 
                 throw std::out_of_range("No such item");

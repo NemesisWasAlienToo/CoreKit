@@ -23,18 +23,18 @@ namespace Core
 
                 // ### Variables
 
-                unsigned char *Data = nullptr;
+                char *Data = nullptr;
 
                 // ### Functions
 
                 Key() = default;
 
-                Key(size_t size, unsigned char Init = 0) : Size(size), Data(new unsigned char[size])
+                Key(size_t size, char Init = 0) : Size(size), Data(new char[size])
                 {
                     Fill(Init);
                 }
 
-                Key(const std::string &Hex, size_t size) : Size(size), Data(new unsigned char[size])
+                Key(const std::string &Hex, size_t size) : Size(size), Data(new char[size])
                 {
                     // @todo Optimize here
 
@@ -43,7 +43,7 @@ namespace Core
                     Conversion::Hex::Bytes(Hex, &Data[Size - (Hex.length() / 2)]);
                 }
 
-                Key(const std::string &Hex) : Size(Hex.length() / 2), Data(new unsigned char[Size])
+                Key(const std::string &Hex) : Size(Hex.length() / 2), Data(new char[Size])
                 {
                     Conversion::Hex::Bytes(Hex, Data);
                 }
@@ -53,7 +53,7 @@ namespace Core
                     std::swap(Data, Other.Data);
                 }
 
-                Key(const Key &Other) : Size(Other.Size), Data(new unsigned char[Size])
+                Key(const Key &Other) : Size(Other.Size), Data(new char[Size])
                 {
                     for (size_t i = 0; i < Size; i++)
                     {
@@ -66,7 +66,7 @@ namespace Core
                     delete[] Data;
                 }
 
-                void Fill(unsigned char Init)
+                void Fill(const char Init)
                 {
                     for (size_t i = 0; i < Size; i++)
                     {
@@ -139,6 +139,8 @@ namespace Core
                 Key &operator=(const Key &Other)
                 {
                     Size = Other.Size;
+                    delete[] Data;
+                    Data = new char[Size];
 
                     for (size_t i = 0; i < Size; i++)
                     {
@@ -148,12 +150,12 @@ namespace Core
                     return *this;
                 }
 
-                unsigned char &operator[](size_t Index)
+                char &operator[](size_t Index)
                 {
                     return Data[Index];
                 }
 
-                const unsigned char &operator[](size_t Index) const
+                const char &operator[](size_t Index) const
                 {
                     return Data[Index];
                 }
@@ -232,7 +234,7 @@ namespace Core
                 {
                     Key Result(Size);
 
-                    unsigned char Carry = 0;
+                    char Carry = 0;
 
                     unsigned short Buffer = 0;
 
@@ -264,7 +266,7 @@ namespace Core
                 {
                     Key Result(Size);
 
-                    unsigned char Carry = 1;
+                    char Carry = 1;
 
                     unsigned short Buffer = 0;
 
@@ -287,7 +289,7 @@ namespace Core
 
                 Key &operator+=(const Key &Other)
                 {
-                    unsigned char Carry = 0;
+                    char Carry = 0;
 
                     unsigned short Buffer = 0;
 
@@ -305,7 +307,7 @@ namespace Core
 
                 Key &operator-=(const Key &Other)
                 {
-                    unsigned char Carry = 1;
+                    char Carry = 1;
 
                     unsigned short Buffer = 0;
 
@@ -365,7 +367,27 @@ namespace Core
                     return *this;
                 }
 
-                Key operator*(const Key &Other) = delete;
+                // Key operator<<(size_t Count) const
+                // {
+                //     Key Result(Size);
+
+                //     char Carry = 0;
+
+                //     unsigned short Buffer = 0;
+
+                //     for (int i = 0; i < Size; i++)
+                //     {
+                //         Buffer = Data[i] + Other.Data[i] + Carry;
+
+                //         Result[i] = Buffer & 0xFF;
+
+                //         Carry = Buffer >> 8;
+                //     }
+
+                //     return Result;
+                // }
+
+                // Key operator*(const Key &Other) = delete;
             };
         }
     }

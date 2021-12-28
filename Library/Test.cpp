@@ -3,6 +3,8 @@
 #include <iostream>
 #include <ctime>
 
+#include "DateTime.cpp"
+
 namespace Core
 {
     namespace Test
@@ -47,10 +49,17 @@ namespace Core
                       << Title << " : "
                       << Reset;
 
+            std::cout.flush();
+
             return std::cout;
         }
 
-        inline std::ostream &Error(const std::string & Title)
+        inline std::ostream &Error(const std::string &Title, std::ostream &os)
+        {
+            return Colored(Red, Title);
+        }
+
+        inline std::ostream &Error(const std::string &Title)
         {
             return Colored(Red, Title);
         }

@@ -67,6 +67,11 @@ namespace Core
                     _Interrupt.Emit(1);
                 }
 
+                inline Descriptor Listener()
+                {
+                    return Ready.INode();
+                }
+
                 bool Take(Request &Request)
                 {
                     // Check if we have task in a while loop to make sure
@@ -113,8 +118,6 @@ namespace Core
                     {
                         Buffer.Add(Request.Buffer.Take());
                     }
-
-                    auto str = Buffer.ToString();
 
                     Request.Buffer = std::move(Buffer);
 

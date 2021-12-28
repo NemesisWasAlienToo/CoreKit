@@ -10,6 +10,7 @@
 #include "Network/DHT/Handler.cpp"
 #include "Network/DHT/Node.cpp"
 #include "Iterable/List.cpp"
+#include "Iterable/Poll.cpp"
 #include "Conversion/Serializer.cpp"
 #include "Test.cpp"
 #include "Duration.cpp"
@@ -26,6 +27,9 @@ namespace Core
             {
                 class Runner
                 {
+                public:
+                    typedef std::function<void()> DoneCallBack;
+
                 private:
                     // ### Types
 
@@ -33,13 +37,21 @@ namespace Core
 
                     enum class Operations : char
                     {
-                        Ping = 0,
+                        Response = 0,
+                        Ping,
                         Query,
                         Set,
                         Get,
                         Data,
                         Deliver,
                         Flood,
+                    };
+
+                    enum class Events : char
+                    {
+                        Incomming = 0,
+                        Exit,
+                        TimeOut,
                     };
 
                     Key Id;
@@ -57,23 +69,38 @@ namespace Core
                     {
                         // Clear running event
 
+                        Iterable::Poll Poll(2);
+
+                        Poll.Add(Server.Listener(), Descriptor::In);
+                        Poll.Add(Handler.Listener(), Descriptor::In);
+
                         while (Server.State == Network::DHT::Server::States::Running)
                         {
                             Network::DHT::Request Request;
                             std::function<void(Network::DHT::Request &)> Task;
 
-                            // Pick one request
+                            Poll.Await();
 
-                            if (!Server.Take(Request))
-                                continue;
+                            if (Poll[0].HasEvent())
+                            {
+                                if (Server.State != Network::DHT::Server::States::Running)
+                                {
+                                    break;
+                                }
 
-                            // Pick one task or default task
+                                if (!Server.Take(Request))
+                                    continue;
 
-                            Handler.Take(Request.Peer, Task);
+                                Handler.Take(Request.Peer, Task);
 
-                            // Execute task
+                                Task(Request);
+                            }
 
-                            Task(Request);
+                            if (Poll[1].HasEvent())
+                            {
+                                Test::Warn("Timeout") << "Request timed out" << std::endl;
+                                Handler.Clean();
+                            }
                         }
 
                         Server.Ready.Emit(1);
@@ -101,16 +128,28 @@ namespace Core
 
                     // ### Static functions
 
-                    Network::EndPoint DefaultEndPoint()
+                    inline Network::EndPoint DefaultEndPoint()
                     {
                         return Network::EndPoint("127.0.0.1:8888");
                     }
 
                     // ### Functionalities
 
+                    void AddNode(Node &&node) // <- @todo Fix with perfect forwarding
+                    {
+                        // Nodes.AddSorted(std::move(node)); // <- Add compare operators for Node
+                        Nodes.Add(std::move(node));
+                    }
+
+                    void AddNode(const Node &node)
+                    {
+                        // Nodes.AddSorted(node); // <- Add compare operators for Node
+                        Nodes.Add(node);
+                    }
+
                     void Await()
                     {
-                        // Wait for out tasks to be done
+                        // Wait for all out tasks to be done
                     }
 
                     inline void GetInPool()
@@ -126,7 +165,12 @@ namespace Core
 
                         // Setup thread pool task
 
-                        Pool.Add(std::thread(_PoolTask), Pool.Capacity());
+                        Pool.Reserver(Pool.Capacity());
+
+                        for (size_t i = 0; i < Pool.Capacity(); i++)
+                        {
+                            Pool[i] = std::thread(_PoolTask);
+                        }
                     }
 
                     void Stop()
@@ -150,11 +194,14 @@ namespace Core
 
                     // Network requests
 
-                    Node &Closest(Key key)
+                    Node &Closest(const Key &key)
                     {
+                        if (Nodes.Length() <= 0)
+                            throw std::out_of_range("Instance contains no node data");
+
                         size_t Index;
 
-                        for (size_t i = 0; i < Nodes.Length() && Nodes[i].Id < key; i++)
+                        for (Index = 0; Index < Nodes.Length() && Nodes[Index].Id < key; Index++)
                         {
                         }
 
@@ -162,6 +209,7 @@ namespace Core
                     }
 
                     // @todo Add on fail callback and bool return value for functions
+                    // @todo Change callback to refrence to callback
 
                     void Query(Network::EndPoint Peer, Key Id, std::function<void(Network::EndPoint)> Callback)
                     {
@@ -170,13 +218,13 @@ namespace Core
                         auto Result = Handler.Put(
                             Peer,
                             DateTime::FromNow(TimeOut),
-                            [this, Callback](Network::DHT::Request &request)
+                            [this, CB = std::move(Callback)](Network::DHT::Request &request)
                             {
                                 auto Response = request.Buffer.ToString();
 
                                 try
                                 {
-                                    Callback(Response);
+                                    CB(Response);
                                 }
                                 catch (const std::exception &e)
                                 {
@@ -190,7 +238,7 @@ namespace Core
                             return;
                         }
 
-                        Network::DHT::Request req(Peer, (Id.Size * 2) + 1);
+                        Network::DHT::Request req(Peer, Id.Size + 1);
 
                         Network::Serializer Serializer(req.Buffer); // <-- @todo Add CHRD header here
 
@@ -198,7 +246,7 @@ namespace Core
 
                         Serializer << static_cast<char>(Operations::Query);
 
-                        Serializer << Id.ToString();
+                        Serializer << Id;
 
                         Server.Put(std::move(req));
 
@@ -210,29 +258,21 @@ namespace Core
                         Query(
                             Peer,
                             Id,
-                            [this, Peer, Id, Callback](Network::EndPoint Response)
+                            [this, Peer, Id, CB = std::move(Callback)](Network::EndPoint Response)
                             {
                                 if (Peer == Response)
-                                    Callback(Peer);
+                                    CB(Peer);
                                 else
-                                    Route(Response, Id, Callback);
+                                    Route(Response, Id, CB);
                             });
                     }
 
-                    void Route(Key Id, std::function<void(Network::EndPoint)> Callback)
+                    void Route(const Key& Id, std::function<void(Network::EndPoint)> Callback)
                     {
                         const auto &Peer = Closest(Id).EndPoint;
 
-                        Route(
-                            Peer,
-                            Id,
-                            [this, Peer, Id, Callback](Network::EndPoint Response)
-                            {
-                                if (Peer == Response)
-                                    Callback(Peer);
-                                else
-                                    Route(Response, Id, Callback);
-                            });
+                        // Route(Peer, Id, std::move(Callback));
+                        Route(Peer, Id, Callback);
                     }
 
                     void Bootstrap(Network::EndPoint Peer, size_t NthNeighbor, std::function<void()> Callback)
@@ -242,33 +282,33 @@ namespace Core
                         Route(
                             Peer,
                             Neighbor,
-                            [this, NthNeighbor, Callback](Network::EndPoint Response)
+                            [this, NthNeighbor, CB = std::move(Callback)](Network::EndPoint Response)
                             {
                                 Nodes.Add(Node(Id, Response));
 
                                 // @todo also not all nodes exist and need to be routed
 
-                                Bootstrap(Closest(Id).EndPoint, NthNeighbor - 1, Callback);
+                                Bootstrap(Closest(Id).EndPoint, NthNeighbor - 1, CB);
                             });
                     }
 
-                    void Bootstrap(std::function<void()> Callback)
+                    void Bootstrap(Network::EndPoint Peer, std::function<void()> Callback)
                     {
-                        Bootstrap(Closest(Id).EndPoint, Id.Size, Callback);
+                        Bootstrap(Closest(Id).EndPoint, Id.Size, std::move(Callback));
                     }
 
-                    void Ping(Network::EndPoint Peer, std::function<void(double)> Callback /*, std::function<void(size_t)> OnFail*/)
+                    void Ping(Network::EndPoint Peer, std::function<void(Duration)> Callback /*, std::function<void(size_t)> OnFail*/)
                     {
                         auto SendTime = DateTime::Now();
 
                         auto Result = Handler.Put(
                             Peer,
                             DateTime::FromNow(TimeOut),
-                            [this, Callback, SendTime](Network::DHT::Request &request)
+                            [this, SendTime, CB = std::move(Callback)](Network::DHT::Request &request)
                             {
                                 // @todo check retuened id as well
 
-                                Callback(DateTime::Now() - SendTime);
+                                CB(DateTime::Now() - SendTime);
                             });
 
                         if (!Result)
@@ -297,11 +337,11 @@ namespace Core
                         auto Result = Handler.Put(
                             Target,
                             DateTime::FromNow(TimeOut),
-                            [this, Callback](Network::DHT::Request &request)
+                            [this, CB = std::move(Callback)](Network::DHT::Request &request)
                             {
                                 // @todo check retuened id as well
 
-                                Callback(request.Buffer);
+                                CB(request.Buffer);
                             });
 
                         if (!Result)
@@ -329,20 +369,20 @@ namespace Core
                     {
                         Route(
                             key,
-                            [this, key, Callback](auto Target)
+                            [this, key, CB = std::move(Callback)](auto Target)
                             {
-                                Get(Target, key, Callback);
+                                Get(Target, key, CB);
                             });
                     }
 
-                    void Set(Network::EndPoint Target, Key key, const Iterable::Span<char>& Data, std::function<void()> Callback)
+                    void Set(Network::EndPoint Target, Key key, const Iterable::Span<char> &Data, std::function<void()> Callback)
                     {
                         auto Result = Handler.Put(
                             Target,
                             DateTime::FromNow(TimeOut),
-                            [this, Callback](Network::DHT::Request &request)
+                            [this, CB = std::move(Callback)](Network::DHT::Request &request)
                             {
-                                Callback();
+                                CB();
                             });
 
                         if (!Result)
@@ -364,13 +404,13 @@ namespace Core
                         Server.Put(std::move(req));
                     }
 
-                    void Set(Key key, Iterable::Span<char>& Data, std::function<void()> Callback)
+                    void Set(Key key, Iterable::Span<char> &Data, std::function<void()> Callback)
                     {
                         Route(
                             key,
-                            [this, key, Data, Callback](auto Target)
+                            [this, key, Data, CB = std::move(Callback)](auto Target)
                             {
-                                Set(Target, key, Data, Callback);
+                                Set(Target, key, Data, CB);
                             });
                     }
                 };

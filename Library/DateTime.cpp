@@ -3,32 +3,74 @@
 #include <iostream>
 #include <time.h>
 
+#include "Duration.cpp"
+
 namespace Core
 {
     class DateTime
     {
     private:
-        time_t Time = 0;
+        struct timespec Spec;
         struct tm State;
 
     public:
         DateTime() = default;
 
-        DateTime(time_t time) : Time(time)
+        DateTime(timespec spec) : Spec(spec)
         {
-            localtime_r(&Time, &State);
+            localtime_r(&spec.tv_sec, &State);
         }
 
-        DateTime(time_t time, struct tm state) : Time(time), State(state) {}
+        DateTime(timespec spec, struct tm state) : Spec(spec), State(state) {}
 
         // DateTime(int second, int minute, int hour, int, int day, int month, int year)
         // {
         //     State.tm_sec = second;
         // }
 
-        DateTime(const DateTime &Other) : Time(Other.Time), State(Other.State) {}
+        DateTime(const DateTime &Other) : Spec(Other.Spec), State(Other.State) {}
 
         // Peroperties
+
+        Duration Left()
+        {
+            struct timespec _Now, Diff;
+
+            timespec_get(&_Now, TIME_UTC);
+
+            Diff = {
+                .tv_sec = Spec.tv_sec - _Now.tv_sec,
+                .tv_nsec = Spec.tv_nsec - _Now.tv_nsec,
+            };
+
+            if (Diff.tv_sec < 0)
+            {
+                return {0, 1};
+            }
+            
+            if (Diff.tv_sec == 0 && Diff.tv_nsec < 0)
+            {
+                return {0, 1};
+            }
+
+            if(Diff.tv_nsec < 0)
+            {
+                Diff.tv_sec--;
+                Diff.tv_nsec += (long)10e8;
+            }
+
+            return Diff;
+        }
+
+        inline int Nanosecond() const
+        {
+            return Spec.tv_nsec;
+        }
+
+        inline void AddNanosecond(int nanosecond)
+        {
+            Spec.tv_nsec += nanosecond;
+        }
 
         inline int Second() const
         {
@@ -39,7 +81,7 @@ namespace Core
         {
             State.tm_sec += seconds;
 
-            Time = mktime(&State);
+            Spec.tv_sec = mktime(&State);
         }
 
         inline int Minute() const
@@ -51,7 +93,7 @@ namespace Core
         {
             State.tm_min += minute;
 
-            Time = mktime(&State);
+            Spec.tv_sec = mktime(&State);
         }
 
         inline int Hour() const
@@ -63,7 +105,7 @@ namespace Core
         {
             State.tm_hour += hour;
 
-            Time = mktime(&State);
+            Spec.tv_sec = mktime(&State);
         }
 
         inline int Day() const
@@ -75,7 +117,7 @@ namespace Core
         {
             State.tm_mday += day;
 
-            Time = mktime(&State);
+            Spec.tv_sec = mktime(&State);
         }
 
         inline int Month() const
@@ -87,7 +129,7 @@ namespace Core
         {
             State.tm_mon += month;
 
-            Time = mktime(&State);
+            Spec.tv_sec = mktime(&State);
         }
 
         inline int Year() const
@@ -99,7 +141,7 @@ namespace Core
         {
             State.tm_year += year;
 
-            Time = mktime(&State);
+            Spec.tv_sec = mktime(&State);
         }
 
         std::string ToString() const
@@ -115,8 +157,9 @@ namespace Core
 
         static DateTime Now()
         {
-            time_t rawtime;
-            time(&rawtime);
+            struct timespec rawtime;
+
+            timespec_get(&rawtime, TIME_UTC);
 
             return DateTime(rawtime);
         }
@@ -132,19 +175,37 @@ namespace Core
 
         // Funtionality
 
-        bool Epired() const
+        Duration operator-(const DateTime &Other) const
         {
-            return (*this) < Now();
+            struct timespec Diff = {
+                .tv_sec = Spec.tv_sec - Other.Spec.tv_sec,
+                .tv_nsec = Spec.tv_nsec - Other.Spec.tv_nsec,
+            };
+
+            if (Diff.tv_sec < 0)
+            {
+                return {0, 1};
+            }
+            
+            if (Diff.tv_sec == 0 && Diff.tv_nsec < 0)
+            {
+                return {0, 1};
+            }
+
+            if(Diff.tv_nsec < 0)
+            {
+                Diff.tv_sec--;
+                Diff.tv_nsec += (long)10e8;
+            }
+
+            return Diff;
         }
 
-        double operator-(const DateTime &Other) const
-        {
-            return difftime(Time, Other.Time);
-        }
+        // DateTime operator+(const DateTime &Other) const
 
         DateTime &operator=(const DateTime &Other)
         {
-            Time = Other.Time;
+            Spec = Other.Spec;
             State = Other.State;
 
             return *this;
@@ -152,32 +213,60 @@ namespace Core
 
         bool operator==(const DateTime &Other) const
         {
-            return Time == Other.Time;
+            return Spec.tv_sec == Other.Spec.tv_sec && Spec.tv_nsec == Other.Spec.tv_nsec;
         }
 
         bool operator!=(const DateTime &Other) const
         {
-            return Time != Other.Time;
+            return Spec.tv_sec != Other.Spec.tv_sec || Spec.tv_nsec != Other.Spec.tv_nsec;
         }
 
         bool operator>(const DateTime &Other) const
         {
-            return Time > Other.Time;
+            if (Spec.tv_sec != Other.Spec.tv_sec)
+            {
+                return Spec.tv_sec > Other.Spec.tv_sec;
+            }
+            else
+            {
+                return Spec.tv_sec > Other.Spec.tv_sec;
+            }
         }
 
         bool operator<(const DateTime &Other) const
         {
-            return Time < Other.Time;
+            if (Spec.tv_sec != Other.Spec.tv_sec)
+            {
+                return Spec.tv_sec < Other.Spec.tv_sec;
+            }
+            else
+            {
+                return Spec.tv_sec < Other.Spec.tv_sec;
+            }
         }
 
         bool operator>=(const DateTime &Other) const
         {
-            return Time >= Other.Time;
+            if (Spec.tv_sec != Other.Spec.tv_sec)
+            {
+                return Spec.tv_sec > Other.Spec.tv_sec;
+            }
+            else
+            {
+                return Spec.tv_sec >= Other.Spec.tv_sec;
+            }
         }
 
         bool operator<=(const DateTime &Other) const
         {
-            return Time <= Other.Time;
+            if (Spec.tv_sec != Other.Spec.tv_sec)
+            {
+                return Spec.tv_sec < Other.Spec.tv_sec;
+            }
+            else
+            {
+                return Spec.tv_sec <= Other.Spec.tv_sec;
+            }
         }
 
         // Operators

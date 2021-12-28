@@ -1,19 +1,12 @@
 #include <iostream>
 #include <string>
-#include <thread>
 #include <functional>
-#include <mutex>
 
-#include <DateTime.cpp>
 #include <Test.cpp>
-#include <File.cpp>
 #include <Timer.cpp>
-#include <Directory.cpp>
+#include <DateTime.cpp>
 #include <Iterable/List.cpp>
-#include <Iterable/Queue.cpp>
-#include <Iterable/Poll.cpp>
 #include <Network/DNS.cpp>
-#include <Network/Socket.cpp>
 #include <Network/DHT/Server.cpp>
 #include <Network/DHT/Handler.cpp>
 #include <Network/DHT/Chord.cpp>
@@ -34,9 +27,17 @@ int main(int argc, char const *argv[])
 
     Test::Log(Network::DNS::HostName()) << EndPoint << std::endl;
 
+    Test::Log("Identity") << Identity.ToString() << std::endl;
+
     // Run the server
 
     Network::DHT::Chord::Runner Chord(Identity, EndPoint, 1, 60);
+
+    // Known Node
+
+    Network::DHT::Node KnownNode = Network::DHT::Node(Network::DHT::Key("f0f00f"), Network::EndPoint("127.0.0.1:4444"));
+
+    Chord.AddNode(KnownNode);
 
     // Chord.Bootstrap();
 
@@ -48,16 +49,16 @@ int main(int argc, char const *argv[])
     {
         // Perform Route
 
-        if(Command == "ping")
+        if (Command == "ping")
         {
             Chord.Ping(
-                Network::EndPoint("127.0.0.1:4444"),
-                [](double Result)
+                KnownNode.EndPoint,
+                [](Duration Result)
                 {
                     Test::Log("Ping") << Result << "s" << std::endl;
                 });
         }
-        else if(Command == "query")
+        else if (Command == "query")
         {
             Chord.Query(
                 Network::EndPoint("127.0.0.1:4444"),
@@ -67,21 +68,20 @@ int main(int argc, char const *argv[])
                     Test::Log("Query") << Result << std::endl;
                 });
         }
-        else if(Command == "route")
+        else if (Command == "route")
         {
             Chord.Route(
-                Network::EndPoint("127.0.0.1:4444"),
                 Identity,
                 [](Network::EndPoint Result)
                 {
                     Test::Log("Routed") << Result << std::endl;
                 });
         }
-        else if(Command == "set")
+        else if (Command == "set")
         {
             //
         }
-        else if(Command == "get")
+        else if (Command == "get")
         {
             //
         }
