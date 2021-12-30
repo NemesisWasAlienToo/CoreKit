@@ -21,7 +21,7 @@ int main(int argc, char const *argv[])
 
     // Init Key
 
-    Network::DHT::Key Identity("ff", 32);
+    Network::DHT::Key Identity(Network::DHT::Key::Generate(32));
 
     // Log End Point
 
@@ -35,7 +35,7 @@ int main(int argc, char const *argv[])
 
     // Known Node
 
-    Network::DHT::Node KnownNode = Network::DHT::Node(Network::DHT::Key("f0f00f"), Network::EndPoint("127.0.0.1:4444"));
+    Network::DHT::Node KnownNode = Network::DHT::Node(Network::DHT::Key("f0f00f", 32), Network::EndPoint("127.0.0.1:4444"));
 
     Chord.AddNode(KnownNode);
 

@@ -6,6 +6,7 @@
 
 #include "Iterable/Queue.cpp"
 #include "Network/DHT/Key.cpp"
+#include "Network/DHT/Chord.cpp"
 
 #define NETWORK_BYTE_ORDER LITTLE_ENDIAN
 
@@ -132,7 +133,7 @@ namespace Core
                 return *this;
             }
 
-            Serializer &operator>>(short Value)
+            Serializer &operator>>(short& Value)
             {
                 short _Value;
 
@@ -143,7 +144,7 @@ namespace Core
                 return *this;
             }
 
-            Serializer &operator>>(int Value)
+            Serializer &operator>>(int& Value)
             {
                 int _Value;
 
@@ -154,7 +155,7 @@ namespace Core
                 return *this;
             }
 
-            Serializer &operator>>(long Value)
+            Serializer &operator>>(long& Value)
             {
                 long _Value;
 
@@ -167,6 +168,7 @@ namespace Core
 
             Serializer &operator>>(Iterable::Span<char> &Value)
             {
+                // Apply byte order
                 size_t Size = std::min(Value.Length(), Queue.Length());
 
                 for (size_t i = 0; i < Size; i++)
@@ -181,14 +183,7 @@ namespace Core
 
             Serializer &operator>>(Network::DHT::Key &Value)
             {
-                Queue.Add(Value.Data, Value.Size);
-
-                for (size_t i = 0; i < Value.Size; i++)
-                {
-                    Value[i] = Queue[i];
-                }
-
-                Queue.Free(Value.Size);
+                Queue.Take(Value.Data, Value.Size);
 
                 return *this;
             }

@@ -14,13 +14,8 @@ namespace Core
 {
     namespace Cryptography
     {
-        class Random
+        namespace Random
         {
-        private:
-            Random();
-            ~Random();
-
-        public:
             // ## Enums
 
             constexpr static char *urandom = (char *) "/dev/urandom";
@@ -31,11 +26,11 @@ namespace Core
 
             // static void Engine(); // Set engine mode to hardware or software
 
-            static int InitEntropy(){ return 32; } //ENTROPY_NEEDED
+            int InitEntropy(){ return 32; } //ENTROPY_NEEDED
 
             // int RAND_bytes_ex(OSSL_LIB_CTX *ctx, unsigned char *buf, size_t num, unsigned int strength);
 
-            static void Load(const char *File = NULL, long MaxSize = -1)
+            void Load(const char *File = NULL, long MaxSize = -1)
             {
                 if (File == NULL)
                 {
@@ -60,7 +55,7 @@ namespace Core
                 }
             }
 
-            static void Store(const char *File)
+            void Store(const char *File)
             {
 
                 int Result = RAND_write_file(File);
@@ -73,18 +68,18 @@ namespace Core
                 }
             }
 
-            static void Seed(unsigned char *Data, int Size)
+            void Seed(unsigned char *Data, int Size)
             {
 
                 RAND_seed(Data, Size);
             }
 
-            static void Add(unsigned char *Data, int Size, double Entropy)
+            void Add(unsigned char *Data, int Size, double Entropy)
             {
                 RAND_add(Data, Size, Entropy);
             }
 
-            static void Bytes(unsigned char *Data, int Size)
+            void Bytes(unsigned char *Data, int Size)
             {
                 int Result = RAND_bytes(Data, Size);
 
@@ -96,7 +91,7 @@ namespace Core
                 }
             }
 
-            static std::string Hex(int Size)
+            std::string Hex(int Size)
             {
                 unsigned char Data[Size];
                 std::stringstream ss;

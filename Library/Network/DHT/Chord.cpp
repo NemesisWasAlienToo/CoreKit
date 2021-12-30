@@ -30,11 +30,6 @@ namespace Core
                 public:
                     typedef std::function<void()> DoneCallBack;
 
-                private:
-                    // ### Types
-
-                    // ### Variables
-
                     enum class Operations : char
                     {
                         Response = 0,
@@ -46,6 +41,11 @@ namespace Core
                         Deliver,
                         Flood,
                     };
+
+                private:
+                    // ### Types
+
+                    // ### Variables
 
                     enum class Events : char
                     {
@@ -244,9 +244,7 @@ namespace Core
 
                         // Form request
 
-                        Serializer << static_cast<char>(Operations::Query);
-
-                        Serializer << Id;
+                        Serializer << (char)Operations::Query << Id;
 
                         Server.Put(std::move(req));
 
@@ -267,12 +265,11 @@ namespace Core
                             });
                     }
 
-                    void Route(const Key& Id, std::function<void(Network::EndPoint)> Callback)
+                    void Route(const Key &Id, std::function<void(Network::EndPoint)> Callback)
                     {
                         const auto &Peer = Closest(Id).EndPoint;
 
-                        // Route(Peer, Id, std::move(Callback));
-                        Route(Peer, Id, Callback);
+                        Route(Peer, Id, std::move(Callback));
                     }
 
                     void Bootstrap(Network::EndPoint Peer, size_t NthNeighbor, std::function<void()> Callback)
@@ -325,9 +322,7 @@ namespace Core
 
                         // Form request
 
-                        Serializer << static_cast<char>(Operations::Ping);
-
-                        Serializer << Id.ToString();
+                        Serializer << (char)Operations::Ping << Id;
 
                         Server.Put(std::move(req));
                     }
@@ -358,9 +353,7 @@ namespace Core
 
                         // Form request
 
-                        Serializer << static_cast<char>(Operations::Get);
-
-                        Serializer << Id.ToString();
+                        Serializer << (char)Operations::Get << Id;
 
                         Server.Put(std::move(req));
                     }
@@ -399,7 +392,7 @@ namespace Core
 
                         // Form request
 
-                        Serializer << static_cast<char>(Operations::Set) << Id.ToString() << Data;
+                        Serializer << (char)Operations::Set << Id << Data;
 
                         Server.Put(std::move(req));
                     }

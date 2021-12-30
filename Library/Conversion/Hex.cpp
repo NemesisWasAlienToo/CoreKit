@@ -12,26 +12,27 @@ namespace Core
         namespace Hex
         {
 
-            static inline unsigned char Digit(char HexChar, bool Upper = false)
+            inline unsigned char Digit(char HexChar, bool Upper = false)
             {
                 return HexChar - (HexChar > '9' ? ((Upper ? 'A' : 'a') - 10) : '0');
             }
 
-            static inline unsigned char Number(const unsigned char Big, const unsigned char Small, bool Upper = false)
+            inline unsigned char Number(const unsigned char Big, const unsigned char Small, bool Upper = false)
             {
                 return ((Digit(Big) << 4) + Digit(Small));
             }
-            static inline int PlainSize(int Size)
+            
+            inline int PlainSize(int Size)
             {
                 return Size / 2;
             }
 
-            static inline int CypherSize(int Size)
+            inline int CypherSize(int Size)
             {
                 return 2 *  Size;
             }
 
-            static std::string From(const char *Data, size_t Size)
+            std::string From(const char *Data, size_t Size)
             {
                 std::stringstream ss;
 
@@ -45,7 +46,7 @@ namespace Core
                 return ss.str();
             }
 
-            static size_t Bytes(const std::string &HexString, char *Data, bool Upper = false)
+            size_t Bytes(const std::string &HexString, char *Data, bool Upper = false)
             {
                 size_t Len = HexString.length() / 2;
 

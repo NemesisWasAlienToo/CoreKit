@@ -44,6 +44,8 @@ namespace Core
                 
                 Node(const Node& Other) : Id(Other.Id), EndPoint(Other.EndPoint), Status(Other.Status) {}
 
+                // Operators
+
                 Node& operator=(Node&& Other)
                 {
                     Id = std::move(Other.Id);

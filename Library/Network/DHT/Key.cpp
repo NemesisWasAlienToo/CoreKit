@@ -4,6 +4,7 @@
 #include <string>
 
 #include <Conversion/Hex.cpp>
+#include <Cryptography/Random.cpp>
 
 using namespace Core;
 
@@ -61,10 +62,33 @@ namespace Core
                     }
                 }
 
+                Key(const char * data, size_t size) : Size(size), Data(new char[size])
+                {
+                    for (size_t i = 0; i < Size; i++)
+                    {
+                        Data[i] = data[i];
+                    }
+                }
+
                 ~Key()
                 {
                     delete[] Data;
                 }
+
+                // Statics
+
+                static Key Generate(size_t size)
+                {
+                    Key Result(size);
+
+                    Cryptography::Random::Load();
+
+                    Cryptography::Random::Bytes((unsigned char *) Result.Data, size);
+
+                    return Result;
+                }
+
+                // Functionalities
 
                 void Fill(const char Init)
                 {
