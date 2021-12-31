@@ -82,3 +82,10 @@ switch:$(SAMPLE_DIR)/$(Name).cpp
 sample:$(SOURCE_DIR)/Main.cpp
 	@echo "Sampling to $(Name).cpp"
 	@cat $(SOURCE_DIR)/Main.cpp > $(SAMPLE_DIR)/$(Name).cpp
+
+# Meat-data
+
+LINES:=$(shell git ls-files | xargs cat | wc -l)
+
+lines:
+	@echo "Number of lines : $(LINES)"

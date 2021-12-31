@@ -24,20 +24,19 @@ namespace Core
             class Handler
             {
             public:
-                typedef std::function<void(Network::DHT::Request &)> Callback;
-                typedef std::function<void(bool)> EndCallback;
+                typedef std::function<void()> EndCallback;
+                typedef std::function<void(Network::DHT::Request &, EndCallback)> Callback;
 
                 struct Handle // @todo Add move semmantics
                 {
                     Callback Routine;
                     DateTime Expire;
+                    EndCallback End;
                 };
 
             private:
                 std::mutex _Lock;
                 std::map<Network::EndPoint, Handle> _Content;
-
-                const Callback &_Default;
 
                 std::pair<Network::EndPoint, Handle> _Closest;
                 Timer ExpireEvent;
@@ -50,7 +49,7 @@ namespace Core
                 }
 
             public:
-                Handler(const Callback &DefaultHandler) : _Default(DefaultHandler), ExpireEvent(Timer::Monotonic, 0) {}
+                Handler() : ExpireEvent(Timer::Monotonic, 0) {} // @todo Add default timeout
                 ~Handler() = default;
 
                 // Functionalities
@@ -90,6 +89,7 @@ namespace Core
 
                         if (handle.Expire <= DateTime::Now())
                         {
+                            handle.End();
                             _Content.erase(_Closest.first);
                         }
                     }
@@ -103,7 +103,6 @@ namespace Core
                         if (_Closest.second.Expire > DateTime::Now())
                         {
                             Left = _Closest.second.Expire.Left();
-                            // Left.AddMilliseconds(100);
                         }
                         else
                         {
@@ -118,8 +117,9 @@ namespace Core
                     }
                 }
 
-                bool Put(const Network::EndPoint &EndPoint, const DateTime &Expire, const Callback &Routine)
+                bool Put(const Network::EndPoint &EndPoint, const DateTime &Expire, const Callback &Routine, const EndCallback &End)
                 {
+                    // @todo THis function must return a pointer to the added item for std::function to be moved when adding a req
                     if (Expire <= DateTime::Now())
                         throw std::invalid_argument("expire time cannot be now or in the past");
 
@@ -128,7 +128,7 @@ namespace Core
                     if (Has(EndPoint))
                         return false;
 
-                    _Content[EndPoint] = {Routine, Expire};
+                    _Content[EndPoint] = {Routine, Expire, End};
 
                     // New
 
@@ -138,7 +138,7 @@ namespace Core
                         _Closest.second.Expire = Expire;
 
                         auto Left = _Closest.second.Expire.Left();
-                        
+
                         ExpireEvent.Set(Left);
                     }
 
@@ -164,7 +164,7 @@ namespace Core
                     }
                 }
 
-                bool Take(const Network::EndPoint &EndPoint, Callback &Routine)
+                bool Take(const Network::EndPoint &EndPoint, Callback &Routine, EndCallback &End)
                 {
                     // @todo Optimize access
 
@@ -172,26 +172,50 @@ namespace Core
 
                     if (!Has(EndPoint))
                     {
-                        Routine = _Default;
-
                         return false;
                     }
 
                     auto &handle = _Content[EndPoint];
 
-                    if (handle.Expire <= DateTime::Now())
-                    {
-                        _Content.erase(EndPoint);
+                    bool Ret;
 
-                        Routine = _Default;
-                        return false;
+                    if ((Ret = handle.Expire <= DateTime::Now()))
+                    {
+                        handle.End();
+
+                        _Content.erase(EndPoint);
+                    }
+                    else
+                    {
+                        Routine = std::move(handle.Routine);
+                        End = std::move(handle.End);
+
+                        _Content.erase(EndPoint);
                     }
 
-                    Routine = std::move(handle.Routine);
+                    if (_Content.size() > 0)
+                    {
+                        _Closest = Soonest();
 
-                    _Content.erase(EndPoint);
+                        Duration Left;
 
-                    return true;
+                        if (_Closest.second.Expire > DateTime::Now())
+                        {
+                            Left = _Closest.second.Expire.Left();
+                        }
+                        else
+                        {
+                            Left = Duration(0, 1);
+                        }
+
+                        ExpireEvent.Set(Left);
+                    }
+                    else
+                    {
+                        ExpireEvent.Set({0, 0});
+                    }
+
+                    return !Ret;
                 }
 
                 Handler &operator=(Handler &Other) = default;

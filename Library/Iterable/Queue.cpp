@@ -323,6 +323,14 @@ namespace Core
             //     return queue;
             // }
 
+            Queue &operator>>(T &Item)
+            {
+
+                Item = Take();
+
+                return *this;
+            }
+
             friend std::ostream &operator<<(std::ostream &os, Queue &Queue)
             {
                 while (!Queue.IsEmpty())

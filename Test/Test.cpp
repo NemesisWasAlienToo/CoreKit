@@ -3,7 +3,6 @@
 #include <functional>
 
 #include <Test.cpp>
-#include <Timer.cpp>
 #include <DateTime.cpp>
 #include <Iterable/List.cpp>
 #include <Network/DNS.cpp>
@@ -31,17 +30,19 @@ int main(int argc, char const *argv[])
 
     // Run the server
 
-    Network::DHT::Chord::Runner Chord(Identity, EndPoint, 1, 60);
+    Network::DHT::Chord::Runner Chord(Identity, EndPoint, 1, 10);
 
     // Known Node
 
     Network::DHT::Node KnownNode = Network::DHT::Node(Network::DHT::Key("f0f00f", 32), Network::EndPoint("127.0.0.1:4444"));
 
-    Chord.AddNode(KnownNode);
+    Chord.Add(KnownNode);
+
+    Chord.Run();
 
     // Chord.Bootstrap();
 
-    Chord.Run();
+    // Chord.Await(); <--- Await all requests to be finished
 
     std::string Command = "";
 
@@ -53,9 +54,13 @@ int main(int argc, char const *argv[])
         {
             Chord.Ping(
                 KnownNode.EndPoint,
-                [](Duration Result)
+                [](Duration Result, Network::DHT::Handler::EndCallback End)
                 {
                     Test::Log("Ping") << Result << "s" << std::endl;
+                },
+                []()
+                {
+                    Test::Log("Ping") << "Ended" << std::endl;
                 });
         }
         else if (Command == "query")
@@ -63,18 +68,28 @@ int main(int argc, char const *argv[])
             Chord.Query(
                 Network::EndPoint("127.0.0.1:4444"),
                 Identity,
-                [](Network::EndPoint Result)
+                [](Network::EndPoint Result, Network::DHT::Handler::EndCallback End)
                 {
                     Test::Log("Query") << Result << std::endl;
+                    End();
+                },
+                []()
+                {
+                    Test::Log("Query") << "Ended" << std::endl;
                 });
         }
         else if (Command == "route")
         {
             Chord.Route(
                 Identity,
-                [](Network::EndPoint Result)
+                [](Network::EndPoint Result, Network::DHT::Handler::EndCallback End)
                 {
-                    Test::Log("Routed") << Result << std::endl;
+                    Test::Log("Route") << Result << std::endl;
+                    End();
+                },
+                []()
+                {
+                    Test::Log("Route") << "Ended" << std::endl;
                 });
         }
         else if (Command == "set")

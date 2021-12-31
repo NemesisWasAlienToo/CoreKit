@@ -6,13 +6,14 @@
 
 #include "Iterable/Queue.cpp"
 #include "Network/DHT/Key.cpp"
-#include "Network/DHT/Chord.cpp"
 
+#ifndef NETWORK_BYTE_ORDER
 #define NETWORK_BYTE_ORDER LITTLE_ENDIAN
+#endif
 
 namespace Core
 {
-    namespace Network
+    namespace Conversion
     {
         // @todo Add endianness maybe?
 
@@ -56,9 +57,22 @@ namespace Core
 
             // Peroperties
 
-            inline void Add(char *Data, size_t Size)
+            inline Serializer& Add(char *Data, size_t Size)
             {
                 Queue.Add(Data, Size);
+
+                return *this;
+            }
+
+            template <typename T>
+            T &Modify(size_t Index)
+            {
+                char *Pointer = &Queue[Index];
+
+                if (Queue.Capacity() == 0 || (static_cast<size_t>((&Queue.Content()[Queue.Capacity() - 1] - Pointer)) < sizeof(T)))
+                    throw std::out_of_range("Size would access out of bound data");
+
+                return *((T *)Pointer);
             }
 
             // Input operators
@@ -133,7 +147,7 @@ namespace Core
                 return *this;
             }
 
-            Serializer &operator>>(short& Value)
+            Serializer &operator>>(short &Value)
             {
                 short _Value;
 
@@ -144,7 +158,7 @@ namespace Core
                 return *this;
             }
 
-            Serializer &operator>>(int& Value)
+            Serializer &operator>>(int &Value)
             {
                 int _Value;
 
@@ -155,7 +169,7 @@ namespace Core
                 return *this;
             }
 
-            Serializer &operator>>(long& Value)
+            Serializer &operator>>(long &Value)
             {
                 long _Value;
 
@@ -194,7 +208,7 @@ namespace Core
 
                 Queue.FirstWhere(Index, [](char &item) -> bool
                                  { return item == 0; });
-                                 
+
                 Value.resize(Index++);
 
                 for (size_t i = 0; i < Index; i++)

@@ -6,12 +6,15 @@
 #include <thread>
 #include <functional>
 
-#include "Network/EndPoint.cpp"
-#include "Network/Socket.cpp"
-#include "Iterable/List.cpp"
-#include "Iterable/Poll.cpp"
 #include "Event.cpp"
 
+#include "Network/EndPoint.cpp"
+#include "Network/Socket.cpp"
+
+#include "Iterable/List.cpp"
+#include "Iterable/Poll.cpp"
+
+#include <Conversion/Serializer.cpp>
 #include "Network/DHT/Request.cpp"
 
 using namespace Core;
@@ -50,7 +53,7 @@ namespace Core
                     Stopped,
                 };
 
-                States State = States::Stopped;
+                volatile States State = States::Stopped;
 
                 Event Ready;
 
@@ -93,6 +96,34 @@ namespace Core
                         if (!Incomming.IsEmpty())
                             Ready.Emit(1);
                     }
+
+                    return true;
+                }
+
+                bool Put(Network::EndPoint Peer, std::function<void(Conversion::Serializer&)> Builder, size_t Size = 1024)
+                {
+                    if (State != States::Running)
+                        return false;
+
+                    // @todo Optimize this
+
+                    Request request(Peer, Size);
+
+                    Conversion::Serializer Serializer(request.Buffer);
+
+                    Serializer.Add((char *) "CHRD", 4) << (int) 0;
+
+                    Builder(Serializer); // @todo What to do for async calls?
+
+                    Serializer.Modify<uint32_t>(4) = htonl(request.Buffer.Length());
+
+                    {
+                        std::lock_guard lock(OutgoingLock);
+
+                        Outgoing.Add(std::move(request));
+                    }
+
+                    Interrupt();
 
                     return true;
                 }

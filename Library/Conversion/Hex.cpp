@@ -57,6 +57,6 @@ namespace Core
 
                 return Len;
             }
-        };
+        }
     }
 }

@@ -6,15 +6,17 @@
 
 // # User headers
 
-#include "Timer.cpp"
-#include "File.cpp"
-#include "DynamicLib.cpp"
-#include "Iterable/List.cpp"
-#include "Iterable/Span.cpp"
-#include <Network/DNS.cpp>
-#include <Network/Socket.cpp>
-#include <Conversion/Serializer.cpp>
+#include <Test.cpp>
+#include <DateTime.cpp>
+#include <Iterable/List.cpp>
+
 #include <Conversion/Hex.cpp>
+#include <Conversion/Serializer.cpp> // <----- @todo Strange error
+
+#include <Network/DNS.cpp>
+#include <Network/DHT/Server.cpp>
+#include <Network/DHT/Handler.cpp>
+#include <Network/DHT/Chord.cpp>
 
 // # Usings
 
@@ -25,6 +27,8 @@ using namespace Core;
 int main(int argc, char const *argv[])
 {
     unsigned short Port = 4444;
+
+    Network::DHT::Key Identity = Network::DHT::Key::Generate(32);
 
     if(argc == 2)
     {
@@ -53,6 +57,31 @@ int main(int argc, char const *argv[])
         if (Command == "exit")
         {
             break;
+        }
+        else if (Command == "ping")
+        {
+            Iterable::Queue<char> q;
+            Conversion::Serializer s(q);
+
+            // Maybe add should give an index to be used to modify later?
+
+            s.Add((char *) "CHRD", 4) << (int) 0 << (char) Network::DHT::Chord::Runner::Operations::Ping << Identity;
+
+            s.Modify<uint32_t>(4) = htonl(q.Length());
+
+            Socket.SendTo(q.Content(), q.Length(), Server);
+
+            Socket.Await(Network::Socket::In);
+
+            size_t len = Socket.Received();
+
+            char Buffer[len + 1];
+
+            Network::EndPoint Target;
+
+            Socket.ReceiveFrom(Buffer, len, Target);
+
+            std::cout << Target << " Said (" << len - 9 << ") " << Conversion::Hex::From(&Buffer[9], len - 9) << std::endl;
         }
         else if (Command == "send")
         {
