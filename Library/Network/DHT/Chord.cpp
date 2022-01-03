@@ -431,6 +431,13 @@ namespace Core
                         return true;
                     }
 
+                    void Fire(
+                        const Core::Network::EndPoint &Peer,
+                        const std::function<void(Core::Format::Serializer &)> &Builder/*, End*/)
+                    {
+                        Server.Put(Peer, Builder);
+                    }
+
                     // @todo Change callback to refrence to callback
 
                     typedef std::function<void(Duration, Handler::EndCallback)> PingCallback;
@@ -441,6 +448,8 @@ namespace Core
                             Peer,
 
                             // Build buffer
+
+                            // Operation
 
                             [this](Format::Serializer &Serializer)
                             {
@@ -468,12 +477,16 @@ namespace Core
 
                             // Build buffer
 
+                            // Operation - Key
+
                             [&Id](Format::Serializer &Serializer)
                             {
                                 Serializer << (char)Operations::Query << Id;
                             },
 
                             // Process response
+
+                            // Response - Node
 
                             [this, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
                             {
@@ -599,6 +612,7 @@ namespace Core
                             Peer,
 
                             // Build buffer
+                            // Get - Key
 
                             [&key](Format::Serializer &Serializer)
                             {
@@ -606,6 +620,7 @@ namespace Core
                             },
 
                             // Process response
+                            // Response - Data
 
                             [this, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
                             {
@@ -637,34 +652,33 @@ namespace Core
 
                     typedef std::function<void(Handler::EndCallback)> SetCallback;
 
-                    void SetTo(Network::EndPoint Peer, Key key, const Iterable::Span<char> &Data, SetCallback Callback, Handler::EndCallback End)
+                    void SetTo(Network::EndPoint Peer, Key key, const Iterable::Span<char> &Data)
                     {
-                        Build(
+                        Fire(
                             Peer,
 
                             // Build buffer
+                            // Set - Key - Data
+
+                            // No response (yet)
 
                             [&key, &Data](Format::Serializer &Serializer)
                             {
                                 Serializer << (char)Operations::Set << key << Data;
-                            },
-
-                            // Process response
-
-                            [this, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
-                            {
-                                CB(std::move(End));
-                            },
-                            std::move(End));
+                            });
                     }
 
-                    void Set(const Key& key, const Iterable::Span<char> &Data, SetCallback Callback, Handler::EndCallback End)
+                    void Set(const Key& key, const Iterable::Span<char> &Data, Handler::EndCallback End)
                     {
                         Route(
                             key,
-                            [this, key, Data, CB = std::move(Callback)](Node Target, Handler::EndCallback End)
+                            [this, key, Data](Node Target, Handler::EndCallback End)
                             {
-                                SetTo(Target.EndPoint, key, Data, std::move(CB), std::move(End));
+                                SetTo(Target.EndPoint, key, Data);
+                                
+                                // fire and forget
+                                
+                                End();
                             },
                             std::move(End));
                     }
