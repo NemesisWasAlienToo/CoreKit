@@ -172,19 +172,43 @@ namespace Core
                         }
                         case Operations::Set:
                         {
-                            //  @todo Handle
+                            // Set - Key - Data
+
+                            Key key(32);
+                            ReqSerializer >> key;
+
+                            Iterable::Span<char> Data(ReqSerializer.Length());
+                            ReqSerializer >> Data;
+
+                            OnSet(key, Data);
+
                             Test::Log("Set") << Request.Peer << std::endl;
                             break;
                         }
                         case Operations::Get:
                         {
-                            //  @todo Handle
+                            // Get - Key
+
+                            Key key(32);
+                            ReqSerializer >> key;
+
+                            Fire(
+                                Request.Peer,
+                                [this, &key](Format::Serializer &Response)
+                                {
+                                    Response << OnGet(key);
+                                });
+
                             Test::Log("Get") << Request.Peer << std::endl;
                             break;
                         }
                         case Operations::Data:
                         {
-                            //  @todo Handle
+                            Iterable::Span<char> Data(ReqSerializer.Length());
+                            ReqSerializer >> Data;
+
+                            OnData(Data);
+
                             Test::Log("Data") << Request.Peer << std::endl;
                             break;
                         }
@@ -214,7 +238,10 @@ namespace Core
                             }
                             else
                             {
-                                // Act as Data
+                                Iterable::Span<char> Data(ReqSerializer.Length());
+                                ReqSerializer >> Data;
+
+                                OnData(Data);
                             }
 
                             Test::Log("Deliver") << Request.Peer << std::endl;
@@ -239,16 +266,18 @@ namespace Core
                                 Count--;
 
                                 Nodes.ForEach(
-                                    [this, &Count, &Data](Node &Item)
+                                    [this, &Count, &Data, Peer = Request.Peer](Node &Item)
                                     {
-                                        Server.Put(
-                                            Item.EndPoint,
-                                            [&Count, &Data](Format::Serializer &Serializer)
-                                            {
-                                                Serializer << (char)Operations::Flood << Count << Data;
-                                            });
+                                        if (Item.EndPoint != Peer)
+                                            Fire(Item.EndPoint,
+                                                [&Count, &Data](Format::Serializer &Serializer)
+                                                {
+                                                    Serializer << (char)Operations::Flood << Count << Data;
+                                                });
                                     });
                             }
+
+                            OnData(Data);
 
                             Test::Log("Flood") << Request.Peer << std::endl;
                             break;
@@ -272,6 +301,12 @@ namespace Core
                     // ### Public Variables
 
                     time_t TimeOut;
+
+                    // Request Handlers
+
+                    std::function<void(const Key &, const Iterable::Span<char> &)> OnSet;
+                    std::function<const Iterable::Span<char> &(const Key &)> OnGet;
+                    std::function<void(Iterable::Span<char>)> OnData;
 
                     // ### Constructors
 
@@ -413,6 +448,8 @@ namespace Core
                         return Nodes[Index - 1];
                     }
 
+                    // Builders for new precedure
+
                     bool Build(
                         const Core::Network::EndPoint &Peer,
                         const std::function<void(Core::Format::Serializer &)> &Builder,
@@ -433,7 +470,7 @@ namespace Core
 
                     void Fire(
                         const Core::Network::EndPoint &Peer,
-                        const std::function<void(Core::Format::Serializer &)> &Builder/*, End*/)
+                        const std::function<void(Core::Format::Serializer &)> &Builder /*, End*/)
                     {
                         Server.Put(Peer, Builder);
                     }
@@ -442,7 +479,7 @@ namespace Core
 
                     typedef std::function<void(Duration, Handler::EndCallback)> PingCallback;
 
-                    void Ping(const Network::EndPoint& Peer, PingCallback Callback, Handler::EndCallback End)
+                    void Ping(const Network::EndPoint &Peer, PingCallback Callback, Handler::EndCallback End)
                     {
                         Build(
                             Peer,
@@ -470,7 +507,7 @@ namespace Core
 
                     typedef std::function<void(Node, Handler::EndCallback)> QueryCallback;
 
-                    void Query(const Network::EndPoint& Peer, const Key& Id, QueryCallback Callback, Handler::EndCallback End)
+                    void Query(const Network::EndPoint &Peer, const Key &Id, QueryCallback Callback, Handler::EndCallback End)
                     {
                         Build(
                             Peer,
@@ -513,7 +550,7 @@ namespace Core
 
                     typedef std::function<void(Node, Handler::EndCallback)> RouteCallback;
 
-                    void Route(const Network::EndPoint& Peer, const Key& Id, RouteCallback Callback, Handler::EndCallback End)
+                    void Route(const Network::EndPoint &Peer, const Key &Id, RouteCallback Callback, Handler::EndCallback End)
                     {
                         Query( // @todo optimize functions in the argument
                             Peer,
@@ -533,7 +570,8 @@ namespace Core
 
                     void Route(const Key &Id, RouteCallback Callback, Handler::EndCallback End)
                     {
-                        if(Nodes.Length() <= 1) throw std::underflow_error("No other node is known");
+                        if (Nodes.Length() <= 1)
+                            throw std::underflow_error("No other node is known");
 
                         const auto &Peer = Closest(Id).EndPoint;
 
@@ -542,7 +580,7 @@ namespace Core
 
                     typedef std::function<void(Handler::EndCallback)> BootstrapCallback;
 
-                    void Bootstrap(const Network::EndPoint& Peer, size_t NthNeighbor, BootstrapCallback Callback, Handler::EndCallback End)
+                    void Bootstrap(const Network::EndPoint &Peer, size_t NthNeighbor, BootstrapCallback Callback, Handler::EndCallback End)
                     {
                         // @todo Add the bootstrap node after asked for its id
 
@@ -553,14 +591,14 @@ namespace Core
                             Neighbor,
                             [this, NthNeighbor, CB = std::move(Callback)](Node Response, Handler::EndCallback End)
                             {
-                                if(Response.Id == Identity.Id)
+                                if (Response.Id == Identity.Id)
                                 {
                                     // All nodes resode before my key
 
                                     End();
                                     return;
                                 }
-                                
+
                                 Add(Response);
 
                                 // @todo also not all nodes exist and need to be routed
@@ -570,32 +608,32 @@ namespace Core
 
                                 for (i = NthNeighbor - 1; i > 0; i--)
                                 {
-                                    if(Identity.Id.Neighbor(i) < Response.Id)
+                                    if (Identity.Id.Neighbor(i) < Response.Id)
                                     {
                                         Found = true;
                                         break;
                                     }
                                 }
 
-                                if(!Found)
+                                if (!Found)
                                 {
                                     i = Identity.Id.Critical();
                                 }
 
-                                if(i > NthNeighbor)
+                                if (i > NthNeighbor)
                                 {
                                     // Wrapped around and bootstrap is done
 
                                     End();
                                     return;
-                                }                                
+                                }
 
                                 Bootstrap(Closest(Identity.Id.Neighbor(i)).EndPoint, i, std::move(CB), std::move(End));
                             },
                             std::move(End));
                     }
 
-                    void Bootstrap(const Network::EndPoint& Peer, BootstrapCallback Callback, Handler::EndCallback End)
+                    void Bootstrap(const Network::EndPoint &Peer, BootstrapCallback Callback, Handler::EndCallback End)
                     {
                         Bootstrap(
                             Peer,
@@ -606,7 +644,7 @@ namespace Core
 
                     typedef std::function<void(Iterable::Span<char> &Data, Handler::EndCallback)> GetCallback;
 
-                    void GetFrom(Network::EndPoint Peer, const Key& key, GetCallback Callback, Handler::EndCallback End)
+                    void GetFrom(const Network::EndPoint &Peer, const Key &key, GetCallback Callback, Handler::EndCallback End)
                     {
                         Build(
                             Peer,
@@ -639,7 +677,7 @@ namespace Core
                             std::move(End));
                     }
 
-                    void Get(Key key, GetCallback Callback, Handler::EndCallback End)
+                    void Get(const Key &key, GetCallback Callback, Handler::EndCallback End)
                     {
                         Route(
                             key,
@@ -650,9 +688,7 @@ namespace Core
                             std::move(End));
                     }
 
-                    typedef std::function<void(Handler::EndCallback)> SetCallback;
-
-                    void SetTo(Network::EndPoint Peer, Key key, const Iterable::Span<char> &Data)
+                    void SetTo(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data)
                     {
                         Fire(
                             Peer,
@@ -660,27 +696,82 @@ namespace Core
                             // Build buffer
                             // Set - Key - Data
 
-                            // No response (yet)
-
                             [&key, &Data](Format::Serializer &Serializer)
                             {
                                 Serializer << (char)Operations::Set << key << Data;
                             });
                     }
 
-                    void Set(const Key& key, const Iterable::Span<char> &Data, Handler::EndCallback End)
+                    void Set(const Key &key, const Iterable::Span<char> &Data, Handler::EndCallback End)
                     {
                         Route(
                             key,
                             [this, key, Data](Node Target, Handler::EndCallback End)
                             {
                                 SetTo(Target.EndPoint, key, Data);
-                                
+
                                 // fire and forget
-                                
+
                                 End();
                             },
                             std::move(End));
+                    }
+
+                    // Send data
+
+                    void SendTo(const Network::EndPoint &Peer, const Iterable::Span<char> &Data)
+                    {
+                        Fire(
+                            Peer,
+
+                            // Build buffer
+                            // Data - Data
+
+                            [&Data](Format::Serializer &Serializer)
+                            {
+                                Serializer << (char)Operations::Data << Data;
+                            });
+                    }
+
+                    // Flood
+
+                    void Flood(const Network::EndPoint &Peer, Key key, const Iterable::Span<char> &Data)
+                    {
+                        Nodes.ForEach(
+                            [this, &Data](Node &Node)
+                            {
+                                Fire(
+                                    Node.EndPoint,
+
+                                    // Build buffer
+                                    // Data - Stage - Data
+
+                                    [this, &Data](Format::Serializer &Serializer)
+                                    {
+                                        Serializer << (char)Operations::Data << Identity.Id.Size << Data;
+                                    });
+                            });
+                    }
+
+                    // Deliver
+
+                    void DeliverTo(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data)
+                    {
+                        Fire(
+                            Peer,
+
+                            // Build buffer
+                            // Data - Key - Data
+
+                            [&key, &Data](Format::Serializer &Serializer)
+                            {
+                                Serializer << (char)Operations::Deliver << key << Data;
+                            });
+                    }
+
+                    void Deliver(const Key &key, const Iterable::Span<char> &Data)
+                    {
+                        DeliverTo(Closest(key).EndPoint, key, Data);
                     }
                 };
             }
