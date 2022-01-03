@@ -32,12 +32,20 @@ namespace Core
 
         Descriptor() = default;
 
-        // @todo check the Handler value to be > 0 ?
-        Descriptor(int Handler) : _INode(Handler) {}
+        Descriptor(int Handler) : _INode(Handler)
+        {
+            if (!IsValid())
+                throw std::invalid_argument("File descriptor is not valid");
+        }
 
         Descriptor(const Descriptor &Other) : _INode(Other._INode) {}
 
         // ### Functionalitues
+
+        inline bool IsValid()
+        {
+            return fcntl(_INode, F_GETFD) != -1 || errno != EBADF;
+        }
 
         auto Write(const void *Data, size_t Size)
         {

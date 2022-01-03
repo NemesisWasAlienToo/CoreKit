@@ -11,7 +11,7 @@
 #include "Network/DHT/Node.cpp"
 #include "Iterable/List.cpp"
 #include "Iterable/Poll.cpp"
-#include "Conversion/Serializer.cpp"
+#include "Format/Serializer.cpp"
 #include "Test.cpp"
 #include "Duration.cpp"
 
@@ -52,7 +52,7 @@ namespace Core
                         TimeOut,
                     };
 
-                    Key Id;
+                    Node Identity;
 
                     Network::DHT::Server Server;
 
@@ -93,13 +93,14 @@ namespace Core
                                 if (Handler.Take(Request.Peer, Task, End))
                                     Task(Request, End);
                                 else
-                                    _Default(Request);
+                                    Respond(Request);
                             }
 
                             if (Poll[1].HasEvent())
                             {
                                 Test::Warn("Timeout") << "Request timed out" << std::endl;
                                 Handler.Clean();
+                                // OnTimeOut()
                             }
                         }
 
@@ -108,12 +109,14 @@ namespace Core
                         std::cout << "Thread exited" << std::endl;
                     };
 
-                    void _Default(Network::DHT::Request &Request)
+                    void OnTimeOut(const Network::EndPoint &Peer)
                     {
-                        Network::DHT::Request Response(Request.Peer, 1024);
-                        
-                        Conversion::Serializer ReqSerializer(Request.Buffer);
-                        Conversion::Serializer ResSerializer(Response.Buffer);
+                        //
+                    }
+
+                    void Respond(Network::DHT::Request &Request)
+                    {
+                        Format::Serializer ReqSerializer(Request.Buffer);
 
                         char Type;
 
@@ -122,34 +125,147 @@ namespace Core
                         switch (static_cast<Operations>(Type))
                         {
                         case Operations::Ping:
+                        {
                             Test::Log("Ping") << Request.Peer << std::endl;
-                            ResSerializer << (char)Operations::Response << Id;
+
+                            Server.Put(
+                                Request.Peer,
+                                [this](Format::Serializer &Response)
+                                {
+                                    Response << (char)Operations::Response << Identity.Id;
+                                });
+
                             break;
+                        }
                         case Operations::Query:
+                        {
+                            Key key(32);
+
+                            ReqSerializer >> key;
+
+                            Server.Put(
+                                Request.Peer,
+                                [this, &key](Format::Serializer &Response)
+                                {
+                                    Response << (char)Operations::Response;
+
+                                    size_t Index;
+
+                                    if (Nodes.ContainsWhere(
+                                            Index,
+                                            [&key](Node &Item) -> bool
+                                            {
+                                                return Item.Id < key;
+                                            }))
+                                    {
+                                        Response << Nodes[Index].EndPoint;
+                                    }
+                                    else
+                                    {
+                                        Response << Identity.Id;
+                                    }
+                                });
+
                             Test::Log("Query") << Request.Peer << std::endl;
+
                             break;
+                        }
                         case Operations::Set:
+                        {
+                            //  @todo Handle
                             Test::Log("Set") << Request.Peer << std::endl;
                             break;
+                        }
                         case Operations::Get:
+                        {
+                            //  @todo Handle
                             Test::Log("Get") << Request.Peer << std::endl;
                             break;
+                        }
                         case Operations::Data:
+                        {
+                            //  @todo Handle
                             Test::Log("Data") << Request.Peer << std::endl;
                             break;
+                        }
                         case Operations::Deliver:
+                        {
+                            Key key(32);
+
+                            ReqSerializer >> key;
+
+                            size_t Index;
+
+                            // @todo can be optimized by only reading and forwarding the same buffer?
+
+                            if (Nodes.ContainsWhere(
+                                    Index,
+                                    [&key](Node &Item) -> bool
+                                    {
+                                        return Item.Id < key;
+                                    }))
+                            {
+                                Server.Put(
+                                    Nodes[Index].EndPoint,
+                                    [this, &key, &ReqSerializer](Format::Serializer &Response)
+                                    {
+                                        Response << (char)Operations::Deliver << key << ReqSerializer;
+                                    });
+                            }
+                            else
+                            {
+                                // Act as Data
+                            }
+
                             Test::Log("Deliver") << Request.Peer << std::endl;
+
                             break;
+                        }
                         case Operations::Flood:
+                        {
+                            // @todo add hod many steps should this be passed
+                            uint16_t Count;
+
+                            ReqSerializer >> Count;
+
+                            Iterable::Span<char> Data(ReqSerializer.Length());
+
+                            ReqSerializer >> Data;
+
+                            // Handle data
+
+                            if (Count > 0)
+                            {
+                                Count--;
+
+                                Nodes.ForEach(
+                                    [this, &Count, &Data](Node &Item)
+                                    {
+                                        Server.Put(
+                                            Item.EndPoint,
+                                            [&Count, &Data](Format::Serializer &Serializer)
+                                            {
+                                                Serializer << (char)Operations::Flood << Count << Data;
+                                            });
+                                    });
+                            }
+
                             Test::Log("Flood") << Request.Peer << std::endl;
                             break;
+                        }
                         default:
-                            ResSerializer << (char)Operations::Response << "Unknown command";
+                        {
+                            Server.Put(
+                                Request.Peer,
+                                [this](Format::Serializer &Response)
+                                {
+                                    Response << (char)Operations::Response << "Unknown command";
+                                });
+
                             Test::Log("Unknown") << Request.Peer << " : " << Request.Buffer << std::endl;
                             break;
                         }
-
-                        Server.Put(std::move(Response));
+                        }
                     };
 
                 public:
@@ -161,33 +277,80 @@ namespace Core
 
                     Runner() = default;
 
-                    Runner(Key id, const Network::EndPoint &EndPoint, size_t ThreadCount = 1, time_t Timeout = 60) : Id(id), Server(EndPoint),
-                                                                                                                     Handler(), Pool(ThreadCount, false), TimeOut(Timeout) {}
+                    Runner(const Node &identity, size_t ThreadCount = 1, time_t Timeout = 60) : Identity(identity), Server(identity.EndPoint), Handler(), Pool(ThreadCount, false), TimeOut(Timeout)
+                    {
+                        Nodes.Add({Identity.Id, {"0.0.0.0:0"}});
+                    }
 
                     // ### Static functions
 
-                    inline Network::EndPoint DefaultEndPoint()
+                    inline static Network::EndPoint DefaultEndPoint()
                     {
                         return Network::EndPoint("127.0.0.1:8888");
                     }
 
                     // ### Functionalities
 
+                    Node Resolve(Key key)
+                    {
+                        size_t Index;
+
+                        if (Nodes.ContainsWhere(
+                                Index,
+                                [this, &key](Node &Item) -> bool
+                                {
+                                    return Item.Id > key;
+                                }))
+                        {
+                            return Nodes[Index];
+                        }
+                        else
+                        {
+                            return Nodes.Last();
+                        }
+                    }
+
                     void Add(Node &&node) // <- @todo Fix with perfect forwarding
                     {
-                        // Nodes.AddSorted(std::move(node)); // <- Add compare operators for Node
-                        Nodes.Add(std::forward<Node>(node));
+                        size_t Index;
+
+                        if (Nodes.ContainsWhere(
+                                Index,
+                                [this, &node](Node &Item) -> bool
+                                {
+                                    return Item.Id > node.Id;
+                                }))
+                        {
+                            Nodes.Squeeze(std::forward<Node>(node), Index);
+                        }
+                        else
+                        {
+                            Nodes.Add(std::forward<Node>(node));
+                        }
                     }
 
                     void Add(const Node &node)
                     {
-                        // Nodes.AddSorted(node); // <- Add compare operators for Node
-                        Nodes.Add(node);
+                        size_t Index;
+
+                        if (Nodes.ContainsWhere(
+                                Index,
+                                [this, &node](Node &Item) -> bool
+                                {
+                                    return Item.Id > node.Id;
+                                }))
+                        {
+                            Nodes.Squeeze(node, Index);
+                        }
+                        else
+                        {
+                            Nodes.Add(node);
+                        }
                     }
 
                     void Await()
                     {
-                        // Wait for all out tasks to be done
+                        // @todo Wait for all out tasks to be done IMPORTANT
                     }
 
                     inline void GetInPool()
@@ -197,7 +360,7 @@ namespace Core
 
                     void Run()
                     {
-                        // Start the udp serializer server
+                        // Start the udp server
 
                         Server.Run();
 
@@ -217,7 +380,7 @@ namespace Core
 
                         Server.Stop();
 
-                        // Join threads
+                        // Join threads in pool
 
                         Pool.ForEach(
                             [](std::thread &Thread)
@@ -250,69 +413,115 @@ namespace Core
                         return Nodes[Index - 1];
                     }
 
-                    // @todo Add on fail callback and bool return value for functions
-                    // @todo Change callback to refrence to callback
-
-                    typedef std::function<void(Network::EndPoint, Handler::EndCallback)> QueryCallback;
-
-                    void Query(Network::EndPoint Peer, Key Id, QueryCallback Callback, Handler::EndCallback End)
+                    bool Build(
+                        const Core::Network::EndPoint &Peer,
+                        const std::function<void(Core::Format::Serializer &)> &Builder,
+                        Core::Network::DHT::Handler::Callback Callback,
+                        Core::Network::DHT::Handler::EndCallback End)
                     {
-                        // Add Handler
-
-                        auto Result = Handler.Put( // @todo <---- this can initialize or generate a buffer containing header
-                            Peer,
-                            DateTime::FromNow(TimeOut),
-                            [this, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
-                            {
-                                auto Response = request.Buffer.ToString();
-
-                                try
-                                {
-                                    CB(Response, End);
-                                }
-                                catch (const std::exception &e)
-                                {
-                                    Test::Warn(e.what()) << Response << std::endl;
-                                    End();
-                                }
-                            },
-                            End);
-
-                        if (!Result)
+                        if (!Handler.Put(Peer, DateTime::FromNow(TimeOut), std::move(Callback), std::move(End)))
                         {
                             End();
-                            Test::Error("Ping") << "Handler already exists" << std::endl;
-                            return;
+                            Test::Error("Chord") << "Handler already exists" << std::endl;
+                            return false;
                         }
 
-                        Server.Put(
+                        Server.Put(Peer, Builder);
+
+                        return true;
+                    }
+
+                    // @todo Change callback to refrence to callback
+
+                    typedef std::function<void(Duration, Handler::EndCallback)> PingCallback;
+
+                    void Ping(const Network::EndPoint& Peer, PingCallback Callback, Handler::EndCallback End)
+                    {
+                        Build(
                             Peer,
-                            [&Id](Conversion::Serializer& Serializer)
+
+                            // Build buffer
+
+                            [this](Format::Serializer &Serializer)
+                            {
+                                Serializer << (char)Operations::Ping << Identity.Id;
+                            },
+
+                            // Process response
+
+                            [this, SendTime = DateTime::Now(), CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
+                            {
+                                // @todo check retuened id as well
+
+                                CB(DateTime::Now() - SendTime, End);
+                                End();
+                            },
+                            End);
+                    }
+
+                    typedef std::function<void(Node, Handler::EndCallback)> QueryCallback;
+
+                    void Query(const Network::EndPoint& Peer, const Key& Id, QueryCallback Callback, Handler::EndCallback End)
+                    {
+                        Build(
+                            Peer,
+
+                            // Build buffer
+
+                            [&Id](Format::Serializer &Serializer)
                             {
                                 Serializer << (char)Operations::Query << Id;
                             },
-                            Id.Size);
+
+                            // Process response
+
+                            [this, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
+                            {
+                                Format::Serializer Serializer(request.Buffer); // <-- maybe already pass this?
+
+                                char Header;
+                                Node node;
+
+                                Serializer >> Header;
+
+                                try
+                                {
+                                    Serializer >> node;
+                                    CB(std::move(node), std::move(End));
+                                }
+                                catch (const std::exception &e)
+                                {
+                                    Test::Warn(e.what()) << Serializer << std::endl;
+                                    End();
+                                }
+                            },
+                            std::move(End));
                     }
 
-                    typedef std::function<void(Network::EndPoint, Handler::EndCallback)> RouteCallback;
+                    typedef std::function<void(Node, Handler::EndCallback)> RouteCallback;
 
-                    void Route(Network::EndPoint Peer, Key Id, RouteCallback Callback, const Handler::EndCallback &End)
+                    void Route(const Network::EndPoint& Peer, const Key& Id, RouteCallback Callback, Handler::EndCallback End)
                     {
                         Query( // @todo optimize functions in the argument
                             Peer,
                             Id,
-                            [this, Peer, Id, CB = std::move(Callback)](Network::EndPoint Response, const Handler::EndCallback &End)
+                            [this, Peer, Id, CB = std::move(Callback)](Node Response, const Handler::EndCallback &End)
                             {
-                                if (Peer == Response)
-                                    CB(Peer, End);
+                                if (Response.EndPoint == Network::EndPoint("0.0.0.0:0")) // <-- @todo Optimize this
+                                {
+                                    Response.EndPoint = Peer;
+                                    CB(std::move(Response), std::move(End));
+                                }
                                 else
-                                    Route(Response, Id, CB, End);
+                                    Route(Response.EndPoint, Id, std::move(CB), std::move(End));
                             },
-                            End);
+                            std::move(End));
                     }
 
                     void Route(const Key &Id, RouteCallback Callback, Handler::EndCallback End)
                     {
+                        if(Nodes.Length() <= 1) throw std::underflow_error("No other node is known");
+
                         const auto &Peer = Closest(Id).EndPoint;
 
                         Route(Peer, Id, std::move(Callback), std::move(End));
@@ -320,142 +529,144 @@ namespace Core
 
                     typedef std::function<void(Handler::EndCallback)> BootstrapCallback;
 
-                    void Bootstrap(Network::EndPoint Peer, size_t NthNeighbor, BootstrapCallback Callback, Handler::EndCallback End)
+                    void Bootstrap(const Network::EndPoint& Peer, size_t NthNeighbor, BootstrapCallback Callback, Handler::EndCallback End)
                     {
-                        auto Neighbor = Id.Neighbor(NthNeighbor);
+                        // @todo Add the bootstrap node after asked for its id
+
+                        auto Neighbor = Identity.Id.Neighbor(NthNeighbor);
 
                         Route(
                             Peer,
                             Neighbor,
-                            [this, NthNeighbor, CB = std::move(Callback)](Network::EndPoint Response, Handler::EndCallback End)
+                            [this, NthNeighbor, CB = std::move(Callback)](Node Response, Handler::EndCallback End)
                             {
-                                Nodes.Add(Node(Id, Response));
+                                if(Response.Id == Identity.Id)
+                                {
+                                    // All nodes resode before my key
+
+                                    End();
+                                    return;
+                                }
+                                
+                                Add(Response);
 
                                 // @todo also not all nodes exist and need to be routed
 
-                                Bootstrap(Closest(Id).EndPoint, NthNeighbor - 1, CB, End);
+                                bool Found = false;
+                                size_t i;
+
+                                for (i = NthNeighbor - 1; i > 0; i--)
+                                {
+                                    if(Identity.Id.Neighbor(i) < Response.Id)
+                                    {
+                                        Found = true;
+                                        break;
+                                    }
+                                }
+
+                                if(!Found)
+                                {
+                                    i = Identity.Id.Critical();
+                                }
+
+                                if(i > NthNeighbor)
+                                {
+                                    // Wrapped around and bootstrap is done
+
+                                    End();
+                                    return;
+                                }                                
+
+                                Bootstrap(Closest(Identity.Id.Neighbor(i)).EndPoint, i, std::move(CB), std::move(End));
                             },
-                            End);
+                            std::move(End));
                     }
 
-                    void Bootstrap(Network::EndPoint Peer, BootstrapCallback Callback, Handler::EndCallback End)
+                    void Bootstrap(const Network::EndPoint& Peer, BootstrapCallback Callback, Handler::EndCallback End)
                     {
-                        Bootstrap(Closest(Id).EndPoint, Id.Size, std::move(Callback), std::move(End));
+                        Bootstrap(
+                            Peer,
+                            Identity.Id.Size,
+                            std::move(Callback),
+                            std::move(End));
                     }
 
-                    typedef std::function<void(Duration, Handler::EndCallback)> PingCallback;
+                    typedef std::function<void(Iterable::Span<char> &Data, Handler::EndCallback)> GetCallback;
 
-                    void Ping(Network::EndPoint Peer, PingCallback Callback, Handler::EndCallback End)
+                    void GetFrom(Network::EndPoint Peer, const Key& key, GetCallback Callback, Handler::EndCallback End)
                     {
-                        auto SendTime = DateTime::Now();
-
-                        auto Result = Handler.Put(
+                        Build(
                             Peer,
-                            DateTime::FromNow(TimeOut),
-                            [this, SendTime, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
-                            {
-                                // @todo check retuened id as well
 
-                                CB(DateTime::Now() - SendTime, End);
-                            },
-                            End);
+                            // Build buffer
 
-                        if (!Result)
-                        {
-                            End();
-                            Test::Error("Ping") << "Handler already exists" << std::endl;
-                            return;
-                        }
-
-                        Server.Put(
-                            Peer,
-                            [this](Conversion::Serializer& Serializer)
-                            {
-                                Serializer << (char)Operations::Ping << Id;
-                            },
-                            Id.Size);
-                    }
-
-                    typedef std::function<void(Iterable::Queue<char> &Data, Handler::EndCallback)> GetCallback;
-
-                    void Get(Network::EndPoint Peer, Key key, GetCallback Callback, Handler::EndCallback End)
-                    {
-                        auto Result = Handler.Put(
-                            Peer,
-                            DateTime::FromNow(TimeOut),
-                            [this, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
-                            {
-                                // @todo check retuened id as well
-
-                                CB(request.Buffer, End);
-                            },
-                            End);
-
-                        if (!Result)
-                        {
-                            End();
-                            Test::Error("Ping") << "Handler already exists" << std::endl;
-                            return;
-                        }
-
-                        Server.Put(
-                            Peer,
-                            [&key](Conversion::Serializer& Serializer)
+                            [&key](Format::Serializer &Serializer)
                             {
                                 Serializer << (char)Operations::Get << key;
                             },
-                            key.Size);
+
+                            // Process response
+
+                            [this, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
+                            {
+                                Format::Serializer Serializer(request.Buffer);
+
+                                char Header;
+
+                                Serializer >> Header;
+
+                                Iterable::Span<char> Data(Serializer.Length());
+
+                                Serializer >> Data;
+
+                                CB(Data, End);
+                            },
+                            std::move(End));
                     }
 
                     void Get(Key key, GetCallback Callback, Handler::EndCallback End)
                     {
                         Route(
                             key,
-                            [this, key, CB = std::move(Callback)](auto Target, Handler::EndCallback End)
+                            [this, key, CB = std::move(Callback)](Node Target, Handler::EndCallback End)
                             {
-                                Get(Target, key, CB, End);
+                                GetFrom(Target.EndPoint, key, CB, std::move(End));
                             },
-                            End);
+                            std::move(End));
                     }
 
                     typedef std::function<void(Handler::EndCallback)> SetCallback;
 
-                    void Set(Network::EndPoint Peer, Key key, const Iterable::Span<char> &Data, SetCallback Callback, Handler::EndCallback End)
+                    void SetTo(Network::EndPoint Peer, Key key, const Iterable::Span<char> &Data, SetCallback Callback, Handler::EndCallback End)
                     {
-                        auto Result = Handler.Put(
+                        Build(
                             Peer,
-                            DateTime::FromNow(TimeOut),
-                            [this, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
-                            {
-                                CB(End);
-                            },
-                            End);
 
-                        if (!Result)
-                        {
-                            End();
-                            Test::Error("Ping") << "Handler already exists" << std::endl;
-                            return;
-                        }
+                            // Build buffer
 
-                        Server.Put(
-                            Peer,
-                            [&key, &Data](Conversion::Serializer& Serializer)
+                            [&key, &Data](Format::Serializer &Serializer)
                             {
                                 Serializer << (char)Operations::Set << key << Data;
                             },
-                            key.Size);
+
+                            // Process response
+
+                            [this, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
+                            {
+                                CB(std::move(End));
+                            },
+                            std::move(End));
                     }
 
-                    void Set(Key key, const Iterable::Span<char> &Data, SetCallback Callback, Handler::EndCallback End)
+                    void Set(const Key& key, const Iterable::Span<char> &Data, SetCallback Callback, Handler::EndCallback End)
                     {
                         Route(
                             key,
-                            [this, key, Data, CB = std::move(Callback)](auto Target, Handler::EndCallback End)
+                            [this, key, Data, CB = std::move(Callback)](Node Target, Handler::EndCallback End)
                             {
-                                Set(Target, key, Data, CB, End);
+                                SetTo(Target.EndPoint, key, Data, std::move(CB), std::move(End));
                             },
-                            End);
+                            std::move(End));
                     }
                 };
             }

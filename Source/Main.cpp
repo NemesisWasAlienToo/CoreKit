@@ -10,8 +10,8 @@
 #include <DateTime.cpp>
 #include <Iterable/List.cpp>
 
-#include <Conversion/Hex.cpp>
-#include <Conversion/Serializer.cpp> // <----- @todo Strange error
+#include <Format/Hex.cpp>
+#include <Format/Serializer.cpp> // <----- @todo Strange error
 
 #include <Network/DNS.cpp>
 #include <Network/DHT/Server.cpp>
@@ -61,7 +61,7 @@ int main(int argc, char const *argv[])
         else if (Command == "ping")
         {
             Iterable::Queue<char> q;
-            Conversion::Serializer s(q);
+            Format::Serializer s(q);
 
             // Maybe add should give an index to be used to modify later?
 
@@ -81,7 +81,7 @@ int main(int argc, char const *argv[])
 
             Socket.ReceiveFrom(Buffer, len, Target);
 
-            std::cout << Target << " Said (" << len - 9 << ") " << Conversion::Hex::From(&Buffer[9], len - 9) << std::endl;
+            std::cout << Target << " Said (" << len - 9 << ") " << Format::Hex::From(&Buffer[9], len - 9) << std::endl;
         }
         else if (Command == "send")
         {
@@ -111,7 +111,7 @@ int main(int argc, char const *argv[])
 
             Buffer[len] = 0;
 
-            std::cout << Target << " Said (" << len - 9 << ") " << Conversion::Hex::From(&Buffer[9], len - 9) << std::endl;
+            std::cout << Target << " Said (" << len - 9 << ") " << Format::Hex::From(&Buffer[9], len - 9) << std::endl;
 
             char Signiture[8] = {'C', 'H', 'R', 'D', 0, 0, 0, 0};
 

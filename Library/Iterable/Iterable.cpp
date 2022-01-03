@@ -208,28 +208,6 @@ namespace Core
                 (this->_Length)++;
             }
 
-            void AddSorted(T &&Item)
-            {
-                this->_IncreaseCapacity();
-
-                size_t i;
-
-                for (i = 0; i <  this->_Length && _ElementAt(i) < Item ; i++) {}
-
-                Squeeze(std::move(Item), i);
-            }
-
-            void AddSorted(const T &Item)
-            {
-                this->_IncreaseCapacity();
-
-                size_t i;
-
-                for (i = 0; i <  this->_Length && _ElementAt(i) < Item ; i++) {}
-
-                Squeeze(Item, i);
-            }
-
             void Add(const T &Item, size_t Count)
             {
                 this->_IncreaseCapacity(Count);
@@ -511,6 +489,8 @@ namespace Core
                         return _ElementAt(i);
                     }
                 }
+
+                // Return last one if none is suitable
 
                 throw std::out_of_range("No such item");
             }

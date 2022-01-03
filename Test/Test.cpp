@@ -14,33 +14,42 @@ using namespace Core;
 
 int main(int argc, char const *argv[])
 {
-    // Init EndPoint
+    // Init Identity
 
     const Network::EndPoint EndPoint("0.0.0.0:8888");
 
-    // Init Key
+    const Network::DHT::Key Key = Network::DHT::Key::Generate(32);
 
-    Network::DHT::Key Identity(Network::DHT::Key::Generate(32));
+    const Network::DHT::Node Identity(Key, EndPoint); // <-- @todo Maybe add generate function?
 
     // Log End Point
 
     Test::Log(Network::DNS::HostName()) << EndPoint << std::endl;
 
-    Test::Log("Identity") << Identity.ToString() << std::endl;
+    Test::Log("Identity") << Identity.Id.ToString() << std::endl;
 
     // Run the server
 
-    Network::DHT::Chord::Runner Chord(Identity, EndPoint, 1, 10);
-
-    // Known Node
-
-    Network::DHT::Node KnownNode = Network::DHT::Node(Network::DHT::Key("f0f00f", 32), Network::EndPoint("127.0.0.1:4444"));
-
-    Chord.Add(KnownNode);
+    Network::DHT::Chord::Runner Chord(Identity, 1, 10);
 
     Chord.Run();
 
-    // Chord.Bootstrap();
+    std::string BootstrapDomain;
+
+    std::cout << "Enter a bootstrap domain : ";
+
+    std::cin >> BootstrapDomain;
+
+    // Chord.Bootstrap(
+    //     BootstrapDomain,
+    //     [](std::function<void()> End)
+    //     {
+    //         End();
+    //     },
+    //     []()
+    //     {
+    //         std::cout << "Routing ended" << std::endl;
+    //     });
 
     // Chord.Await(); <--- Await all requests to be finished
 
@@ -53,7 +62,7 @@ int main(int argc, char const *argv[])
         if (Command == "ping")
         {
             Chord.Ping(
-                KnownNode.EndPoint,
+                {"127.0.0.1:4444"},
                 [](Duration Result, Network::DHT::Handler::EndCallback End)
                 {
                     Test::Log("Ping") << Result << "s" << std::endl;
@@ -66,11 +75,11 @@ int main(int argc, char const *argv[])
         else if (Command == "query")
         {
             Chord.Query(
-                Network::EndPoint("127.0.0.1:4444"),
-                Identity,
-                [](Network::EndPoint Result, Network::DHT::Handler::EndCallback End)
+                {"127.0.0.1:4444"},
+                Identity.Id,
+                [](Network::DHT::Node Result, Network::DHT::Handler::EndCallback End)
                 {
-                    Test::Log("Query") << Result << std::endl;
+                    Test::Log("Query") << Result.EndPoint << std::endl;
                     End();
                 },
                 []()
@@ -81,10 +90,11 @@ int main(int argc, char const *argv[])
         else if (Command == "route")
         {
             Chord.Route(
-                Identity,
-                [](Network::EndPoint Result, Network::DHT::Handler::EndCallback End)
+                {"127.0.0.1:4444"},
+                Identity.Id,
+                [](Network::DHT::Node Result, Network::DHT::Handler::EndCallback End)
                 {
-                    Test::Log("Route") << Result << std::endl;
+                    Test::Log("Route") << Result.EndPoint << std::endl;
                     End();
                 },
                 []()

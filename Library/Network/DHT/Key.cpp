@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 
-#include <Conversion/Hex.cpp>
+#include <Format/Hex.cpp>
 #include <Cryptography/Random.cpp>
 
 using namespace Core;
@@ -17,7 +17,7 @@ namespace Core
             struct Key
             {
                 // @todo maybr add endianness?
-                
+
                 // ### Constants
 
                 size_t Size = 0;
@@ -41,12 +41,12 @@ namespace Core
 
                     Fill(0);
 
-                    Conversion::Hex::Bytes(Hex, &Data[Size - (Hex.length() / 2)]);
+                    Format::Hex::Bytes(Hex, &Data[Size - (Hex.length() / 2)]);
                 }
 
                 Key(const std::string &Hex) : Size(Hex.length() / 2), Data(new char[Size])
                 {
-                    Conversion::Hex::Bytes(Hex, Data);
+                    Format::Hex::Bytes(Hex, Data);
                 }
 
                 Key(Key &&Other) : Size(Other.Size)
@@ -62,7 +62,7 @@ namespace Core
                     }
                 }
 
-                Key(const char * data, size_t size) : Size(size), Data(new char[size])
+                Key(const char *data, size_t size) : Size(size), Data(new char[size])
                 {
                     for (size_t i = 0; i < Size; i++)
                     {
@@ -83,7 +83,7 @@ namespace Core
 
                     Cryptography::Random::Load();
 
-                    Cryptography::Random::Bytes((unsigned char *) Result.Data, size);
+                    Cryptography::Random::Bytes((unsigned char *)Result.Data, size);
 
                     return Result;
                 }
@@ -98,12 +98,12 @@ namespace Core
                     }
                 }
 
-                std::string ToString()
+                std::string ToString() const
                 {
-                    return Conversion::Hex::From(Data, Size);
+                    return Format::Hex::From(Data, Size);
                 }
 
-                Key Neighbor(size_t nth)
+                Key Neighbor(size_t nth) const
                 {
                     Key Result(Size);
 
@@ -112,7 +112,26 @@ namespace Core
                     return *this + Result;
                 }
 
-                bool Bit(size_t Number)
+                size_t Critical() const // @todo Important Fix and optimize this
+                {
+                    size_t Index = 0;
+
+                    Key key = Neighbor(1);
+
+                    for (size_t i = 2; i <= Size; i++)
+                    {
+                        Key temp = Neighbor(i);
+                        if( temp > key)
+                        {
+                            key = std::move(temp);
+                            Index = i;
+                        }
+                    }
+
+                    return Index;
+                }
+
+                bool Bit(size_t Number) const
                 {
                     if (Number == 0)
                         throw std::invalid_argument("Zero th bit is meaningless");

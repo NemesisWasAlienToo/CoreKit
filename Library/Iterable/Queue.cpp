@@ -145,6 +145,26 @@ namespace Core
                 this->_Length += Count;
             }
 
+            void Add(Queue& Other)
+            {
+                this->_IncreaseCapacity(Other._Length);
+
+                while (!Other.IsEmpty())
+                {
+                    Add(Other.Take());
+                }
+            }
+
+            void Add(const Queue& Other)
+            {
+                this->_IncreaseCapacity(Other._Length);
+
+                for (size_t i = 0; i < Other._Length; i++)
+                {
+                    Add(Other[i]);
+                }
+            }
+
             void Remove(size_t Index)
             {
                 if (Index >= this->_Length)

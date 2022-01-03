@@ -81,6 +81,12 @@ namespace Core
 
             EndPoint(const EndPoint &Othere) : _Address(Othere._Address), _Port(Othere._Port), _Flow(Othere._Flow), _Scope(Othere._Scope) {}
 
+            EndPoint(const std::string& address, unsigned short Port)
+            {
+                _Address = Address(address);
+                _Port = htons(Port);
+            }
+
             EndPoint(const std::string& Content)
             {
                 int Seprator = Content.find(':');
@@ -138,7 +144,7 @@ namespace Core
                 return sizeof(struct sockaddr_in6);
             }
 
-            std::string ToString()
+            std::string ToString() const
             {
                 return _Address.ToString() + ":" + std::to_string(ntohs(_Port));
             }
@@ -150,8 +156,8 @@ namespace Core
             Address &address() { return _Address; }
             const Address &address() const { return _Address; }
 
-            int port() { return _Port; }
-            const int port(int Port)
+            unsigned short port() { return _Port; }
+            const unsigned short port(unsigned short Port)
             {
                 _Port = Port;
                 return _Port;

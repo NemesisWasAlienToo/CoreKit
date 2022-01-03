@@ -59,6 +59,8 @@ namespace Core
                     if (_Content.size() <= 0)
                         throw std::out_of_range("Instance contains no handler");
 
+                    // @todo Optimize by keeping a refrence
+
                     std::pair<Network::EndPoint, Handle> Result = *_Content.begin();
 
                     for (auto Item : _Content)
@@ -79,6 +81,8 @@ namespace Core
 
                 void Clean()
                 {
+                    // @todo return expired item
+                    
                     ExpireEvent.Value();
 
                     std::lock_guard Lock(_Lock);

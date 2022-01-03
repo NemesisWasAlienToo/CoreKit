@@ -14,7 +14,7 @@
 #include "Iterable/List.cpp"
 #include "Iterable/Poll.cpp"
 
-#include <Conversion/Serializer.cpp>
+#include <Format/Serializer.cpp>
 #include "Network/DHT/Request.cpp"
 
 using namespace Core;
@@ -53,14 +53,14 @@ namespace Core
                     Stopped,
                 };
 
-                volatile States State = States::Stopped;
+                volatile States State;
 
                 Event Ready;
 
                 Server() = default;
 
-                Server(Network::EndPoint EndPoint) : _Socket(Network::Socket::IPv4, Network::Socket::UDP), _Interrupt(0, 0),
-                                                     _Sends(1), _Receives(1), Incomming(1), Outgoing(1), Ready(0, Event::Semaphore)
+                Server(const Network::EndPoint& EndPoint) : _Socket(Network::Socket::IPv4, Network::Socket::UDP), _Interrupt(0, 0),
+                _Sends(1), _Receives(1), Incomming(1), Outgoing(1), State(States::Stopped), Ready(0, Event::Semaphore)
                 {
                     _Socket.Bind(EndPoint);
                 }
@@ -100,16 +100,16 @@ namespace Core
                     return true;
                 }
 
-                bool Put(Network::EndPoint Peer, std::function<void(Conversion::Serializer&)> Builder, size_t Size = 1024)
+                bool Put(const Network::EndPoint& Peer, const std::function<void(Format::Serializer&)>& Builder, size_t Size = 1024)
                 {
                     if (State != States::Running)
                         return false;
 
-                    // @todo Optimize this
+                    // @todo Optimize and generalize this
 
-                    Request request(Peer, Size);
+                    Request request(Peer, Size + 9 /* 9 is default header size */);
 
-                    Conversion::Serializer Serializer(request.Buffer);
+                    Format::Serializer Serializer(request.Buffer);
 
                     Serializer.Add((char *) "CHRD", 4) << (int) 0;
 

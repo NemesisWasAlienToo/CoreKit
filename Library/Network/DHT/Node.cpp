@@ -6,10 +6,6 @@
 
 #include "Network/EndPoint.cpp"
 #include "Network/DHT/Key.cpp"
-#include "Network/DHT/Server.cpp"
-#include "Network/DHT/Handler.cpp"
-#include "Iterable/List.cpp"
-#include "Test.cpp"
 
 using namespace Core;
 
@@ -23,7 +19,7 @@ namespace Core
             {
                 // ### Types
 
-                enum class Status
+                enum class States : char
                 {
                     Available = 0,
                 };
@@ -32,17 +28,17 @@ namespace Core
 
                 Key Id;
                 Network::EndPoint EndPoint;
-                Status Status;
+                States State;
 
                 // ### Constructors
 
                 Node() = default;
 
-                Node(Key id, Network::EndPoint endPoint) : Id(id), EndPoint(endPoint), Status(Status::Available) {}
+                Node(Key id, Network::EndPoint endPoint, States state = States::Available) : Id(id), EndPoint(endPoint), State(state) {}
 
-                Node(Node&& Other) : Id(std::move(Other.Id)), EndPoint(Other.EndPoint), Status(Other.Status) {}
+                Node(Node&& Other) : Id(std::move(Other.Id)), EndPoint(Other.EndPoint), State(Other.State) {}
                 
-                Node(const Node& Other) : Id(Other.Id), EndPoint(Other.EndPoint), Status(Other.Status) {}
+                Node(const Node& Other) : Id(Other.Id), EndPoint(Other.EndPoint), State(Other.State) {}
 
                 // Operators
 
@@ -50,7 +46,7 @@ namespace Core
                 {
                     Id = std::move(Other.Id);
                     EndPoint = Other.EndPoint;
-                    Status = Other.Status;
+                    State = Other.State;
 
                     return *this;
                 }
@@ -59,7 +55,7 @@ namespace Core
                 {
                     Id = Other.Id;
                     EndPoint = Other.EndPoint;
-                    Status = Other.Status;
+                    State = Other.State;
 
                     return *this;
                 }

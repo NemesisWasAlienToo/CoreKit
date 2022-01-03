@@ -165,7 +165,7 @@ namespace Core
                 return sizeof(_IN6_ADDR);
             }
 
-            std::string ToString()
+            std::string ToString() const
             {
                 char str[INET6_ADDRSTRLEN] = {0};
                 inet_ntop(_Family, (void *)_Content, str, sizeof str);

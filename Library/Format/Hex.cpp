@@ -7,7 +7,7 @@
 
 namespace Core
 {
-    namespace Conversion
+    namespace Format
     {
         namespace Hex
         {

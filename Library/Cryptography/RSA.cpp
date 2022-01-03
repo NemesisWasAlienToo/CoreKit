@@ -10,8 +10,8 @@
 #include <openssl/evp.h>
 #include <openssl/engine.h>
 
-#include "Conversion/Hex.cpp"
-#include "Conversion/Base64.cpp"
+#include "Format/Hex.cpp"
+#include "Format/Base64.cpp"
 
 namespace Core
 {

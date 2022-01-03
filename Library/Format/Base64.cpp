@@ -13,7 +13,7 @@
 
 namespace Core
 {
-    namespace Conversion
+    namespace Format
     {
         class Base64
         {

@@ -5,15 +5,19 @@
 #include <arpa/inet.h>
 
 #include "Iterable/Queue.cpp"
+#include "Network/EndPoint.cpp"
 #include "Network/DHT/Key.cpp"
+#include "Network/DHT/Node.cpp"
 
 #ifndef NETWORK_BYTE_ORDER
 #define NETWORK_BYTE_ORDER LITTLE_ENDIAN
 #endif
 
+// @todo Seperate serializer and deserializer IMPORTANT
+
 namespace Core
 {
-    namespace Conversion
+    namespace Format
     {
         // @todo Add endianness maybe?
 
@@ -57,7 +61,12 @@ namespace Core
 
             // Peroperties
 
-            inline Serializer& Add(char *Data, size_t Size)
+            inline size_t Length()
+            {
+                return Queue.Length();
+            }
+
+            inline Serializer &Add(char *Data, size_t Size)
             {
                 Queue.Add(Data, Size);
 
@@ -117,6 +126,50 @@ namespace Core
                 return *this;
             }
 
+            //
+
+            Serializer &operator<<(unsigned char Value)
+            {
+                Queue << Value;
+
+                return *this;
+            }
+
+            Serializer &operator<<(unsigned short Value)
+            {
+                unsigned short _Value;
+
+                Order(Value, _Value);
+
+                Queue.Add((char *)&_Value, sizeof(_Value));
+
+                return *this;
+            }
+
+            Serializer &operator<<(unsigned int Value)
+            {
+                unsigned int _Value;
+
+                Order(Value, _Value);
+
+                Queue.Add((char *)&_Value, sizeof(_Value));
+
+                return *this;
+            }
+
+            Serializer &operator<<(unsigned long Value)
+            {
+                unsigned long _Value;
+
+                Order(Value, _Value);
+
+                Queue.Add((char *)&_Value, sizeof(_Value));
+
+                return *this;
+            }
+
+            //
+
             Serializer &operator<<(const Iterable::Span<char> &Value)
             {
                 Queue.Add(Value.Content(), Value.Length());
@@ -134,6 +187,38 @@ namespace Core
             Serializer &operator<<(const std::string &Value)
             {
                 Queue.Add(Value.c_str(), Value.length() + 1);
+
+                return *this;
+            }
+
+            Serializer &operator<<(const Network::Address &Value)
+            {
+                auto str = Value.ToString();
+
+                return *this << str;
+            }
+
+            Serializer &operator<<(const Network::EndPoint &Value)
+            {
+                auto str = Value.ToString();
+
+                return *this << str;
+            }
+
+            Serializer &operator>>(const Network::DHT::Node::States &Value)
+            {
+                Queue.Add(static_cast<const char>(Value));
+                return *this;
+            }
+
+            Serializer &operator<<(const Network::DHT::Node &Value)
+            {
+                return *this << Value.Id << Value.EndPoint << static_cast<const char>(Value.State);
+            }
+
+            Serializer &operator<<(Serializer &Value)
+            {
+                Queue.Add(Value.Queue);
 
                 return *this;
             }
@@ -180,6 +265,62 @@ namespace Core
                 return *this;
             }
 
+            //
+
+            Serializer &operator>>(unsigned char &Value)
+            {
+                char *_value = (char *)&Value;
+
+                Queue >> *_value;
+
+                return *this;
+            }
+
+            Serializer &operator>>(unsigned short &Value)
+            {
+                unsigned short _Value;
+
+                Queue.Take((char *)&_Value, sizeof(_Value));
+
+                Order(_Value, Value);
+
+                return *this;
+            }
+
+            Serializer &operator>>(unsigned int &Value)
+            {
+                unsigned int _Value;
+
+                Queue.Take((char *)&_Value, sizeof(_Value));
+
+                Order(_Value, Value);
+
+                return *this;
+            }
+
+            Serializer &operator>>(unsigned long &Value)
+            {
+                unsigned long _Value;
+
+                Queue.Take((char *)&_Value, sizeof(_Value));
+
+                Order(_Value, Value);
+
+                return *this;
+            }
+
+            // friend std::istream &operator>>(Serializer &Serializer, std::istream &is)
+            // {
+            //     while (!Serializer.Queue.IsEmpty())
+            //     {
+            //         os << Serializer.Queue.Take();
+            //     }
+
+            //     return os;
+            // }
+
+            //
+
             Serializer &operator>>(Iterable::Span<char> &Value)
             {
                 // Apply byte order
@@ -219,6 +360,56 @@ namespace Core
                 Queue.Free(Index);
 
                 return *this;
+            }
+
+            Serializer &operator>>(Network::Address &Value)
+            {
+                std::string str;
+
+                *this >> str;
+
+                Value = Network::Address(str);
+
+                return *this;
+            }
+
+            Serializer &operator>>(Network::EndPoint &Value)
+            {
+                std::string str;
+
+                *this >> str;
+
+                Value = Network::EndPoint(str);
+
+                return *this;
+            }
+
+            Serializer &operator>>(Network::DHT::Node::States &Value)
+            {
+                Value = static_cast<Network::DHT::Node::States>(Queue.Take());
+                return *this;
+            }
+
+            Serializer &operator>>(Network::DHT::Node &Value)
+            {
+                return *this >> Value.Id >> Value.EndPoint >> Value.State;
+            }
+
+            // Serializer &operator>>(Serializer &Value)
+            // {
+            //     Queue.Add(Value.Queue);
+
+            //     return *this;
+            // }
+
+            friend std::ostream &operator<<(std::ostream &os, Serializer &Serializer)
+            {
+                while (!Serializer.Queue.IsEmpty())
+                {
+                    os << Serializer.Queue.Take();
+                }
+
+                return os;
             }
         };
     }
