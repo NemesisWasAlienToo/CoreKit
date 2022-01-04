@@ -1,3 +1,27 @@
+/**
+ * @file Chord.cpp
+ * @author Nemesis (github.com/NemesisWasAlienToo)
+ * @brief Chord node runner
+ *
+ *      Supported operations: [ Response, Invalid, Ping, Query, Set, Get, Data ]
+ *
+ *      The packet format for each operation is as follows :
+ *
+ *      Response   : [ Header - Size ] - Response Specifier - Data
+ *      Invalid    : [ Header - Size ] - Invalid Specifier - Cause of failure
+ *      Ping       : [ Header - Size ] - Ping Specifier - My ID
+ *      Query      : [ Header - Size ] - Query Specifier - Target ID -> [ Header - Size ] - Response Specifier - Node
+ *      Set        : [ Header - Size ] - Set Specifier - Key - Data
+ *      Get        : [ Header - Size ] - Get Specifier - Key
+ *      Data       : [ Header - Size ] - Data Specifier - Data
+ *
+ * @version 0.1
+ * @date 2022-01-03
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
+
 #pragma once
 
 #include <iostream>
@@ -10,10 +34,11 @@
 #include "Network/DHT/Handler.cpp"
 #include "Network/DHT/Node.cpp"
 #include "Iterable/List.cpp"
+#include "Iterable/Span.cpp"
 #include "Iterable/Poll.cpp"
 #include "Format/Serializer.cpp"
-#include "Test.cpp"
 #include "Duration.cpp"
+#include "Test.cpp"
 
 using namespace Core;
 
@@ -31,13 +56,20 @@ namespace Core
                     enum class Operations : char
                     {
                         Response = 0,
+                        Invalid,
+                        Notify,
                         Ping,
                         Query,
                         Set,
                         Get,
                         Data,
-                        Deliver,
-                        Flood,
+                    };
+                    
+                    enum class Notifications : char
+                    {
+                        Join = 0,
+                        Leave,
+                        TimeOut,
                     };
 
                 private:
@@ -60,12 +92,14 @@ namespace Core
 
                     Iterable::List<std::thread> Pool;
 
+                public:
                     Iterable::List<Node> Nodes;
 
+                private:
                     std::function<void()> _PoolTask =
                         [this]()
                     {
-                        // Clear running event
+                        // @todo Clear running event
 
                         Iterable::Poll Poll(2);
 
@@ -91,9 +125,13 @@ namespace Core
                                     continue;
 
                                 if (Handler.Take(Request.Peer, Task, End))
+                                {
                                     Task(Request, End);
+                                }
                                 else
+                                {
                                     Respond(Request);
+                                }
                             }
 
                             if (Poll[1].HasEvent())
@@ -128,7 +166,7 @@ namespace Core
                         {
                             Test::Log("Ping") << Request.Peer << std::endl;
 
-                            Server.Put(
+                            Fire(
                                 Request.Peer,
                                 [this](Format::Serializer &Response)
                                 {
@@ -139,31 +177,17 @@ namespace Core
                         }
                         case Operations::Query:
                         {
-                            Key key(32);
+                            Key key(Identity.Id.Size);
 
                             ReqSerializer >> key;
 
-                            Server.Put(
+                            Fire(
                                 Request.Peer,
                                 [this, &key](Format::Serializer &Response)
                                 {
                                     Response << (char)Operations::Response;
 
-                                    size_t Index;
-
-                                    if (Nodes.ContainsWhere(
-                                            Index,
-                                            [&key](Node &Item) -> bool
-                                            {
-                                                return Item.Id < key;
-                                            }))
-                                    {
-                                        Response << Nodes[Index].EndPoint;
-                                    }
-                                    else
-                                    {
-                                        Response << Identity.Id;
-                                    }
+                                    Response << Resolve(key);
                                 });
 
                             Test::Log("Query") << Request.Peer << std::endl;
@@ -174,11 +198,10 @@ namespace Core
                         {
                             // Set - Key - Data
 
-                            Key key(32);
+                            Key key(Identity.Id.Size);
                             ReqSerializer >> key;
 
-                            Iterable::Span<char> Data(ReqSerializer.Length());
-                            ReqSerializer >> Data;
+                            Iterable::Span<char> Data = ReqSerializer.Blob();
 
                             OnSet(key, Data);
 
@@ -189,130 +212,72 @@ namespace Core
                         {
                             // Get - Key
 
-                            Key key(32);
+                            Key key(Identity.Id.Size);
                             ReqSerializer >> key;
 
-                            Fire(
-                                Request.Peer,
-                                [this, &key](Format::Serializer &Response)
-                                {
-                                    Response << OnGet(key);
-                                });
+                            OnGet(key);
 
                             Test::Log("Get") << Request.Peer << std::endl;
                             break;
                         }
                         case Operations::Data:
                         {
-                            Iterable::Span<char> Data(ReqSerializer.Length());
-                            ReqSerializer >> Data;
+                            Iterable::Span<char> Data = ReqSerializer.Blob();
 
                             OnData(Data);
 
                             Test::Log("Data") << Request.Peer << std::endl;
                             break;
                         }
-                        case Operations::Deliver:
+                        case Operations::Notify:
                         {
-                            Key key(32);
+                            //
 
-                            ReqSerializer >> key;
-
-                            size_t Index;
-
-                            // @todo can be optimized by only reading and forwarding the same buffer?
-
-                            if (Nodes.ContainsWhere(
-                                    Index,
-                                    [&key](Node &Item) -> bool
-                                    {
-                                        return Item.Id < key;
-                                    }))
-                            {
-                                Server.Put(
-                                    Nodes[Index].EndPoint,
-                                    [this, &key, &ReqSerializer](Format::Serializer &Response)
-                                    {
-                                        Response << (char)Operations::Deliver << key << ReqSerializer;
-                                    });
-                            }
-                            else
-                            {
-                                Iterable::Span<char> Data(ReqSerializer.Length());
-                                ReqSerializer >> Data;
-
-                                OnData(Data);
-                            }
-
-                            Test::Log("Deliver") << Request.Peer << std::endl;
-
+                            Test::Log("Notify") << Request.Peer << std::endl;
                             break;
                         }
-                        case Operations::Flood:
+                        case Operations::Invalid:
                         {
-                            // @todo add hod many steps should this be passed
-                            uint16_t Count;
+                            std::string Cause;
 
-                            ReqSerializer >> Count;
+                            // OnFail();
 
-                            Iterable::Span<char> Data(ReqSerializer.Length());
+                            ReqSerializer >> Cause;
 
-                            ReqSerializer >> Data;
-
-                            // Handle data
-
-                            if (Count > 0)
-                            {
-                                Count--;
-
-                                Nodes.ForEach(
-                                    [this, &Count, &Data, Peer = Request.Peer](Node &Item)
-                                    {
-                                        if (Item.EndPoint != Peer)
-                                            Fire(Item.EndPoint,
-                                                [&Count, &Data](Format::Serializer &Serializer)
-                                                {
-                                                    Serializer << (char)Operations::Flood << Count << Data;
-                                                });
-                                    });
-                            }
-
-                            OnData(Data);
-
-                            Test::Log("Flood") << Request.Peer << std::endl;
+                            Test::Log("Invalid") << Request.Peer << " : " << Cause << std::endl;
                             break;
                         }
                         default:
                         {
-                            Server.Put(
+                            Fire(
                                 Request.Peer,
                                 [this](Format::Serializer &Response)
                                 {
-                                    Response << (char)Operations::Response << "Unknown command";
+                                    Response << (char)Operations::Invalid << "Invalid command";
                                 });
 
                             Test::Log("Unknown") << Request.Peer << " : " << Request.Buffer << std::endl;
                             break;
                         }
                         }
-                    };
+                    }
 
                 public:
                     // ### Public Variables
 
-                    time_t TimeOut;
+                    Duration TimeOut;
 
                     // Request Handlers
 
                     std::function<void(const Key &, const Iterable::Span<char> &)> OnSet;
-                    std::function<const Iterable::Span<char> &(const Key &)> OnGet;
+                    std::function<void(const Key &)> OnGet;
                     std::function<void(Iterable::Span<char>)> OnData;
 
                     // ### Constructors
 
                     Runner() = default;
 
-                    Runner(const Node &identity, size_t ThreadCount = 1, time_t Timeout = 60) : Identity(identity), Server(identity.EndPoint), Handler(), Pool(ThreadCount, false), TimeOut(Timeout)
+                    Runner(const Node &identity, Duration Timeout, size_t ThreadCount = 1) : Identity(identity), Server(identity.EndPoint), Handler(), Pool(ThreadCount, false), TimeOut(Timeout)
                     {
                         Nodes.Add({Identity.Id, {"0.0.0.0:0"}});
                     }
@@ -326,7 +291,7 @@ namespace Core
 
                     // ### Functionalities
 
-                    Node Resolve(Key key)
+                    Node &Resolve(const Key &key)
                     {
                         size_t Index;
 
@@ -334,14 +299,14 @@ namespace Core
                                 Index,
                                 [this, &key](Node &Item) -> bool
                                 {
-                                    return Item.Id > key;
+                                    return Item.Id < key;
                                 }))
                         {
                             return Nodes[Index];
                         }
                         else
                         {
-                            return Nodes.Last();
+                            return Nodes.First();
                         }
                     }
 
@@ -353,7 +318,7 @@ namespace Core
                                 Index,
                                 [this, &node](Node &Item) -> bool
                                 {
-                                    return Item.Id > node.Id;
+                                    return Item.Id < node.Id;
                                 }))
                         {
                             Nodes.Squeeze(std::forward<Node>(node), Index);
@@ -368,11 +333,14 @@ namespace Core
                     {
                         size_t Index;
 
+                        if (Nodes.Contains(node))
+                            return;
+
                         if (Nodes.ContainsWhere(
                                 Index,
                                 [this, &node](Node &Item) -> bool
                                 {
-                                    return Item.Id > node.Id;
+                                    return Item.Id < node.Id;
                                 }))
                         {
                             Nodes.Squeeze(node, Index);
@@ -385,7 +353,7 @@ namespace Core
 
                     void Await()
                     {
-                        // @todo Wait for all out tasks to be done IMPORTANT
+                        //
                     }
 
                     inline void GetInPool()
@@ -441,12 +409,14 @@ namespace Core
                         if (Count == 1)
                             return Nodes[0];
 
-                        for (Index = 0; Index < Nodes.Length() && Nodes[Index].Id < key; Index++)
+                        for (Index = 0; Index < Nodes.Length() && Nodes[Index].Id > key; Index++)
                         {
                         }
 
-                        return Nodes[Index - 1];
+                        return Nodes[Index];
                     }
+
+                    // const Iterable::List<Node> &Nodes() { return Nodes; }
 
                     // Builders for new precedure
 
@@ -468,7 +438,7 @@ namespace Core
                         return true;
                     }
 
-                    void Fire(
+                    inline void Fire( // @todo Fix with perfect forwarding
                         const Core::Network::EndPoint &Peer,
                         const std::function<void(Core::Format::Serializer &)> &Builder /*, End*/)
                     {
@@ -530,7 +500,7 @@ namespace Core
                                 Format::Serializer Serializer(request.Buffer); // <-- maybe already pass this?
 
                                 char Header;
-                                Node node;
+                                Node node(Identity.Id.Size); // <-- @todo clarify this
 
                                 Serializer >> Header;
 
@@ -557,7 +527,7 @@ namespace Core
                             Id,
                             [this, Peer, Id, CB = std::move(Callback)](Node Response, const Handler::EndCallback &End)
                             {
-                                if (Response.EndPoint == Network::EndPoint("0.0.0.0:0")) // <-- @todo Optimize this
+                                if (Response.EndPoint.address() == Network::Address("0.0.0.0")) // <-- @todo Optimize this
                                 {
                                     Response.EndPoint = Peer;
                                     CB(std::move(Response), std::move(End));
@@ -573,7 +543,8 @@ namespace Core
                         if (Nodes.Length() <= 1)
                             throw std::underflow_error("No other node is known");
 
-                        const auto &Peer = Closest(Id).EndPoint;
+                        // const auto &Peer = Closest(Id).EndPoint;
+                        const auto &Peer = Resolve(Id).EndPoint;
 
                         Route(Peer, Id, std::move(Callback), std::move(End));
                     }
@@ -628,12 +599,26 @@ namespace Core
                                     return;
                                 }
 
-                                Bootstrap(Closest(Identity.Id.Neighbor(i)).EndPoint, i, std::move(CB), std::move(End));
+                                Network::EndPoint Next;
+
+                                while ((Next = Resolve(Identity.Id.Neighbor(i--)).EndPoint).address() == Network::Address("0.0.0.0") && i > 0)
+                                {
+                                    //
+                                }
+
+                                if (i > 0)
+                                {
+                                    Bootstrap(Next, i, std::move(CB), std::move(End));
+                                }
+                                else
+                                {
+                                    End();
+                                }
                             },
                             std::move(End));
                     }
 
-                    void Bootstrap(const Network::EndPoint &Peer, BootstrapCallback Callback, Handler::EndCallback End)
+                    inline void Bootstrap(const Network::EndPoint &Peer, BootstrapCallback Callback, Handler::EndCallback End)
                     {
                         Bootstrap(
                             Peer,
@@ -744,34 +729,33 @@ namespace Core
                                     Node.EndPoint,
 
                                     // Build buffer
-                                    // Data - Stage - Data
+                                    // Data - Data
 
                                     [this, &Data](Format::Serializer &Serializer)
                                     {
-                                        Serializer << (char)Operations::Data << Identity.Id.Size << Data;
+                                        Serializer << (char)Operations::Data << Data;
                                     });
                             });
                     }
 
-                    // Deliver
-
-                    void DeliverTo(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data)
+                    void FloodWhere(const Network::EndPoint &Peer, Key key, const Iterable::Span<char> &Data,
+                                    const std::function<bool(const Node &)> &Condition)
                     {
-                        Fire(
-                            Peer,
-
-                            // Build buffer
-                            // Data - Key - Data
-
-                            [&key, &Data](Format::Serializer &Serializer)
+                        Nodes.ForEach(
+                            [this, &Data, &Condition](Node &node)
                             {
-                                Serializer << (char)Operations::Deliver << key << Data;
-                            });
-                    }
+                                if (Condition(node))
+                                    Fire(
+                                        node.EndPoint,
 
-                    void Deliver(const Key &key, const Iterable::Span<char> &Data)
-                    {
-                        DeliverTo(Closest(key).EndPoint, key, Data);
+                                        // Build buffer
+                                        // Data - Data
+
+                                        [this, &Data](Format::Serializer &Serializer)
+                                        {
+                                            Serializer << (char)Operations::Data << Data;
+                                        });
+                            });
                     }
                 };
             }

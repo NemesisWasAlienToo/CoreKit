@@ -21,7 +21,8 @@ namespace Core
 
                 enum class States : char
                 {
-                    Available = 0,
+                    Present = 0,
+                    Absent,
                 };
 
                 // ### Variables
@@ -34,15 +35,17 @@ namespace Core
 
                 Node() = default;
 
-                Node(Key id, Network::EndPoint endPoint, States state = States::Available) : Id(id), EndPoint(endPoint), State(state) {}
+                Node(size_t KeySize) : Id(KeySize) {}
 
-                Node(Node&& Other) : Id(std::move(Other.Id)), EndPoint(Other.EndPoint), State(Other.State) {}
-                
-                Node(const Node& Other) : Id(Other.Id), EndPoint(Other.EndPoint), State(Other.State) {}
+                Node(Key id, Network::EndPoint endPoint, States state = States::Present) : Id(id), EndPoint(endPoint), State(state) {}
+
+                Node(Node &&Other) : Id(std::move(Other.Id)), EndPoint(Other.EndPoint), State(Other.State) {}
+
+                Node(const Node &Other) : Id(Other.Id), EndPoint(Other.EndPoint), State(Other.State) {}
 
                 // Operators
 
-                Node& operator=(Node&& Other)
+                Node &operator=(Node &&Other)
                 {
                     Id = std::move(Other.Id);
                     EndPoint = Other.EndPoint;
@@ -51,13 +54,27 @@ namespace Core
                     return *this;
                 }
 
-                Node& operator=(const Node& Other)
+                Node &operator=(const Node &Other)
                 {
                     Id = Other.Id;
                     EndPoint = Other.EndPoint;
                     State = Other.State;
 
                     return *this;
+                }
+
+                bool operator==(const Node &Other) const
+                {
+                    return Id == Other.Id &&
+                           EndPoint == Other.EndPoint &&
+                           State == Other.State;
+                }
+
+                bool operator!=(const Node &Other) const
+                {
+                    return Id != Other.Id ||
+                           EndPoint != Other.EndPoint ||
+                           State != Other.State;
                 }
             };
         }

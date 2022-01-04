@@ -48,7 +48,37 @@ namespace Core
                     return _Content.contains(EndPoint);
                 }
 
+                void Wind()
+                {
+                    bool IsEmpty = (_Content.size() == 0);
+
+                    if (!IsEmpty)
+                    {
+                        _Closest = Soonest();
+
+                        Duration Left;
+
+                        if (_Closest.second.Expire > DateTime::Now())
+                        {
+                            Left = _Closest.second.Expire.Left();
+                        }
+                        else
+                        {
+                            Left = Duration(0, 1);
+                        }
+
+                        ExpireEvent.Set(Left);
+                    }
+                    else
+                    {
+                        ExpireEvent.Set({0, 0});
+                    }                    
+                }
+
             public:
+
+                // volatile bool IsEmpty = true;
+
                 Handler() : ExpireEvent(Timer::Monotonic, 0) {} // @todo Add default timeout
                 ~Handler() = default;
 
@@ -98,27 +128,7 @@ namespace Core
                         }
                     }
 
-                    if (_Content.size() > 0)
-                    {
-                        _Closest = Soonest();
-
-                        Duration Left;
-
-                        if (_Closest.second.Expire > DateTime::Now())
-                        {
-                            Left = _Closest.second.Expire.Left();
-                        }
-                        else
-                        {
-                            Left = Duration(0, 1);
-                        }
-
-                        ExpireEvent.Set(Left);
-                    }
-                    else
-                    {
-                        ExpireEvent.Set({0, 0});
-                    }
+                    Wind();
                 }
 
                 bool Put(const Network::EndPoint &EndPoint, const DateTime &Expire, const Callback &Routine, const EndCallback &End)
@@ -197,32 +207,12 @@ namespace Core
                         _Content.erase(EndPoint);
                     }
 
-                    if (_Content.size() > 0)
-                    {
-                        _Closest = Soonest();
-
-                        Duration Left;
-
-                        if (_Closest.second.Expire > DateTime::Now())
-                        {
-                            Left = _Closest.second.Expire.Left();
-                        }
-                        else
-                        {
-                            Left = Duration(0, 1);
-                        }
-
-                        ExpireEvent.Set(Left);
-                    }
-                    else
-                    {
-                        ExpireEvent.Set({0, 0});
-                    }
+                    Wind();
 
                     return !Ret;
                 }
 
-                Handler &operator=(Handler &Other) = default;
+                Handler &operator=(const Handler &Other) = default;
             };
         }
     }

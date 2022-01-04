@@ -1,137 +1,135 @@
-// # Standard headers
-
 #include <iostream>
 #include <string>
-#include <mutex>
-
-// # User headers
+#include <functional>
 
 #include <Test.cpp>
 #include <DateTime.cpp>
 #include <Iterable/List.cpp>
-
-#include <Format/Hex.cpp>
-#include <Format/Serializer.cpp> // <----- @todo Strange error
-
 #include <Network/DNS.cpp>
 #include <Network/DHT/Server.cpp>
 #include <Network/DHT/Handler.cpp>
 #include <Network/DHT/Chord.cpp>
 
-// # Usings
-
 using namespace Core;
-
-// # Global variables
 
 int main(int argc, char const *argv[])
 {
-    unsigned short Port = 4444;
+    // Init Identity
 
-    Network::DHT::Key Identity = Network::DHT::Key::Generate(32);
+    const Network::EndPoint EndPoint("0.0.0.0:8888");
 
-    if(argc == 2)
+    const Network::DHT::Key Key = Network::DHT::Key::Generate(4);
+
+    const Network::DHT::Node Identity(Key, EndPoint); // <-- @todo Maybe add generate function?
+
+    // Log End Point
+
+    Test::Log(Network::DNS::HostName()) << EndPoint << std::endl;
+
+    Test::Log("Identity") << Identity.Id.ToString() << std::endl;
+
+    // Run the server
+
+    Network::DHT::Chord::Runner Chord(Identity, {5, 0}, 1);
+
+    Chord.Add({{"0000000f"}, {"127.0.0.1:0"}});
+    Chord.Add({{"000000f1"}, {"127.0.0.1:1"}});
+    Chord.Add({{"00000ff2"}, {"127.0.0.1:2"}});
+    Chord.Add({{"0000fff3"}, {"127.0.0.1:3"}});
+    Chord.Add({{"000ffff4"}, {"127.0.0.1:4"}});
+    Chord.Add({{"00fffff5"}, {"127.0.0.1:5"}});
+    Chord.Add({{"0ffffff6"}, {"127.0.0.1:6"}});
+    Chord.Add({{"fffffff7"}, {"127.0.0.1:7"}});
+
+    Chord.Run();
+
+    // Chord.Await(); // <--- Await all requests to be finished
+
+    std::string Command = "";
+
+    while (Command != "exit")
     {
-        Port = std::atol(argv[1]);
-    }
+        // Perform Route
 
-    Network::EndPoint EndPoint(Network::Address::Any(Network::Address::IPv4), Port);
+        if (Command == "ping")
+        {
+            Chord.Ping(
+                {"127.0.0.1:4444"},
+                [](Duration Result, Network::DHT::Handler::EndCallback End)
+                {
+                    Test::Log("Ping") << Result << "s" << std::endl;
+                },
+                []()
+                {
+                    Test::Log("Ping") << "Ended" << std::endl;
+                });
+        }
+        else if (Command == "query")
+        {
+            Chord.Query(
+                {"127.0.0.1:4444"},
+                Identity.Id,
+                [](Network::DHT::Node Result, Network::DHT::Handler::EndCallback End)
+                {
+                    Test::Log("Query") << Result.EndPoint << std::endl;
+                    End();
+                },
+                []()
+                {
+                    Test::Log("Query") << "Ended" << std::endl;
+                });
+        }
+        else if (Command == "route")
+        {
+            Chord.Route(
+                {"127.0.0.1:4444"},
+                Identity.Id,
+                [](Network::DHT::Node Result, Network::DHT::Handler::EndCallback End)
+                {
+                    Test::Log("Route") << Result.EndPoint << std::endl;
+                    End();
+                },
+                []()
+                {
+                    Test::Log("Route") << "Ended" << std::endl;
+                });
+        }
+        else if (Command == "boot")
+        {
+            Chord.Bootstrap(
+                {"127.0.0.1:4444"},
+                [](std::function<void()> End)
+                {
+                    End();
+                },
+                []()
+                {
+                    std::cout << "Bootstrap ended" << std::endl;
+                });
+        }
+        else if (Command == "set")
+        {
+            //
+        }
+        else if (Command == "get")
+        {
+            //
+        }
+        else if (Command == "print")
+        {
+            Chord.Nodes.ForEach(
+                [](Network::DHT::Node &node)
+                {
+                    std::cout << node.Id.ToString() << std::endl;
+                });
+        }
 
-    Network::EndPoint Server("127.0.0.1:8888");
-
-    Network::Socket Socket(Network::Socket::IPv4, Network::Socket::UDP);
-
-    std::string Command;
-    std::string Message;
-
-    Socket.Bind(EndPoint);
-
-    std::cout << Network::DNS::HostName() << " is listenning with udp on " << EndPoint << std::endl;
-
-    while (true)
-    {
-        std::cout << "Command : ";
+        std::cout << "Waiting for command, master : " << std::endl;
 
         std::cin >> Command;
-
-        if (Command == "exit")
-        {
-            break;
-        }
-        else if (Command == "ping")
-        {
-            Iterable::Queue<char> q;
-            Format::Serializer s(q);
-
-            // Maybe add should give an index to be used to modify later?
-
-            s.Add((char *) "CHRD", 4) << (int) 0 << (char) Network::DHT::Chord::Runner::Operations::Ping << Identity;
-
-            s.Modify<uint32_t>(4) = htonl(q.Length());
-
-            Socket.SendTo(q.Content(), q.Length(), Server);
-
-            Socket.Await(Network::Socket::In);
-
-            size_t len = Socket.Received();
-
-            char Buffer[len + 1];
-
-            Network::EndPoint Target;
-
-            Socket.ReceiveFrom(Buffer, len, Target);
-
-            std::cout << Target << " Said (" << len - 9 << ") " << Format::Hex::From(&Buffer[9], len - 9) << std::endl;
-        }
-        else if (Command == "send")
-        {
-            std::cout << "Message : ";
-
-            std::cin >> Message;
-
-            char Signiture[8] = {'C', 'H', 'R', 'D', 0, 0, 0, 0};
-
-            auto len = Message.length() + 1;
-
-            *(uint32_t *)(&Signiture[4]) = htonl(len + sizeof(Signiture));
-
-            Socket.SendTo(Signiture, sizeof(Signiture), Server);
-
-            Socket.SendTo(Message.c_str(), len, Server);
-        }
-        else if (Command == "listen")
-        {
-            Socket.Await(Network::Socket::In);
-
-            size_t len = Socket.Received();
-            char Buffer[len + 1];
-            Network::EndPoint Target;
-
-            Socket.ReceiveFrom(Buffer, len, Target);
-
-            Buffer[len] = 0;
-
-            std::cout << Target << " Said (" << len - 9 << ") " << Format::Hex::From(&Buffer[9], len - 9) << std::endl;
-
-            char Signiture[8] = {'C', 'H', 'R', 'D', 0, 0, 0, 0};
-
-            std::cout << "Message : ";
-
-            std::cin >> Message;
-
-            len = Message.length() + 1;
-
-            *(uint32_t *)(&Signiture[4]) = htonl(len + sizeof(Signiture));
-
-            Socket.SendTo(Signiture, sizeof(Signiture), Target);
-
-            Socket.SendTo(Message.c_str(), len, Target);
-        }
-
-        Command = "";
     }
 
-    Socket.Close();
+    Chord.Stop();
 
     return 0;
 }

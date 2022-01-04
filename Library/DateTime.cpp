@@ -72,6 +72,12 @@ namespace Core
             Spec.tv_nsec += nanosecond;
         }
 
+        void Add(const Duration& duration)
+        {
+            Spec.tv_sec += duration.Seconds;
+            Spec.tv_nsec += duration.Nanoseconds;
+        }
+
         inline int Second() const
         {
             return State.tm_sec;
@@ -164,11 +170,24 @@ namespace Core
             return DateTime(rawtime);
         }
 
-        static DateTime FromNow(time_t Seconds)
+        static DateTime FromNow(time_t Seconds, time_t Nanoseconds = 0)
         {
             auto Result = Now();
 
             Result.AddSecond(Seconds);
+
+            Result.AddNanosecond(Nanoseconds);
+
+            return Result;
+        }
+
+        static DateTime FromNow(Duration duration)
+        {
+            auto Result = Now();
+
+            Result.AddSecond(duration.Seconds);
+
+            Result.AddNanosecond(duration.Nanoseconds);
 
             return Result;
         }

@@ -145,7 +145,7 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Add(Queue& Other)
+            void Add(Queue &Other)
             {
                 this->_IncreaseCapacity(Other._Length);
 
@@ -155,7 +155,7 @@ namespace Core
                 }
             }
 
-            void Add(const Queue& Other)
+            void Add(const Queue &Other)
             {
                 this->_IncreaseCapacity(Other._Length);
 
@@ -205,7 +205,7 @@ namespace Core
                 this->_Length = this->_Capacity;
             }
 
-            T Take() 
+            T Take()
             {
                 if (this->IsEmpty())
                     throw std::out_of_range("");
@@ -227,10 +227,11 @@ namespace Core
                     Items[i] = std::move(_ElementAt(i));
                 }
 
+                _First = (_First + Count) % this->_Capacity;
                 this->_Length -= Count;
             }
 
-            void Free() 
+            void Free()
             {
                 if constexpr (!std::is_arithmetic<T>::value)
                 {
@@ -240,10 +241,11 @@ namespace Core
                     }
                 }
 
+                this->_First = 0;
                 this->_Length = 0;
             }
 
-            void Free(size_t Count) 
+            void Free(size_t Count)
             {
                 if (this->_Length < Count)
                     throw std::out_of_range("");
@@ -255,8 +257,38 @@ namespace Core
                         _ElementAt(i).~T();
                     }
                 }
-
+                
+                _First = (_First + Count) % this->_Capacity;
                 this->_Length -= Count;
+            }
+
+            bool ContainsWhere(std::function<bool(T &)> Condition)
+            {
+                for (size_t i = 0; i < this->_Length; i++)
+                {
+                    T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                        return true;
+                }
+
+                return false;
+            }
+
+            bool ContainsWhere(size_t &First, std::function<bool(T &)> Condition)
+            {
+                for (size_t i = 0; i < this->_Length; i++)
+                {
+                    T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                    {
+                        First = i;
+                        return true;
+                    }
+                }
+
+                return false;
             }
 
             std::string Peek(size_t Size)
@@ -307,6 +339,14 @@ namespace Core
 
             // ### Operators
 
+            T &operator[](const size_t &Index)
+            {
+                if (Index >= this->_Length)
+                    throw std::out_of_range("");
+
+                return _ElementAt(Index);
+            }
+
             Queue &operator=(const Queue &Other)
             {
                 this->_Capacity = Other._Capacity;
@@ -335,13 +375,6 @@ namespace Core
 
                 return *this;
             }
-
-            // friend Queue<char> &operator<<(Queue<char> &queue, const std::string &Message)
-            // {
-            //     queue.Add(Message.c_str(), Message.length());
-
-            //     return queue;
-            // }
 
             Queue &operator>>(T &Item)
             {

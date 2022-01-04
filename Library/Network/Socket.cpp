@@ -333,7 +333,7 @@ namespace Core
                 return recv(_INode, Data, Length, Flags);
             }
 
-            ssize_t SendTo(const char *Data, size_t Length, EndPoint Target, int Flags = 0) const
+            ssize_t SendTo(const char *Data, size_t Length, const EndPoint& Target, int Flags = 0) const
             {
                 struct sockaddr_storage Client;
                 socklen_t len = Target.sockaddr((struct sockaddr *)&Client);

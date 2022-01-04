@@ -456,43 +456,13 @@ namespace Core
                     T &item = _ElementAt(i);
 
                     if (Condition(item))
-                        return true;
-                }
-
-                return false;
-            }
-
-            T &FirstWhere(std::function<bool(T &)> Condition)
-            {
-                size_t result;
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                        return _ElementAt(i);
-                }
-
-                throw std::out_of_range("No such item");
-            }
-
-            T &FirstWhere(size_t& Index, std::function<bool(T &)> Condition)
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    T &item = _ElementAt(i);
-
-                    if (Condition(item))
                     {
-                        Index = i;
-                        return _ElementAt(i);
+                        First = i;
+                        return true;
                     }
                 }
 
-                // Return last one if none is suitable
-
-                throw std::out_of_range("No such item");
+                return false;
             }
 
             T &Biggest() const
@@ -526,38 +496,6 @@ namespace Core
 
                 return _ElementAt(result);
             }
-
-            // T &LastWhere(std::function<bool(T &, T &)> Comparer)
-            // {
-            //     if (this->_Length <= 0)
-            //         throw std::out_of_range("Instance contains no element");
-
-            //     size_t result = 0;
-
-            //     for (size_t i = 1; i < _Length; i++)
-            //     {
-            //         if (Comparer(_ElementAt(result), _ElementAt(i)))
-            //             result = i;
-            //     }
-
-            //     return _ElementAt(result);
-            // }
-
-            // T &LastWhere(std::function<bool(const T &, const T &)> Comparer) const
-            // {
-            //     if (this->_Length <= 0)
-            //         throw std::out_of_range("Instance contains no element");
-
-            //     size_t result = 0;
-
-            //     for (size_t i = 1; i < _Length; i++)
-            //     {
-            //         if (Comparer(_ElementAt(result), _ElementAt(i)))
-            //             result = i;
-            //     }
-
-            //     return _ElementAt(result);
-            // }
 
             template <typename O>
             Iterable<O> Map(std::function<O(T &)> Transform)

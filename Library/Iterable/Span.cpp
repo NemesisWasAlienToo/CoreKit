@@ -26,6 +26,7 @@ namespace Core
             }
 
         public:
+            Span() = default;
             Span(size_t Size, bool AutoFree = true) : _Content(new T[Size]), _Length(Size), _Free(AutoFree) {}
             Span(T *Array, size_t Size, bool AutoFree = true) : _Content(Array), _Length(Size), _Free(AutoFree) {}
             Span(Span &&Other) : _Content(Other._Content), _Length(Other._Length), _Free(Other._Free) {}
@@ -181,7 +182,7 @@ namespace Core
                     if (_Content[i] == Other._Content[i])
                         return false;
                 }
-                
+
                 return true;
             }
         };

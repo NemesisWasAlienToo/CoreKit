@@ -24,29 +24,29 @@ namespace Core
 
                 // ### Variables
 
-                char *Data = nullptr;
+                unsigned char *Data = nullptr;
 
                 // ### Functions
 
                 Key() = default;
 
-                Key(size_t size, char Init = 0) : Size(size), Data(new char[size])
+                Key(size_t size, char Init = 0) : Size(size), Data(new unsigned char[size])
                 {
                     Fill(Init);
                 }
 
-                Key(const std::string &Hex, size_t size) : Size(size), Data(new char[size])
+                Key(const std::string &Hex, size_t size) : Size(size), Data(new unsigned char[size])
                 {
                     // @todo Optimize here
 
                     Fill(0);
 
-                    Format::Hex::Bytes(Hex, &Data[Size - (Hex.length() / 2)]);
+                    Format::Hex::Bytes(Hex, (char *) &Data[Size - (Hex.length() / 2)]);
                 }
 
-                Key(const std::string &Hex) : Size(Hex.length() / 2), Data(new char[Size])
+                Key(const std::string &Hex) : Size(Hex.length() / 2), Data(new unsigned char[Size])
                 {
-                    Format::Hex::Bytes(Hex, Data);
+                    Format::Hex::Bytes(Hex, (char *) Data);
                 }
 
                 Key(Key &&Other) : Size(Other.Size)
@@ -54,7 +54,7 @@ namespace Core
                     std::swap(Data, Other.Data);
                 }
 
-                Key(const Key &Other) : Size(Other.Size), Data(new char[Size])
+                Key(const Key &Other) : Size(Other.Size), Data(new unsigned char[Size])
                 {
                     for (size_t i = 0; i < Size; i++)
                     {
@@ -62,7 +62,7 @@ namespace Core
                     }
                 }
 
-                Key(const char *data, size_t size) : Size(size), Data(new char[size])
+                Key(const char *data, size_t size) : Size(size), Data(new unsigned char[size])
                 {
                     for (size_t i = 0; i < Size; i++)
                     {
@@ -100,7 +100,7 @@ namespace Core
 
                 std::string ToString() const
                 {
-                    return Format::Hex::From(Data, Size);
+                    return Format::Hex::From((char *) Data, Size);
                 }
 
                 Key Neighbor(size_t nth) const
@@ -121,7 +121,7 @@ namespace Core
                     for (size_t i = 2; i <= Size; i++)
                     {
                         Key temp = Neighbor(i);
-                        if( temp > key)
+                        if (temp > key)
                         {
                             key = std::move(temp);
                             Index = i;
@@ -183,7 +183,7 @@ namespace Core
                 {
                     Size = Other.Size;
                     delete[] Data;
-                    Data = new char[Size];
+                    Data = new unsigned char[Size];
 
                     for (size_t i = 0; i < Size; i++)
                     {
@@ -193,12 +193,12 @@ namespace Core
                     return *this;
                 }
 
-                char &operator[](size_t Index)
+                unsigned char &operator[](size_t Index)
                 {
                     return Data[Index];
                 }
 
-                const char &operator[](size_t Index) const
+                const unsigned char &operator[](size_t Index) const
                 {
                     return Data[Index];
                 }

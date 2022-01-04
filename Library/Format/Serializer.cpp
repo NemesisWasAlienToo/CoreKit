@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 
 #include "Iterable/Queue.cpp"
+#include "Iterable/Span.cpp"
 #include "Network/EndPoint.cpp"
 #include "Network/DHT/Key.cpp"
 #include "Network/DHT/Node.cpp"
@@ -74,7 +75,7 @@ namespace Core
             }
 
             template <typename T>
-            T &Modify(size_t Index)
+            T &Modify(size_t Index) // @todo automatically do htonl
             {
                 char *Pointer = &Queue[Index];
 
@@ -82,6 +83,15 @@ namespace Core
                     throw std::out_of_range("Size would access out of bound data");
 
                 return *((T *)Pointer);
+            }
+
+            Iterable::Span<char> Blob()
+            {
+                Iterable::Span<char> Result(Queue.Length());
+
+                Queue.Take(Result.Content(), Queue.Length());
+
+                return Result;
             }
 
             // Input operators
@@ -179,7 +189,7 @@ namespace Core
 
             Serializer &operator<<(const Network::DHT::Key &Value)
             {
-                Queue.Add(Value.Data, Value.Size);
+                Queue.Add((char *) Value.Data, Value.Size);
 
                 return *this;
             }
@@ -309,18 +319,6 @@ namespace Core
                 return *this;
             }
 
-            // friend std::istream &operator>>(Serializer &Serializer, std::istream &is)
-            // {
-            //     while (!Serializer.Queue.IsEmpty())
-            //     {
-            //         os << Serializer.Queue.Take();
-            //     }
-
-            //     return os;
-            // }
-
-            //
-
             Serializer &operator>>(Iterable::Span<char> &Value)
             {
                 // Apply byte order
@@ -336,9 +334,9 @@ namespace Core
                 return *this;
             }
 
-            Serializer &operator>>(Network::DHT::Key &Value)
+            Serializer &operator>>(Network::DHT::Key &Value) // @todo key size is not obvious to the user
             {
-                Queue.Take(Value.Data, Value.Size);
+                Queue.Take((char *)Value.Data, Value.Size);
 
                 return *this;
             }
@@ -347,7 +345,7 @@ namespace Core
             {
                 size_t Index;
 
-                Queue.FirstWhere(Index, [](char &item) -> bool
+                Queue.ContainsWhere(Index, [](char &item) -> bool
                                  { return item == 0; });
 
                 Value.resize(Index++);
