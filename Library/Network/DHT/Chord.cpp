@@ -123,13 +123,13 @@ namespace Core
 
                                     Format::Serializer Ser(Request.Buffer);
                                     Node node(Identity.Id.Size);
-                                    node.EndPoint = Request.Peer;
 
+                                    node.EndPoint = Request.Peer;
                                     Ser >> node.Id;
 
                                     Add(node);
 
-                                    Task(node.Id, Request, End); // <-- fix this mess
+                                    Task(node, Ser, End);
                                 }
                                 else
                                 {
@@ -357,16 +357,16 @@ namespace Core
                                 }))
                         {
                             if (Nodes.IsFull())
-                                Nodes.Squeeze(node, Index);
-                            else
                                 Nodes[Index] = node;
+                            else
+                                Nodes.Squeeze(node, Index);
                         }
                         else
                         {
                             if (Nodes.IsFull())
-                                Nodes.Add(node);
-                            else
                                 Nodes.Last() = node;
+                            else
+                                Nodes.Add(node);
                         }
                     }
 
@@ -493,7 +493,7 @@ namespace Core
 
                             // Process response
 
-                            [this, SendTime = DateTime::Now(), CB = std::move(Callback)](Key& key, Network::DHT::Request &request, Handler::EndCallback End)
+                            [this, SendTime = DateTime::Now(), CB = std::move(Callback)](Node& key, Format::Serializer &request, Handler::EndCallback End)
                             {
                                 // @todo check retuened id as well
 
@@ -523,15 +523,13 @@ namespace Core
 
                             // Response - Node
 
-                            [this, CB = std::move(Callback)](Key& key, Network::DHT::Request &request, Handler::EndCallback End)
+                            [this, CB = std::move(Callback)](Node& Requester, Format::Serializer &Serializer, Handler::EndCallback End)
                             {
-                                if(key == Identity.Id)
+                                if(Requester.Id == Identity.Id)
                                 {
                                     End();
                                     return;
                                 }
-
-                                Format::Serializer Serializer(request.Buffer); // <-- maybe already pass this?
 
                                 char Header;
                                 Node node(Identity.Id.Size); // <-- @todo clarify this
@@ -679,10 +677,8 @@ namespace Core
                             // Process response
                             // Response - Data
 
-                            [this, CB = std::move(Callback)](Key& key, Network::DHT::Request &request, Handler::EndCallback End)
+                            [this, CB = std::move(Callback)](Node& Requester, Format::Serializer &Serializer, Handler::EndCallback End)
                             {
-                                Format::Serializer Serializer(request.Buffer);
-
                                 char Header;
 
                                 Serializer >> Header;
