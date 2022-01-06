@@ -41,20 +41,21 @@ namespace Core
 
                     Fill(0);
 
-                    Format::Hex::Bytes(Hex, (char *) &Data[Size - (Hex.length() / 2)]);
+                    Format::Hex::Bytes(Hex, (char *)&Data[Size - (Hex.length() / 2)]);
                 }
 
                 Key(const std::string &Hex) : Size(Hex.length() / 2), Data(new unsigned char[Size])
                 {
-                    Format::Hex::Bytes(Hex, (char *) Data);
+                    Format::Hex::Bytes(Hex, (char *)Data);
                 }
 
-                Key(Key &&Other) : Size(Other.Size)
+                Key(Key &&Other)
                 {
+                    std::swap(Size, Other.Size);
                     std::swap(Data, Other.Data);
                 }
 
-                Key(const Key &Other) : Size(Other.Size), Data(new unsigned char[Size])
+                Key(const Key &Other) : Size(Other.Size), Data(new unsigned char[Other.Size])
                 {
                     for (size_t i = 0; i < Size; i++)
                     {
@@ -73,6 +74,7 @@ namespace Core
                 ~Key()
                 {
                     delete[] Data;
+                    Data = nullptr;
                 }
 
                 // Statics
@@ -100,7 +102,12 @@ namespace Core
 
                 std::string ToString() const
                 {
-                    return Format::Hex::From((char *) Data, Size);
+                    return Format::Hex::From((char *)Data, Size);
+                }
+
+                inline size_t NeighborCount() const
+                {
+                    return Size * 8;
                 }
 
                 Key Neighbor(size_t nth) const
@@ -109,7 +116,9 @@ namespace Core
 
                     Result.Set(nth);
 
-                    return *this + Result;
+                    // return *this + Result;
+
+                    return std::move(Result += *this);
                 }
 
                 size_t Critical() const // @todo Important Fix and optimize this
@@ -118,12 +127,12 @@ namespace Core
 
                     Key key = Neighbor(1);
 
-                    for (size_t i = 2; i <= Size; i++)
+                    for (size_t i = 2; i <= Size * 8; i++)
                     {
-                        Key temp = Neighbor(i);
-                        if (temp > key)
+                        Key Next = Neighbor(i);
+                        if (Next > key)
                         {
-                            key = std::move(temp);
+                            key = std::move(Next);
                             Index = i;
                         }
                     }
@@ -134,7 +143,7 @@ namespace Core
                 bool Bit(size_t Number) const
                 {
                     if (Number == 0)
-                        throw std::invalid_argument("Zero th bit is meaningless");
+                        throw std::invalid_argument("Zero-th bit is meaningless");
 
                     Number--;
 
@@ -172,8 +181,7 @@ namespace Core
 
                 Key &operator=(Key &&Other)
                 {
-                    Size = Other.Size;
-
+                    std::swap(Size, Other.Size);
                     std::swap(Data, Other.Data);
 
                     return *this;
@@ -181,9 +189,12 @@ namespace Core
 
                 Key &operator=(const Key &Other)
                 {
-                    Size = Other.Size;
-                    delete[] Data;
-                    Data = new unsigned char[Size];
+                    if (Size != Other.Size)
+                    {
+                        delete[] Data;
+                        Size = Other.Size;
+                        Data = new unsigned char[Other.Size];
+                    }
 
                     for (size_t i = 0; i < Size; i++)
                     {
@@ -336,7 +347,7 @@ namespace Core
 
                     unsigned short Buffer = 0;
 
-                    for (size_t i = Size - 1; i >= 0; i--)
+                    for (int i = Size - 1; i >= 0; i--)
                     {
                         Buffer = Data[i] + Other.Data[i] + Carry;
 
@@ -354,7 +365,7 @@ namespace Core
 
                     unsigned short Buffer = 0;
 
-                    for (size_t i = Size - 1; i >= 0; i--)
+                    for (int i = Size - 1; i >= 0; i--)
                     {
                         Buffer = (~Data[i]) + Other.Data[i] + Carry;
 
@@ -408,6 +419,11 @@ namespace Core
                     }
 
                     return *this;
+                }
+
+                friend std::ostream& operator<<(std::ostream& os, const Key& key)
+                {
+                    return os << key.ToString();
                 }
 
                 // Key operator<<(size_t Count) const

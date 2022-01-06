@@ -13,24 +13,34 @@
 
 using namespace Core;
 
+#define TSIZE 2
+
 int main(int argc, char const *argv[])
 {
-    Iterable::Queue<char> q;
-    Format::Serializer s(q);
+    Network::EndPoint Host{"0.0.0.0:4444"};
 
-    q.Add("hello there", 12);
+    Network::Socket server(Network::Socket::IPv4, Network::Socket::UDP);
 
-    char b[12] = {0};
+    server.Bind(Host);
 
-    q.Take(b, 12);
+    std::cout << Network::DNS::HostName() << " is listenning on " << Host << std::endl;
 
-    std::cout << b << std::endl;
+    while (1)
+    {
+        Network::EndPoint Target;
 
-    char c[12] = {0};
+        server.Await(Network::Socket::In);
 
-    q.Take(c, 12);
+        auto size = server.Received();
 
-    std::cout << c << std::endl;
+        char Buffer[size + 1];
+
+        Buffer[size] = 0;
+
+        server.ReceiveFrom(Buffer, sizeof(Buffer), Target);
+
+        std::cout << Target << " : " << Buffer << std::endl;
+    }
 
     return 0;
 }

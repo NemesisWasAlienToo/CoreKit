@@ -9,11 +9,13 @@
 
 #include "Iterable/Poll.cpp"
 
+using namespace Core;
+
 int main(int argc, char const *argv[])
 {
-    Network::Socket server(Network::IPv4Protocol, Network::TCP, true);
+    Network::Socket server(Network::Socket::IPv4, Network::Socket::TCP, true);
 
-    auto result = Network::DNS::Host(Network::IPv4Address);
+    auto result = Network::DNS::Host(Network::Socket::IPv4);
 
     Network::EndPoint Host(result[0], 8888);
 

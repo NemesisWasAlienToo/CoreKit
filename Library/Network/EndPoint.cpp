@@ -102,7 +102,7 @@ namespace Core
 
             int sockaddr(struct sockaddr *SocketAddress) const
             {
-                if (SocketAddress->sa_family == Address::IPv4)
+                if (_Address.Family() == Address::IPv4)
                 {
                     return sockaddr_in((struct sockaddr_in *)SocketAddress);
                 }

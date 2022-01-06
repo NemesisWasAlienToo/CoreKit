@@ -132,7 +132,7 @@ namespace Core
 
             // Properties :
 
-            AddressFamily Family() const { return _Family; }
+            inline AddressFamily Family() const { return _Family; }
 
             std::string IP() const
             {

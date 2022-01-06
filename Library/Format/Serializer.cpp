@@ -343,7 +343,7 @@ namespace Core
 
             Serializer &operator>>(std::string &Value)
             {
-                size_t Index;
+                size_t Index = 0;
 
                 Queue.ContainsWhere(Index, [](char &item) -> bool
                                  { return item == 0; });

@@ -16,6 +16,9 @@ int main(int argc, char const *argv[])
 {
     // Init Identity
 
+    const Network::EndPoint Target("192.168.1.17:4444");
+    // const Network::EndPoint Target("127.0.0.1:4444");
+
     const Network::EndPoint EndPoint("0.0.0.0:8888");
 
     const Network::DHT::Key Key = Network::DHT::Key::Generate(4);
@@ -30,16 +33,9 @@ int main(int argc, char const *argv[])
 
     // Run the server
 
-    Network::DHT::Chord::Runner Chord(Identity, {5, 0}, 1);
+    // Network::DHT::Runner<Network::DHT::Chord> Chrod;
 
-    Chord.Add({{"0000000f"}, {"127.0.0.1:0"}});
-    Chord.Add({{"000000f1"}, {"127.0.0.1:1"}});
-    Chord.Add({{"00000ff2"}, {"127.0.0.1:2"}});
-    Chord.Add({{"0000fff3"}, {"127.0.0.1:3"}});
-    Chord.Add({{"000ffff4"}, {"127.0.0.1:4"}});
-    Chord.Add({{"00fffff5"}, {"127.0.0.1:5"}});
-    Chord.Add({{"0ffffff6"}, {"127.0.0.1:6"}});
-    Chord.Add({{"fffffff7"}, {"127.0.0.1:7"}});
+    Network::DHT::Chord::Runner Chord(Identity, {5, 0}, 1);
 
     Chord.Run();
 
@@ -54,7 +50,7 @@ int main(int argc, char const *argv[])
         if (Command == "ping")
         {
             Chord.Ping(
-                {"127.0.0.1:4444"},
+                Target,
                 [](Duration Result, Network::DHT::Handler::EndCallback End)
                 {
                     Test::Log("Ping") << Result << "s" << std::endl;
@@ -67,7 +63,7 @@ int main(int argc, char const *argv[])
         else if (Command == "query")
         {
             Chord.Query(
-                {"127.0.0.1:4444"},
+                Target,
                 Identity.Id,
                 [](Network::DHT::Node Result, Network::DHT::Handler::EndCallback End)
                 {
@@ -82,7 +78,7 @@ int main(int argc, char const *argv[])
         else if (Command == "route")
         {
             Chord.Route(
-                {"127.0.0.1:4444"},
+                Target,
                 Identity.Id,
                 [](Network::DHT::Node Result, Network::DHT::Handler::EndCallback End)
                 {
@@ -97,7 +93,7 @@ int main(int argc, char const *argv[])
         else if (Command == "boot")
         {
             Chord.Bootstrap(
-                {"127.0.0.1:4444"},
+                Target,
                 [](std::function<void()> End)
                 {
                     End();

@@ -25,7 +25,7 @@ namespace Core
             {
             public:
                 typedef std::function<void()> EndCallback;
-                typedef std::function<void(Network::DHT::Request &, EndCallback)> Callback;
+                typedef std::function<void(Key&, Network::DHT::Request &, EndCallback)> Callback;
 
                 struct Handle // @todo Add move semmantics
                 {

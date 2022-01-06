@@ -64,13 +64,6 @@ namespace Core
                         Get,
                         Data,
                     };
-                    
-                    enum class Notifications : char
-                    {
-                        Join = 0,
-                        Leave,
-                        TimeOut,
-                    };
 
                 private:
                     // ### Types
@@ -126,7 +119,17 @@ namespace Core
 
                                 if (Handler.Take(Request.Peer, Task, End))
                                 {
-                                    Task(Request, End);
+                                    // Extract peer key and add it
+
+                                    Format::Serializer Ser(Request.Buffer);
+                                    Node node(Identity.Id.Size);
+                                    node.EndPoint = Request.Peer;
+
+                                    Ser >> node.Id;
+
+                                    Add(node);
+
+                                    Task(node.Id, Request, End); // <-- fix this mess
                                 }
                                 else
                                 {
@@ -155,8 +158,17 @@ namespace Core
                     void Respond(Network::DHT::Request &Request)
                     {
                         Format::Serializer ReqSerializer(Request.Buffer);
-
+                        Node node(Identity.Id.Size);
                         char Type;
+
+                        node.EndPoint = Request.Peer;
+                        ReqSerializer >> node.Id;
+
+                        // Handle this new node
+
+                        Add(node);
+
+                        // Get request type
 
                         ReqSerializer >> Type;
 
@@ -269,15 +281,16 @@ namespace Core
 
                     // Request Handlers
 
-                    std::function<void(const Key &, const Iterable::Span<char> &)> OnSet;
                     std::function<void(const Key &)> OnGet;
+                    std::function<void(const Key &, const Iterable::Span<char> &)> OnSet;
                     std::function<void(Iterable::Span<char>)> OnData;
+                    std::function<void(Iterable::Span<char>)> OnFlood;
 
                     // ### Constructors
 
                     Runner() = default;
 
-                    Runner(const Node &identity, Duration Timeout, size_t ThreadCount = 1) : Identity(identity), Server(identity.EndPoint), Handler(), Pool(ThreadCount, false), TimeOut(Timeout)
+                    Runner(const Node &identity, Duration Timeout, size_t ThreadCount = 1) : Identity(identity), Server(identity.EndPoint), Handler(), Pool(ThreadCount, false), Nodes(Identity.Id.Size + 1), TimeOut(Timeout)
                     {
                         Nodes.Add({Identity.Id, {"0.0.0.0:0"}});
                     }
@@ -310,26 +323,26 @@ namespace Core
                         }
                     }
 
-                    void Add(Node &&node) // <- @todo Fix with perfect forwarding
-                    {
-                        size_t Index;
+                    // void Add(Node &&node) // <- @todo Fix with perfect forwarding
+                    // {
+                    //     size_t Index;
 
-                        if (Nodes.ContainsWhere(
-                                Index,
-                                [this, &node](Node &Item) -> bool
-                                {
-                                    return Item.Id < node.Id;
-                                }))
-                        {
-                            Nodes.Squeeze(std::forward<Node>(node), Index);
-                        }
-                        else
-                        {
-                            Nodes.Add(std::forward<Node>(node));
-                        }
-                    }
+                    //     if (Nodes.ContainsWhere(
+                    //             Index,
+                    //             [this, &node](Node &Item) -> bool
+                    //             {
+                    //                 return Item.Id < node.Id;
+                    //             }))
+                    //     {
+                    //         Nodes.Squeeze(std::forward<Node>(node), Index);
+                    //     }
+                    //     else
+                    //     {
+                    //         Nodes.Add(std::forward<Node>(node));
+                    //     }
+                    // }
 
-                    void Add(const Node &node)
+                    void Add(const Node &node) // @todo Improve this
                     {
                         size_t Index;
 
@@ -340,14 +353,20 @@ namespace Core
                                 Index,
                                 [this, &node](Node &Item) -> bool
                                 {
-                                    return Item.Id < node.Id;
+                                    return Item.Id <= node.Id;
                                 }))
                         {
-                            Nodes.Squeeze(node, Index);
+                            if (Nodes.IsFull())
+                                Nodes.Squeeze(node, Index);
+                            else
+                                Nodes[Index] = node;
                         }
                         else
                         {
-                            Nodes.Add(node);
+                            if (Nodes.IsFull())
+                                Nodes.Add(node);
+                            else
+                                Nodes.Last() = node;
                         }
                     }
 
@@ -420,6 +439,24 @@ namespace Core
 
                     // Builders for new precedure
 
+                    inline void Fire( // @todo Fix with perfect forwarding
+                        const Core::Network::EndPoint &Peer,
+                        const std::function<void(Core::Format::Serializer &)> &Builder /*, End*/)
+                    {
+                        Server.Put(
+                            Peer,
+                            [this, &Builder](Format::Serializer &Ser)
+                            {
+                                // Fill in my id for me
+
+                                Ser << Identity.Id;
+
+                                // Build
+
+                                Builder(Ser);
+                            });
+                    }
+
                     bool Build(
                         const Core::Network::EndPoint &Peer,
                         const std::function<void(Core::Format::Serializer &)> &Builder,
@@ -433,16 +470,9 @@ namespace Core
                             return false;
                         }
 
-                        Server.Put(Peer, Builder);
+                        Fire(Peer, Builder);
 
                         return true;
-                    }
-
-                    inline void Fire( // @todo Fix with perfect forwarding
-                        const Core::Network::EndPoint &Peer,
-                        const std::function<void(Core::Format::Serializer &)> &Builder /*, End*/)
-                    {
-                        Server.Put(Peer, Builder);
                     }
 
                     // @todo Change callback to refrence to callback
@@ -456,8 +486,6 @@ namespace Core
 
                             // Build buffer
 
-                            // Operation
-
                             [this](Format::Serializer &Serializer)
                             {
                                 Serializer << (char)Operations::Ping << Identity.Id;
@@ -465,7 +493,7 @@ namespace Core
 
                             // Process response
 
-                            [this, SendTime = DateTime::Now(), CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
+                            [this, SendTime = DateTime::Now(), CB = std::move(Callback)](Key& key, Network::DHT::Request &request, Handler::EndCallback End)
                             {
                                 // @todo check retuened id as well
 
@@ -495,8 +523,14 @@ namespace Core
 
                             // Response - Node
 
-                            [this, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
+                            [this, CB = std::move(Callback)](Key& key, Network::DHT::Request &request, Handler::EndCallback End)
                             {
+                                if(key == Identity.Id)
+                                {
+                                    End();
+                                    return;
+                                }
+
                                 Format::Serializer Serializer(request.Buffer); // <-- maybe already pass this?
 
                                 char Header;
@@ -645,7 +679,7 @@ namespace Core
                             // Process response
                             // Response - Data
 
-                            [this, CB = std::move(Callback)](Network::DHT::Request &request, Handler::EndCallback End)
+                            [this, CB = std::move(Callback)](Key& key, Network::DHT::Request &request, Handler::EndCallback End)
                             {
                                 Format::Serializer Serializer(request.Buffer);
 
@@ -720,7 +754,7 @@ namespace Core
 
                     // Flood
 
-                    void Flood(const Network::EndPoint &Peer, Key key, const Iterable::Span<char> &Data)
+                    void Flood(const Network::EndPoint &Peer,const Key& key, const Iterable::Span<char> &Data)
                     {
                         Nodes.ForEach(
                             [this, &Data](Node &Node)
@@ -738,7 +772,7 @@ namespace Core
                             });
                     }
 
-                    void FloodWhere(const Network::EndPoint &Peer, Key key, const Iterable::Span<char> &Data,
+                    void FloodWhere(const Network::EndPoint &Peer, const Key& key, const Iterable::Span<char> &Data,
                                     const std::function<bool(const Node &)> &Condition)
                     {
                         Nodes.ForEach(

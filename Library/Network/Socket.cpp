@@ -51,7 +51,7 @@ namespace Core
                 Truncate = MSG_TRUNC,
                 WaitAll = MSG_WAITALL,
             };
-            
+
             Socket()
             {
                 _INode = socket(IPv4, TCP, 0);
@@ -201,7 +201,7 @@ namespace Core
 
                 // Error handling here
 
-                if (ClientDescriptor < 0/* && errno != EAGAIN*/)
+                if (ClientDescriptor < 0 /* && errno != EAGAIN*/)
                 {
                     throw std::system_error(errno, std::generic_category());
                 }
@@ -333,10 +333,13 @@ namespace Core
                 return recv(_INode, Data, Length, Flags);
             }
 
-            ssize_t SendTo(const char *Data, size_t Length, const EndPoint& Target, int Flags = 0) const
+            ssize_t SendTo(const char *Data, size_t Length, const EndPoint &Target, int Flags = 0) const
             {
-                struct sockaddr_storage Client;
+                struct sockaddr_storage Client = {0, 0};
                 socklen_t len = Target.sockaddr((struct sockaddr *)&Client);
+
+                Network::EndPoint a((struct sockaddr *)&Client);
+
                 int Result = sendto(_INode, (const char *)Data, Length, Flags, (struct sockaddr *)&Client, len);
 
                 if (Result < 0)
