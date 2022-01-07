@@ -6,7 +6,9 @@
 
 #include "Network/DNS.cpp"
 #include "Network/Socket.cpp"
-#include "Base/Poll.cpp"
+#include "Iterable/Poll.cpp"
+
+using namespace Core;
 
 int main(int argc, char const *argv[])
 {
@@ -18,7 +20,7 @@ int main(int argc, char const *argv[])
 
     std::cout << "Google is at " << Google << std::endl;
 
-    Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP, false);
+    Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP);
 
     client.Connect(Google);
 

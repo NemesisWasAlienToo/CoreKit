@@ -5,7 +5,7 @@
 #include "Iterable/List.cpp"
 #include "Network/DNS.cpp"
 #include "Network/Socket.cpp"
-#include "Network/HTTP.cpp"
+#include "Network/HTTP/HTTP.cpp"
 
 using namespace Core;
 using namespace std;

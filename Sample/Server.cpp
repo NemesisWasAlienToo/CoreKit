@@ -13,9 +13,9 @@ using namespace Core;
 
 int main(int argc, char const *argv[])
 {
-    Network::Socket server(Network::Socket::IPv4, Network::Socket::TCP, true);
+    Network::Socket server(Network::Socket::IPv4, Network::Socket::TCP);
 
-    auto result = Network::DNS::Host(Network::Socket::IPv4);
+    auto result = Network::DNS::Host(Network::Address::IPv4);
 
     Network::EndPoint Host(result[0], 8888);
 

@@ -7,7 +7,9 @@
 #include "Network/DNS.cpp"
 #include "Network/Address.cpp"
 #include "Network/Socket.cpp"
-#include "Network/HTTP.cpp"
+#include "Network/HTTP/HTTP.cpp"
+
+using namespace Core;
 
 void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info);
 

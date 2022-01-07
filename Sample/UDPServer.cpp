@@ -7,23 +7,25 @@
 #include "Network/Address.cpp"
 #include "Network/Socket.cpp"
 
+using namespace Core;
+
 int main(int argc, char const *argv[])
 {
-	Core::Network::EndPoint Host(Core::Network::Address(Core::Network::Address::Any()), 8888);
+	Network::EndPoint Host(Network::Address(Network::Address::Any()), 8888);
 
-	Core::Network::Socket server(Core::Network::Socket::IPv4, Core::Network::Socket::UDP);
+	Network::Socket server(Network::Socket::IPv4, Network::Socket::UDP);
 
 	server.Bind(Host);
 
-	std::cout << Core::Network::DNS::HostName() << " is listenning on " << Host << std::endl;
+	std::cout << Network::DNS::HostName() << " is listenning on " << Host << std::endl;
 
 	while (1)
 	{
 		char buffer[1024];
 
-		Core::Network::EndPoint Client;
+		Network::EndPoint Client;
 
-		server.Await(Core::Network::Socket::In);
+		server.Await(Network::Socket::In);
 
         std::cout << server.Received() << " Bytes ready" << std::endl;
 

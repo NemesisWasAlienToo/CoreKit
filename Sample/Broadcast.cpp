@@ -80,7 +80,7 @@ int main(int argc, char const *argv[])
             Buffers.ForEach([&](size_t index, Iterable::Queue<char> &Buffer)
                             {
                 if(index != Index - 1){
-                    Buffer << Message;
+                    Buffer.Add(Message.c_str(), Message.length());
                     Poll[index + 1].Set(Iterable::Poll::Out);
                 } });
         }

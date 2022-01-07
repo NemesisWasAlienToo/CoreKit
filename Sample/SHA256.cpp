@@ -6,6 +6,8 @@
 #include "Iterable/List.cpp"
 #include "Cryptography/Digest.cpp"
 
+using namespace Core;
+
 int main(int argc, char const *argv[])
 {
     if(argc < 2) {
@@ -25,7 +27,7 @@ int main(int argc, char const *argv[])
 
     MyReadFile.close();
 
-    std::cout << Core::Cryptography::SHA256::Hex(Content) << std::endl;
+    std::cout << Cryptography::SHA256::Hex(Content) << std::endl;
 
     return 0;
 }
