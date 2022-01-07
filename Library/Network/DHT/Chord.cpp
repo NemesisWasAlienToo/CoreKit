@@ -299,7 +299,7 @@ namespace Core
 
                     inline static Network::EndPoint DefaultEndPoint()
                     {
-                        return Network::EndPoint("127.0.0.1:8888");
+                        return {"0.0.0.0:8888"};
                     }
 
                     // ### Functionalities
@@ -323,24 +323,50 @@ namespace Core
                         }
                     }
 
-                    // void Add(Node &&node) // <- @todo Fix with perfect forwarding
-                    // {
-                    //     size_t Index;
+                    size_t ResolveAt(const Key &key)
+                    {
+                        size_t Index;
 
-                    //     if (Nodes.ContainsWhere(
-                    //             Index,
-                    //             [this, &node](Node &Item) -> bool
-                    //             {
-                    //                 return Item.Id < node.Id;
-                    //             }))
-                    //     {
-                    //         Nodes.Squeeze(std::forward<Node>(node), Index);
-                    //     }
-                    //     else
-                    //     {
-                    //         Nodes.Add(std::forward<Node>(node));
-                    //     }
-                    // }
+                        if (!Nodes.ContainsWhere(
+                                Index,
+                                [this, &key](Node &Item) -> bool
+                                {
+                                    return Item.Id < key;
+                                }))
+                        {
+                            Index = 0;
+                        }
+
+                        return Index;
+                    }
+
+                    void Add(Node &&node)
+                    {
+                        size_t Index;
+
+                        if (Nodes.Contains(node))
+                            return;
+
+                        if (Nodes.ContainsWhere(
+                                Index,
+                                [this, &node](Node &Item) -> bool
+                                {
+                                    return Item.Id <= node.Id;
+                                }))
+                        {
+                            if (Nodes.IsFull())
+                                Nodes[Index] = std::move(node);
+                            else
+                                Nodes.Squeeze(std::move(node), Index);
+                        }
+                        else
+                        {
+                            if (Nodes.IsFull())
+                                Nodes.Last() = std::move(node);
+                            else
+                                Nodes.Add(std::move(node));
+                        }
+                    }
 
                     void Add(const Node &node) // @todo Improve this
                     {

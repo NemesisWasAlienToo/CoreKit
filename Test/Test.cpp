@@ -13,8 +13,6 @@
 
 using namespace Core;
 
-#define TSIZE 2
-
 int main(int argc, char const *argv[])
 {
     Network::EndPoint Host{"0.0.0.0:4444"};

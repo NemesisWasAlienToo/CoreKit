@@ -7,3 +7,5 @@ Public.pem
 Private.pem
 TestFile
 opendir
+Makefile
+Test
