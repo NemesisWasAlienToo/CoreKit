@@ -72,6 +72,11 @@ namespace Core
                 O.Update(&_State, Data.c_str(), Data.size());
             }
 
+            static size_t Size()
+            {
+                return O.Lenght;
+            }
+
             static void Bytes(const std::string &Data, unsigned char *Digest)
             {
                 O.Name((unsigned char *)Data.c_str(), Data.length(), Digest);
@@ -80,10 +85,6 @@ namespace Core
             static void Bytes(const unsigned char *Data, size_t Size, unsigned char *Digest)
             {
                 O.Name(Data, Size, Digest);
-            }
-
-            static size_t Size(){
-                return O.Lenght;
             }
 
             // ## Remove this

@@ -7,14 +7,16 @@
  *
  *      The packet format for each operation is as follows :
  *
- *      Response   : [ Header - Size ] - Response Specifier - Data
- *      Invalid    : [ Header - Size ] - Invalid Specifier - Cause of failure
- *      Ping       : [ Header - Size ] - Ping Specifier - My ID
- *      Query      : [ Header - Size ] - Query Specifier - Target ID -> [ Header - Size ] - Response Specifier - Node
- *      Set        : [ Header - Size ] - Set Specifier - Key - Data
- *      Get        : [ Header - Size ] - Get Specifier - Key
- *      Data       : [ Header - Size ] - Data Specifier - Data
+ *      Response   : [ [ Header - Size ] - My id ] - Response Specifier - Data
+ *      Invalid    : [ [ Header - Size ] - My id ] - Invalid Specifier - Cause of failure
+ *      Ping       : [ [ Header - Size ] - My id ] - Ping Specifier - My ID
+ *      Query      : [ [ Header - Size ] - My id ] - Query Specifier - Target ID -> [ Header - Size - Their id ] - Response Specifier - Node
+ *      Set        : [ [ Header - Size ] - My id ] - Set Specifier - Key - Data
+ *      Get        : [ [ Header - Size ] - My id ] - Get Specifier - Key
+ *      Data       : [ [ Header - Size ] - My id ] - Data Specifier - Data
  *
+ * @todo Optimize adding and removing node by using binary tree or linked list
+ * @todo Network::DHT::Runner<Network::DHT::Chord> Chrod syntax
  * @version 0.1
  * @date 2022-01-03
  *
@@ -57,7 +59,6 @@ namespace Core
                     {
                         Response = 0,
                         Invalid,
-                        Notify,
                         Ping,
                         Query,
                         Set,
@@ -227,7 +228,17 @@ namespace Core
                             Key key(Identity.Id.Size);
                             ReqSerializer >> key;
 
-                            OnGet(key);
+                            OnGet(
+                                key,
+                                [this, &node](const Iterable::Span<char> &Data)
+                                {
+                                    Fire(
+                                        node.EndPoint,
+                                        [&Data](Format::Serializer &Serializer)
+                                        {
+                                            Serializer << (char) Operations::Response << Data;
+                                        });
+                                });
 
                             Test::Log("Get") << Request.Peer << std::endl;
                             break;
@@ -239,13 +250,6 @@ namespace Core
                             OnData(Data);
 
                             Test::Log("Data") << Request.Peer << std::endl;
-                            break;
-                        }
-                        case Operations::Notify:
-                        {
-                            //
-
-                            Test::Log("Notify") << Request.Peer << std::endl;
                             break;
                         }
                         case Operations::Invalid:
@@ -281,7 +285,9 @@ namespace Core
 
                     // Request Handlers
 
-                    std::function<void(const Key &)> OnGet;
+                    typedef std::function<void(Iterable::Span<char> &)> OnGetCallback;
+
+                    std::function<void(const Key &, OnGetCallback)> OnGet;
                     std::function<void(const Key &, const Iterable::Span<char> &)> OnSet;
                     std::function<void(Iterable::Span<char>)> OnData;
                     std::function<void(Iterable::Span<char>)> OnFlood;
@@ -331,7 +337,7 @@ namespace Core
                                 Index,
                                 [this, &key](Node &Item) -> bool
                                 {
-                                    return Item.Id < key;
+                                    return Item.Id <= key;
                                 }))
                         {
                             Index = 0;
@@ -396,10 +402,10 @@ namespace Core
                         }
                     }
 
-                    void Await()
-                    {
-                        //
-                    }
+                    // void Await()
+                    // {
+                    //     //
+                    // }
 
                     inline void GetInPool()
                     {
@@ -519,7 +525,7 @@ namespace Core
 
                             // Process response
 
-                            [this, SendTime = DateTime::Now(), CB = std::move(Callback)](Node& key, Format::Serializer &request, Handler::EndCallback End)
+                            [this, SendTime = DateTime::Now(), CB = std::move(Callback)](Node &key, Format::Serializer &request, Handler::EndCallback End)
                             {
                                 // @todo check retuened id as well
 
@@ -549,9 +555,9 @@ namespace Core
 
                             // Response - Node
 
-                            [this, CB = std::move(Callback)](Node& Requester, Format::Serializer &Serializer, Handler::EndCallback End)
+                            [this, CB = std::move(Callback)](Node &Requester, Format::Serializer &Serializer, Handler::EndCallback End)
                             {
-                                if(Requester.Id == Identity.Id)
+                                if (Requester.Id == Identity.Id)
                                 {
                                     End();
                                     return;
@@ -565,6 +571,7 @@ namespace Core
                                 try
                                 {
                                     Serializer >> node;
+                                    Test::Log("Query") << "Routed to " << node.EndPoint << std::endl;
                                     CB(std::move(node), std::move(End));
                                 }
                                 catch (const std::exception &e)
@@ -580,11 +587,23 @@ namespace Core
 
                     void Route(const Network::EndPoint &Peer, const Key &Id, RouteCallback Callback, Handler::EndCallback End)
                     {
+                        if (Id == Identity.Id)
+                        {
+                            Callback(Identity, std::move(End));
+                            return;
+                        }
+
                         Query( // @todo optimize functions in the argument
                             Peer,
                             Id,
                             [this, Peer, Id, CB = std::move(Callback)](Node Response, const Handler::EndCallback &End)
                             {
+                                if (Response.Id == Identity.Id)
+                                {
+                                    End();
+                                    return;
+                                }
+
                                 if (Response.EndPoint.address() == Network::Address("0.0.0.0")) // <-- @todo Optimize this
                                 {
                                     Response.EndPoint = Peer;
@@ -599,12 +618,20 @@ namespace Core
                     void Route(const Key &Id, RouteCallback Callback, Handler::EndCallback End)
                     {
                         if (Nodes.Length() <= 1)
+                        {
+                            End();
                             throw std::underflow_error("No other node is known");
+                        }
 
-                        // const auto &Peer = Closest(Id).EndPoint;
-                        const auto &Peer = Resolve(Id).EndPoint;
+                        const auto &Peer = Resolve(Id);
 
-                        Route(Peer, Id, std::move(Callback), std::move(End));
+                        if (Peer.Id == Identity.Id)
+                        {
+                            Callback(Identity, std::move(End));
+                            return;
+                        }
+
+                        Route(Peer.EndPoint, Id, std::move(Callback), std::move(End));
                     }
 
                     typedef std::function<void(Handler::EndCallback)> BootstrapCallback;
@@ -703,7 +730,7 @@ namespace Core
                             // Process response
                             // Response - Data
 
-                            [this, CB = std::move(Callback)](Node& Requester, Format::Serializer &Serializer, Handler::EndCallback End)
+                            [this, CB = std::move(Callback)](Node &Requester, Format::Serializer &Serializer, Handler::EndCallback End)
                             {
                                 char Header;
 
@@ -722,9 +749,22 @@ namespace Core
                     {
                         Route(
                             key,
-                            [this, key, CB = std::move(Callback)](Node Target, Handler::EndCallback End)
+                            [this, key, CB = std::move(Callback)](Node Peer, Handler::EndCallback End)
                             {
-                                GetFrom(Target.EndPoint, key, CB, std::move(End));
+                                
+                                if (Peer.Id == Identity.Id)
+                                {
+                                    OnGet(
+                                        key,
+                                        [CB = std::move(CB), End = std::move(End)](Iterable::Span<char> &Data)
+                                        {
+                                            CB(Data, End);
+                                        });
+                                    
+                                    return;
+                                }
+
+                                GetFrom(Peer.EndPoint, key, CB, std::move(End));
                             },
                             std::move(End));
                     }
@@ -747,11 +787,16 @@ namespace Core
                     {
                         Route(
                             key,
-                            [this, key, Data](Node Target, Handler::EndCallback End)
+                            [this, key, Data](Node Peer, Handler::EndCallback End)
                             {
-                                SetTo(Target.EndPoint, key, Data);
+                                if (Peer.Id == Identity.Id)
+                                {
+                                    OnSet(key, Data);
+                                    End(); // <-- Fix this
+                                    return;
+                                }
 
-                                // fire and forget
+                                SetTo(Peer.EndPoint, key, Data);
 
                                 End();
                             },
@@ -776,7 +821,7 @@ namespace Core
 
                     // Flood
 
-                    void Flood(const Network::EndPoint &Peer,const Key& key, const Iterable::Span<char> &Data)
+                    void Flood(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data)
                     {
                         Nodes.ForEach(
                             [this, &Data](Node &Node)
@@ -794,7 +839,7 @@ namespace Core
                             });
                     }
 
-                    void FloodWhere(const Network::EndPoint &Peer, const Key& key, const Iterable::Span<char> &Data,
+                    void FloodWhere(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data,
                                     const std::function<bool(const Node &)> &Condition)
                     {
                         Nodes.ForEach(

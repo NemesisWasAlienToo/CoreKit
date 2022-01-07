@@ -15,23 +15,19 @@ namespace Core
 {
     namespace Format
     {
-        class Base64
+        namespace Base64
         {
-        private:
-            Base64();
-
-        public:
-            static inline int PlainSize(int Size)
+            inline int PlainSize(int Size)
             {
                 return 3 * Size / 4;
             }
 
-            static inline int CypherSize(int Size)
+            inline int CypherSize(int Size)
             {
                 return 4 * ((Size + 2) / 3);
             }
             
-            static std::string From(const unsigned char *Data, int Size)
+            std::string From(const unsigned char *Data, int Size)
             {
                 int _Size = 4 * ((Size + 2) / 3);
                 char Output[_Size + 1];
@@ -47,7 +43,7 @@ namespace Core
                 return Output;
             }
 
-            static int Bytes(const std::string &Base64String, unsigned char *Data)
+            int Bytes(const std::string &Base64String, unsigned char *Data)
             {
                 int Result = EVP_DecodeBlock(Data, reinterpret_cast<const unsigned char *>(Base64String.c_str()), Base64String.length());
                 

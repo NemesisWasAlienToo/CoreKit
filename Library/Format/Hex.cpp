@@ -11,7 +11,6 @@ namespace Core
     {
         namespace Hex
         {
-
             inline unsigned char Digit(char HexChar, bool Upper = false)
             {
                 return HexChar - (HexChar > '9' ? ((Upper ? 'A' : 'a') - 10) : '0');

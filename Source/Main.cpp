@@ -5,6 +5,7 @@
 #include <Test.cpp>
 #include <DateTime.cpp>
 #include <Iterable/List.cpp>
+#include <Iterable/Span.cpp>
 #include <Network/DNS.cpp>
 #include <Network/DHT/Server.cpp>
 #include <Network/DHT/Handler.cpp>
@@ -16,14 +17,13 @@ int main(int argc, char const *argv[])
 {
     // Init Identity
 
-    const Network::EndPoint Target("192.168.1.17:4444");
-    // const Network::EndPoint Target("127.0.0.1:4444");
+    const Network::EndPoint Target("192.168.1.17:8888");
 
     const Network::EndPoint EndPoint("0.0.0.0:8888");
 
     const Network::DHT::Key Key = Network::DHT::Key::Generate(4);
 
-    const Network::DHT::Node Identity(Key, EndPoint); // <-- @todo Maybe add generate function?
+    const Network::DHT::Node Identity(Key, EndPoint);
 
     // Log End Point
 
@@ -33,9 +33,23 @@ int main(int argc, char const *argv[])
 
     // Run the server
 
-    // Network::DHT::Runner<Network::DHT::Chord> Chrod;
-
     Network::DHT::Chord::Runner Chord(Identity, {5, 0}, 1);
+
+    Chord.OnSet =
+        [](const Core::Network::DHT::Key &Key, const Core::Iterable::Span<char> &Data)
+    {
+        Test::Log("Set") << "{ " << Key << ", " << Data << " }" << std::endl;
+    };
+
+    Chord.OnGet =
+        [&Chord](const Core::Network::DHT::Key &Key, Network::DHT::Chord::Runner::OnGetCallback CB)
+    {
+        Test::Log("Get") << "{ " << Key << " }" << std::endl;
+
+        Iterable::Span<char> Data("Get Received", 12);
+
+        CB(Data);
+    };
 
     Chord.Run();
 
@@ -105,11 +119,25 @@ int main(int argc, char const *argv[])
         }
         else if (Command == "set")
         {
-            //
+            std::string Data = "Hello there";
+            Chord.Set(
+                Network::DHT::Key::Generate(4),
+                {Data.c_str(), Data.length()},
+                []() {});
         }
         else if (Command == "get")
         {
-            //
+            Chord.Get(
+                Network::DHT::Key::Generate(4),
+                [](Iterable::Span<char> &Data, std::function<void()> End)
+                {
+                    Test::Log("Get") << "{ " << Data << " }" << std::endl; 
+                    End();
+                },
+                []()
+                {
+                    std::cout << "Get ended" << std::endl;
+                });
         }
         else if (Command == "print")
         {

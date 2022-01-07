@@ -13,7 +13,6 @@ namespace Core
         private:
             T *_Content = nullptr;
             size_t _Length = 0;
-            bool _Free = true;
 
             _FORCE_INLINE inline T &_ElementAt(size_t Index)
             {
@@ -27,10 +26,9 @@ namespace Core
 
         public:
             Span() = default;
-            Span(size_t Size, bool AutoFree = true) : _Content(new T[Size]), _Length(Size), _Free(AutoFree) {}
-            Span(T *Array, size_t Size, bool AutoFree = true) : _Content(Array), _Length(Size), _Free(AutoFree) {}
-            Span(Span &&Other) : _Content(Other._Content), _Length(Other._Length), _Free(Other._Free) {}
-            Span(const Span &Other) : _Content(new T[Other._Length]), _Length(Other._Length), _Free(Other._Free)
+            Span(size_t Size) : _Content(new T[Size]), _Length(Size) {}
+            Span(Span &&Other) : _Content(Other._Content), _Length(Other._Length) {}
+            Span(const Span &Other) : _Content(new T[Other._Length]), _Length(Other._Length)
             {
                 for (size_t i = 0; i < Other._Length; i++)
                 {
@@ -38,10 +36,18 @@ namespace Core
                 }
             }
 
+            Span(const T *Array, size_t Size, bool AutoFree = true) : _Content(new T[Size]), _Length(Size) 
+            {
+                for (size_t i = 0; i < Size; i++)
+                {
+                    _Content[i] = Array[i];
+                }
+                
+            }
+
             ~Span()
             {
-                if (_Free)
-                    Free();
+                Free();
             }
 
             T *Content() const
@@ -135,7 +141,6 @@ namespace Core
 
             Span &operator=(const Span &Other)
             {
-                _Free = Other._Free;
                 _Length = Other._Length;
 
                 delete[] _Content;
@@ -151,12 +156,27 @@ namespace Core
 
             Span &operator=(Span &&Other)
             {
-                _Free = Other._Free;
                 _Length = Other._Length;
                 std::swap(_Content, Other._Content);
 
                 return *this;
             }
+
+            // Funtionalities
+
+            std::string ToString()
+            {
+                std::stringstream ss;
+
+                for (size_t i = 0; i < this->_Length; i++)
+                {
+                    ss << this->_Content[i] << '\n';
+                }
+
+                return ss.str();
+            }
+
+            // Operators
 
             bool operator==(const Span &Other) noexcept
             {
@@ -184,6 +204,18 @@ namespace Core
                 }
 
                 return true;
+            }
+
+            friend std::ostream &operator<<(std::ostream &os, const Span &List)
+            {
+                // Check for << opeartor
+
+                for (size_t i = 0; i < List._Length; i++)
+                {
+                    os << List._ElementAt(i);
+                }
+
+                return os;
             }
         };
     }
