@@ -17,7 +17,7 @@ int main(int argc, char const *argv[])
 {
     // Init Identity
 
-    const Network::EndPoint Target("192.168.1.17:8888");
+    const Network::EndPoint Target("5.123.18.87:8888");
 
     const Network::EndPoint EndPoint("0.0.0.0:8888");
 
@@ -149,7 +149,13 @@ int main(int argc, char const *argv[])
         }
         else if (Command == "data")
         {
-            Chord.SendTo(Target, {"Sending data", 12});
+            std::string Message;
+
+            std::cout << "Enter data : ";
+
+            std::cin >> Message; 
+
+            Chord.SendTo(Target, {Message.c_str(), Message.length()});
         }
         else if (Command == "print")
         {
