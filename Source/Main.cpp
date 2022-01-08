@@ -17,7 +17,13 @@ int main(int argc, char const *argv[])
 {
     // Init Identity
 
-    const Network::EndPoint Target("5.123.18.87:8888");
+    std::cout << "Enter target ip : ";
+
+    std::string TargetString;
+
+    std::cin >> TargetString;
+
+    const Network::EndPoint Target(TargetString);
 
     const Network::EndPoint EndPoint("0.0.0.0:8888");
 
