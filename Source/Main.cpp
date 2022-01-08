@@ -51,6 +51,12 @@ int main(int argc, char const *argv[])
         CB(Data);
     };
 
+    Chord.OnData =
+        [](Core::Iterable::Span<char> &Data)
+    {
+        Test::Log("Data") << Data << std::endl;
+    };
+
     Chord.Run();
 
     // Chord.Await(); // <--- Await all requests to be finished
@@ -78,7 +84,7 @@ int main(int argc, char const *argv[])
         {
             Chord.Query(
                 Target,
-                Identity.Id,
+                Network::DHT::Key::Generate(4),
                 [](Network::DHT::Node Result, Network::DHT::Handler::EndCallback End)
                 {
                     Test::Log("Query") << Result.EndPoint << std::endl;
@@ -92,8 +98,7 @@ int main(int argc, char const *argv[])
         else if (Command == "route")
         {
             Chord.Route(
-                Target,
-                Identity.Id,
+                Network::DHT::Key::Generate(4),
                 [](Network::DHT::Node Result, Network::DHT::Handler::EndCallback End)
                 {
                     Test::Log("Route") << Result.EndPoint << std::endl;
@@ -123,7 +128,10 @@ int main(int argc, char const *argv[])
             Chord.Set(
                 Network::DHT::Key::Generate(4),
                 {Data.c_str(), Data.length()},
-                []() {});
+                []()
+                {
+                    std::cout << "Set ended" << std::endl;
+                });
         }
         else if (Command == "get")
         {
@@ -131,13 +139,17 @@ int main(int argc, char const *argv[])
                 Network::DHT::Key::Generate(4),
                 [](Iterable::Span<char> &Data, std::function<void()> End)
                 {
-                    Test::Log("Get") << "{ " << Data << " }" << std::endl; 
+                    Test::Log("Get") << "{ " << Data << " }" << std::endl;
                     End();
                 },
                 []()
                 {
                     std::cout << "Get ended" << std::endl;
                 });
+        }
+        else if (Command == "data")
+        {
+            Chord.SendTo(Target, {"Sending data", 12});
         }
         else if (Command == "print")
         {

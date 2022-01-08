@@ -17,6 +17,8 @@
  *
  * @todo Optimize adding and removing node by using binary tree or linked list
  * @todo Network::DHT::Runner<Network::DHT::Chord> Chrod syntax
+ * @todo Nodes mutex and lock
+ * @todo Optimization
  * @version 0.1
  * @date 2022-01-03
  *
@@ -236,7 +238,7 @@ namespace Core
                                         node.EndPoint,
                                         [&Data](Format::Serializer &Serializer)
                                         {
-                                            Serializer << (char) Operations::Response << Data;
+                                            Serializer << (char)Operations::Response << Data;
                                         });
                                 });
 
@@ -287,10 +289,9 @@ namespace Core
 
                     typedef std::function<void(Iterable::Span<char> &)> OnGetCallback;
 
-                    std::function<void(const Key &, OnGetCallback)> OnGet;
-                    std::function<void(const Key &, const Iterable::Span<char> &)> OnSet;
-                    std::function<void(Iterable::Span<char>)> OnData;
-                    std::function<void(Iterable::Span<char>)> OnFlood;
+                    std::function<void(const Key &, const Iterable::Span<char> &)> OnSet = [](const Core::Network::DHT::Key &Key, const Core::Iterable::Span<char> &Data) {};
+                    std::function<void(const Key &, OnGetCallback)> OnGet = [](const Core::Network::DHT::Key &Key, Network::DHT::Chord::Runner::OnGetCallback CB) {};
+                    std::function<void(Iterable::Span<char> &)> OnData = [](Core::Iterable::Span<char> &Data) {};
 
                     // ### Constructors
 
@@ -571,7 +572,6 @@ namespace Core
                                 try
                                 {
                                     Serializer >> node;
-                                    Test::Log("Query") << "Routed to " << node.EndPoint << std::endl;
                                     CB(std::move(node), std::move(End));
                                 }
                                 catch (const std::exception &e)
@@ -598,7 +598,7 @@ namespace Core
                             Id,
                             [this, Peer, Id, CB = std::move(Callback)](Node Response, const Handler::EndCallback &End)
                             {
-                                if (Response.Id == Identity.Id)
+                                [[unlikely]] if (Response.Id == Identity.Id)
                                 {
                                     End();
                                     return;
@@ -625,7 +625,7 @@ namespace Core
 
                         const auto &Peer = Resolve(Id);
 
-                        if (Peer.Id == Identity.Id)
+                        [[unlikely]] if (Peer.Id == Identity.Id)
                         {
                             Callback(Identity, std::move(End));
                             return;
@@ -705,11 +705,7 @@ namespace Core
 
                     inline void Bootstrap(const Network::EndPoint &Peer, BootstrapCallback Callback, Handler::EndCallback End)
                     {
-                        Bootstrap(
-                            Peer,
-                            Identity.Id.Size,
-                            std::move(Callback),
-                            std::move(End));
+                        Bootstrap(Peer, Identity.Id.Size, std::move(Callback), std::move(End));
                     }
 
                     typedef std::function<void(Iterable::Span<char> &Data, Handler::EndCallback)> GetCallback;
@@ -751,7 +747,6 @@ namespace Core
                             key,
                             [this, key, CB = std::move(Callback)](Node Peer, Handler::EndCallback End)
                             {
-                                
                                 if (Peer.Id == Identity.Id)
                                 {
                                     OnGet(
@@ -760,7 +755,7 @@ namespace Core
                                         {
                                             CB(Data, End);
                                         });
-                                    
+
                                     return;
                                 }
 
@@ -819,6 +814,26 @@ namespace Core
                             });
                     }
 
+                    void SendWhere(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data,
+                                    const std::function<bool(const Node &)> &Condition)
+                    {
+                        Nodes.ForEach(
+                            [this, &Data, &Condition](Node &node)
+                            {
+                                if (Condition(node))
+                                    Fire(
+                                        node.EndPoint,
+
+                                        // Build buffer
+                                        // Data - Data
+
+                                        [this, &Data](Format::Serializer &Serializer)
+                                        {
+                                            Serializer << (char)Operations::Data << Data;
+                                        });
+                            });
+                    }
+
                     // Flood
 
                     void Flood(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data)
@@ -836,26 +851,6 @@ namespace Core
                                     {
                                         Serializer << (char)Operations::Data << Data;
                                     });
-                            });
-                    }
-
-                    void FloodWhere(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data,
-                                    const std::function<bool(const Node &)> &Condition)
-                    {
-                        Nodes.ForEach(
-                            [this, &Data, &Condition](Node &node)
-                            {
-                                if (Condition(node))
-                                    Fire(
-                                        node.EndPoint,
-
-                                        // Build buffer
-                                        // Data - Data
-
-                                        [this, &Data](Format::Serializer &Serializer)
-                                        {
-                                            Serializer << (char)Operations::Data << Data;
-                                        });
                             });
                     }
                 };

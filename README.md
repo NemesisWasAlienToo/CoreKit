@@ -13,8 +13,8 @@ Core Kit is general purpose c++ 20 library with focus on networking specially co
 
 ## Dependencies
 
-Standard c++ 20 Library
-Openssl 1.1.0 or higher
+- Standard c++ 20 Library
+- Openssl 1.1.0 or higher
 
 ## Instalation
 

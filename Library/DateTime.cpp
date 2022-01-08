@@ -23,10 +23,18 @@ namespace Core
 
         DateTime(timespec spec, struct tm state) : Spec(spec), State(state) {}
 
-        // DateTime(int second, int minute, int hour, int, int day, int month, int year)
-        // {
-        //     State.tm_sec = second;
-        // }
+        DateTime(int year, int month = 0, int day = 0, int hour = 0, int minute = 0, int second = 0, long nanoseconds = 0)
+        {
+            State.tm_sec = second;
+            State.tm_min = minute;
+            State.tm_hour = hour;
+            State.tm_mday = day;
+            State.tm_mon = month;
+            State.tm_year = year;
+
+            Spec.tv_sec = mktime(&State);
+            Spec.tv_nsec = nanoseconds;
+        }
 
         DateTime(const DateTime &Other) : Spec(Other.Spec), State(Other.State) {}
 
@@ -47,13 +55,13 @@ namespace Core
             {
                 return {0, 1};
             }
-            
+
             if (Diff.tv_sec == 0 && Diff.tv_nsec < 0)
             {
                 return {0, 1};
             }
 
-            if(Diff.tv_nsec < 0)
+            if (Diff.tv_nsec < 0)
             {
                 Diff.tv_sec--;
                 Diff.tv_nsec += (long)10e8;
@@ -72,7 +80,7 @@ namespace Core
             Spec.tv_nsec += nanosecond;
         }
 
-        void Add(const Duration& duration)
+        void Add(const Duration &duration)
         {
             Spec.tv_sec += duration.Seconds;
             Spec.tv_nsec += duration.Nanoseconds;
@@ -150,6 +158,21 @@ namespace Core
             Spec.tv_sec = mktime(&State);
         }
 
+        inline int DayOfWeek() const
+        {
+            return State.tm_wday;
+        }
+
+        inline int DayOfYear() const
+        {
+            return State.tm_yday;
+        }
+
+        inline std::string Zone() const
+        {
+            return State.tm_zone;
+        }
+
         std::string ToString() const
         {
             char buffer[40];
@@ -205,13 +228,13 @@ namespace Core
             {
                 return {0, 1};
             }
-            
+
             if (Diff.tv_sec == 0 && Diff.tv_nsec < 0)
             {
                 return {0, 1};
             }
 
-            if(Diff.tv_nsec < 0)
+            if (Diff.tv_nsec < 0)
             {
                 Diff.tv_sec--;
                 Diff.tv_nsec += (long)10e8;
