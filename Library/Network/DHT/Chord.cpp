@@ -379,7 +379,11 @@ namespace Core
                     {
                         size_t Index;
 
-                        if (Nodes.Contains(node))
+                        if (Nodes.ContainsWhere(
+                                [&node](Node &Item) -> bool
+                                {
+                                    return Item.Id == node.Id;
+                                }))
                             return;
 
                         if (Nodes.ContainsWhere(
@@ -815,7 +819,7 @@ namespace Core
                     }
 
                     void SendWhere(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data,
-                                    const std::function<bool(const Node &)> &Condition)
+                                   const std::function<bool(const Node &)> &Condition)
                     {
                         Nodes.ForEach(
                             [this, &Data, &Condition](Node &node)
