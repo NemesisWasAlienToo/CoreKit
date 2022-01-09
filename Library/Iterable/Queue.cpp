@@ -56,9 +56,9 @@ namespace Core
 
             // ### Properties
 
-            Span<T> Chunk()
+            size_t Chunk()
             {
-                return Span<T>(&(this->_Content[_First]), std::min((this->_Capacity - this->_Length), this->_Length), false);
+                return std::min((this->_Capacity - this->_Length), this->_Length);
             }
 
             // ### Public Functions

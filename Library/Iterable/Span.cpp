@@ -11,8 +11,8 @@ namespace Core
         class Span
         {
         private:
-            T *_Content = nullptr;
             size_t _Length = 0;
+            T *_Content = nullptr;
 
             _FORCE_INLINE inline T &_ElementAt(size_t Index)
             {
@@ -26,9 +26,9 @@ namespace Core
 
         public:
             Span() = default;
-            Span(size_t Size) : _Content(new T[Size]), _Length(Size) {}
-            Span(Span &&Other) : _Content(Other._Content), _Length(Other._Length) {}
-            Span(const Span &Other) : _Content(new T[Other._Length]), _Length(Other._Length)
+            Span(size_t Size) : _Length(Size), _Content(new T[Size]) {}
+            Span(Span &&Other) : _Length(Other._Length), _Content(Other._Content) {}
+            Span(const Span &Other) : _Length(Other._Length), _Content(new T[Other._Length])
             {
                 for (size_t i = 0; i < Other._Length; i++)
                 {
@@ -36,18 +36,18 @@ namespace Core
                 }
             }
 
-            Span(const T *Array, size_t Size, bool AutoFree = true) : _Content(new T[Size]), _Length(Size) 
+            Span(const T *Array, size_t Size) : _Length(Size) , _Content(new T[Size])
             {
                 for (size_t i = 0; i < Size; i++)
                 {
                     _Content[i] = Array[i];
                 }
-                
             }
 
             ~Span()
             {
-                Free();
+                delete[] _Content;
+                _Content = nullptr;
             }
 
             T *Content() const
@@ -58,12 +58,6 @@ namespace Core
             size_t Length() const
             {
                 return _Length;
-            }
-
-            void Free()
-            {
-                delete[] _Content;
-                _Content = nullptr;
             }
 
             bool Contains(const T &Item) const

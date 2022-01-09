@@ -3,7 +3,7 @@
 | WARNING: This library is still in heavy development and might contain bugs or undergo heavy changes at any time. |
 | --- |
 
-Core Kit is general purpose c++ 20 library with focus on networking specially containing commonly used features and Chord DHT architecture implementation.
+Core Kit is general purpose c++ 20 library with focus on networking specially containing commonly used tools and DHT node runner implementation.
 
 ## Project architecture
 
@@ -67,7 +67,7 @@ Checked items are implemented completly at the moment and unchecked items are to
         - [x] Key : N-Byte key (id)
         - [x] Node
         - [x] Server : UDP Server
-        - [ ] Chord : A Chord DHT node runner
+        - [ ] Runner : A DHT node runner
 
 - [ ] Cryptography:
     - [x] Random : Cryptographicly secure random number generation and tools
@@ -78,4 +78,4 @@ Checked items are implemented completly at the moment and unchecked items are to
 ## To do
 
 - Optimize Http request, response and server
-- Optimize Chord node lookup, insert and remove using linked list or binary tree
+- Optimize DHT node lookup, insert and remove using linked list or binary tree

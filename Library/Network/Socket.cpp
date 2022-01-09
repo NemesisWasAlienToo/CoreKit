@@ -415,40 +415,76 @@ namespace Core
 
             const Socket &operator<<(Iterable::Queue<char> &queue) const
             {
-                auto _Buffer = queue.Chunk();
+                // @todo Clarify on blocking and nnon-blocking
 
-                int Result = write(_INode, _Buffer.Content(), _Buffer.Length());
+                size_t _Size;
+                int Result;
+
+                for(;;)
+                {
+                    _Size = queue.Chunk();
+
+                    if(_Size == 0)
+                    {
+                        break;
+                    }
+
+                    Result = write(_INode, &queue.First(), _Size);
+
+                    if(Result > 0)
+                    {
+                        queue.Free(Result);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
 
                 // Error handling here
 
-                if (Result < 0)
+                if (Result < 0 && errno != EAGAIN)
                 {
                     throw std::system_error(errno, std::generic_category());
                 }
-
-                // ### Probably send more if can?
-
-                queue.Free(Result);
 
                 return *this;
             }
 
             Socket &operator<<(Iterable::Queue<char> &queue)
             {
-                auto _Buffer = queue.Chunk();
+                // @todo Clarify on blocking and nnon-blocking
 
-                int Result = write(_INode, _Buffer.Content(), _Buffer.Length());
+                size_t _Size;
+                int Result;
+
+                for(;;)
+                {
+                    _Size = queue.Chunk();
+
+                    if(_Size == 0)
+                    {
+                        break;
+                    }
+
+                    Result = write(_INode, &queue.First(), _Size);
+
+                    if(Result > 0)
+                    {
+                        queue.Free(Result);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
 
                 // Error handling here
 
-                if (Result < 0)
+                if (Result < 0 && errno != EAGAIN)
                 {
                     throw std::system_error(errno, std::generic_category());
                 }
-
-                // ### Probably send more if can?
-
-                queue.Free(Result);
 
                 return *this;
             }

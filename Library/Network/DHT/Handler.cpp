@@ -115,7 +115,7 @@ namespace Core
                     
                     ExpireEvent.Value();
 
-                    std::lock_guard Lock(_Lock);
+                    std::lock_guard<std::mutex> Lock(_Lock);
 
                     if (Has(_Closest.first))
                     {
@@ -137,7 +137,7 @@ namespace Core
                     if (Expire <= DateTime::Now())
                         throw std::invalid_argument("expire time cannot be now or in the past");
 
-                    std::lock_guard Lock(_Lock);
+                    std::lock_guard<std::mutex> Lock(_Lock);
 
                     if (Has(EndPoint))
                         return false;
@@ -161,7 +161,7 @@ namespace Core
 
                 void Replace(const Network::EndPoint &EndPoint, const Callback &Routine, const DateTime &Expire)
                 {
-                    std::lock_guard Lock(_Lock);
+                    std::lock_guard<std::mutex> Lock(_Lock);
 
                     _Content[EndPoint] = {Routine, Expire};
 
@@ -182,7 +182,7 @@ namespace Core
                 {
                     // @todo Optimize access
 
-                    std::lock_guard Lock(_Lock);
+                    std::lock_guard<std::mutex> Lock(_Lock);
 
                     if (!Has(EndPoint))
                     {

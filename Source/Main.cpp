@@ -9,13 +9,25 @@
 #include <Network/DNS.cpp>
 #include <Network/DHT/Server.cpp>
 #include <Network/DHT/Handler.cpp>
-#include <Network/DHT/Chord.cpp>
+#include <Network/DHT/Runner.cpp>
 
 using namespace Core;
 
 int main(int argc, char const *argv[])
 {
     // Init Identity
+
+    const Network::DHT::Node Identity(Network::DHT::Key::Generate(4), {"0.0.0.0:8888"});
+
+    Test::Log("Identity") << Identity.Id.ToString() << std::endl;
+
+    // Log End Point
+
+    Test::Log(Network::DNS::HostName()) << Identity.EndPoint << std::endl;
+
+    Test::Log("Identity") << Identity.Id.ToString() << std::endl;
+
+    // Setup a target
 
     std::cout << "Enter target ip : ";
 
@@ -25,43 +37,33 @@ int main(int argc, char const *argv[])
 
     const Network::EndPoint Target(TargetString);
 
-    const Network::EndPoint EndPoint("0.0.0.0:8888");
+    // Setup the server
 
-    const Network::DHT::Key Key = Network::DHT::Key::Generate(4);
-
-    const Network::DHT::Node Identity(Key, EndPoint);
-
-    // Log End Point
-
-    Test::Log(Network::DNS::HostName()) << EndPoint << std::endl;
-
-    Test::Log("Identity") << Identity.Id.ToString() << std::endl;
-
-    // Run the server
-
-    Network::DHT::Chord::Runner Chord(Identity, {5, 0}, 1);
+    Network::DHT::Runner Chord(Identity, {5, 0}, 1);
 
     Chord.OnSet =
         [](const Core::Network::DHT::Key &Key, const Core::Iterable::Span<char> &Data)
-    {
-        Test::Log("Set") << "{ " << Key << ", " << Data << " }" << std::endl;
-    };
+        {
+            Test::Log("Set") << "{ " << Key << ", " << Data << " }" << std::endl;
+        };
 
     Chord.OnGet =
-        [&Chord](const Core::Network::DHT::Key &Key, Network::DHT::Chord::Runner::OnGetCallback CB)
-    {
-        Test::Log("Get") << "{ " << Key << " }" << std::endl;
+        [&Chord](const Core::Network::DHT::Key &Key, Network::DHT::Runner::OnGetCallback CB)
+        {
+            Test::Log("Get") << "{ " << Key << " }" << std::endl;
 
-        Iterable::Span<char> Data("Get Received", 12);
+            Iterable::Span<char> Data("Get Received", 12);
 
-        CB(Data);
-    };
+            CB(Data);
+        };
 
     Chord.OnData =
         [](Core::Iterable::Span<char> &Data)
-    {
-        Test::Log("Data") << Data << std::endl;
-    };
+        {
+            Test::Log("Data") << Data << std::endl;
+        };
+
+    // Run the server
 
     Chord.Run();
 
@@ -71,8 +73,6 @@ int main(int argc, char const *argv[])
 
     while (Command != "exit")
     {
-        // Perform Route
-
         if (Command == "ping")
         {
             Chord.Ping(

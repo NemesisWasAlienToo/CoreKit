@@ -88,7 +88,7 @@ namespace Core
                     }
 
                     {
-                        std::lock_guard Lock(IncommingLock);
+                        std::lock_guard<std::mutex> Lock(IncommingLock);
 
                         if (!Incomming.IsEmpty())
                             Request = Incomming.Take();
@@ -118,7 +118,7 @@ namespace Core
                     Serializer.Modify<uint32_t>(4) = htonl(request.Buffer.Length());
 
                     {
-                        std::lock_guard lock(OutgoingLock);
+                        std::lock_guard<std::mutex> lock(OutgoingLock);
 
                         Outgoing.Add(std::move(request));
                     }
@@ -153,7 +153,7 @@ namespace Core
                     Request.Buffer = std::move(Buffer);
 
                     {
-                        std::lock_guard lock(OutgoingLock);
+                        std::lock_guard<std::mutex> lock(OutgoingLock);
 
                         Outgoing.Add(std::move(Request));
                     }
@@ -281,7 +281,7 @@ namespace Core
                                     {
                                         // @todo try lock for non-blocking
 
-                                        std::lock_guard lock(IncommingLock);
+                                        std::lock_guard<std::mutex> lock(IncommingLock);
 
                                         Incomming.Add(_Receives.Swap(Index));
                                     }
@@ -311,7 +311,7 @@ namespace Core
                         {
                             // @todo try lock for non-blocking
 
-                            std::lock_guard lock(OutgoingLock);
+                            std::lock_guard<std::mutex> lock(OutgoingLock);
 
                             while (!Outgoing.IsEmpty())
                             {

@@ -16,13 +16,13 @@ namespace Core
     {
         namespace DHT
         {
-            class Bucket
+            class Policy
             {
             private:
                 Iterable::List<Node> Nodes;
             public:
-                Bucket(size_t KeySize);
-                ~Bucket();
+                Policy(size_t KeySize);
+                ~Policy();
             };
             
         }
