@@ -19,17 +19,10 @@ namespace Core
             {
                 // ### Types
 
-                enum class States : char
-                {
-                    Present = 0,
-                    Absent,
-                };
-
                 // ### Variables
 
                 Key Id;
                 Network::EndPoint EndPoint;
-                States State;
 
                 // ### Constructors
 
@@ -37,11 +30,11 @@ namespace Core
 
                 Node(size_t KeySize) : Id(KeySize) {}
 
-                Node(Key id, Network::EndPoint endPoint, States state = States::Present) : Id(id), EndPoint(endPoint), State(state) {}
+                Node(Key id, Network::EndPoint endPoint) : Id(id), EndPoint(endPoint) {}
 
-                Node(Node &&Other) : Id(std::move(Other.Id)), EndPoint(Other.EndPoint), State(Other.State) {}
+                Node(Node &&Other) : Id(std::move(Other.Id)), EndPoint(Other.EndPoint) {}
 
-                Node(const Node &Other) : Id(Other.Id), EndPoint(Other.EndPoint), State(Other.State) {}
+                Node(const Node &Other) : Id(Other.Id), EndPoint(Other.EndPoint) {}
 
                 // Operators
 
@@ -49,7 +42,6 @@ namespace Core
                 {
                     Id = std::move(Other.Id);
                     EndPoint = Other.EndPoint;
-                    State = Other.State;
 
                     return *this;
                 }
@@ -58,7 +50,6 @@ namespace Core
                 {
                     Id = Other.Id;
                     EndPoint = Other.EndPoint;
-                    State = Other.State;
 
                     return *this;
                 }
@@ -66,15 +57,13 @@ namespace Core
                 bool operator==(const Node &Other) const
                 {
                     return Id == Other.Id &&
-                           EndPoint == Other.EndPoint &&
-                           State == Other.State;
+                           EndPoint == Other.EndPoint;
                 }
 
                 bool operator!=(const Node &Other) const
                 {
                     return Id != Other.Id ||
-                           EndPoint != Other.EndPoint ||
-                           State != Other.State;
+                           EndPoint != Other.EndPoint;
                 }
             };
         }

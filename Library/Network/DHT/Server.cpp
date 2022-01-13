@@ -1,3 +1,14 @@
+/**
+ * @file Server.cpp
+ * @author Nemesis (github.com/NemesisWasAlienToo)
+ * @brief
+ * @todo Add time out for incomming and out going requests
+ * @version 0.1
+ * @date 2022-01-11
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
 #pragma once
 
 #include <iostream>
@@ -6,6 +17,7 @@
 #include <thread>
 #include <functional>
 
+#include "Test.cpp"
 #include "Event.cpp"
 
 #include "Network/EndPoint.cpp"
@@ -16,8 +28,6 @@
 
 #include <Format/Serializer.cpp>
 #include "Network/DHT/Request.cpp"
-
-using namespace Core;
 
 namespace Core
 {
@@ -46,6 +56,11 @@ namespace Core
                 std::mutex OutgoingLock;
                 Iterable::Queue<Network::DHT::Request> Outgoing;
 
+                inline void Interrupt()
+                {
+                    _Interrupt.Emit(1);
+                }
+
             public:
                 enum class States : uint8_t
                 {
@@ -59,15 +74,10 @@ namespace Core
 
                 Server() = default;
 
-                Server(const Network::EndPoint& EndPoint) : _Socket(Network::Socket::IPv4, Network::Socket::UDP), _Interrupt(0, 0),
-                _Sends(1), _Receives(1), Incomming(1), Outgoing(1), State(States::Stopped), Ready(0, Event::Semaphore)
+                Server(const Network::EndPoint &EndPoint) : _Socket(Network::Socket::IPv4, Network::Socket::UDP), _Interrupt(0, 0),
+                                                            _Sends(1), _Receives(1), Incomming(1), Outgoing(1), State(States::Stopped), Ready(0, Event::Semaphore)
                 {
                     _Socket.Bind(EndPoint);
-                }
-
-                inline void Interrupt()
-                {
-                    _Interrupt.Emit(1);
                 }
 
                 inline Descriptor Listener()
@@ -100,7 +110,7 @@ namespace Core
                     return true;
                 }
 
-                bool Put(const Network::EndPoint& Peer, const std::function<void(Format::Serializer&)>& Builder, size_t Size = 1024)
+                bool Put(const Network::EndPoint &Peer, const std::function<void(Format::Serializer &)> &Builder, size_t Size = 1024)
                 {
                     if (State != States::Running)
                         return false;
@@ -111,9 +121,9 @@ namespace Core
 
                     Format::Serializer Serializer(request.Buffer);
 
-                    Serializer.Add((char *) "CHRD", 4) << (int) 0;
+                    Serializer.Add((char *)"CHRD", 4) << (int)0;
 
-                    Builder(Serializer); // @todo What to do for async calls?
+                    Builder(Serializer);
 
                     Serializer.Modify<uint32_t>(4) = htonl(request.Buffer.Length());
 
@@ -181,11 +191,11 @@ namespace Core
                     Runner = std::thread(
                         [this]()
                         {
-                            Test::Log("Server") << "Spawning runner" << std::endl;
                             Funtionality();
                         });
                 }
 
+            private:
                 void Funtionality()
                 {
                     Iterable::Poll Poll(2);

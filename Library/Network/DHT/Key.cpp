@@ -100,6 +100,38 @@ namespace Core
                     }
                 }
 
+                bool IsZero()
+                {
+                    for (size_t i = 0; i < Size; i++)
+                    {
+                        if (Data[i])
+                        {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+
+                size_t MSNB()
+                {
+                    for (size_t i = 0; i < Size; i++)
+                    {
+                        if (Data[i])
+                        {
+                            for (size_t j = 0; j < 8; j++)
+                            {
+                                if (((Data[i] << j) & 0x80) != 0)
+                                {
+                                    return (((Size - i) * 8) - j);
+                                }
+                            }
+                        }
+                    }
+
+                    return 0;
+                }
+
                 std::string ToString() const
                 {
                     return Format::Hex::From((char *)Data, Size);
@@ -121,15 +153,17 @@ namespace Core
                     return std::move(Result += *this);
                 }
 
+                // 
                 size_t Critical() const // @todo Important Fix and optimize this
                 {
                     size_t Index = 0;
 
                     Key key = Neighbor(1);
 
-                    for (size_t i = 2; i <= Size * 8; i++)
+                    for (size_t i = 2; i <= NeighborCount(); i++)
                     {
                         Key Next = Neighbor(i);
+                        
                         if (Next > key)
                         {
                             key = std::move(Next);
@@ -214,6 +248,19 @@ namespace Core
                     return Data[Index];
                 }
 
+                operator bool() const
+                {
+                    for (size_t i = 0; i != Size; i++)
+                    {
+                        if (Data[i])
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }
+
                 bool operator>=(const Key &Other) const
                 {
                     for (size_t i = 0; i < Size; i++)
@@ -284,6 +331,33 @@ namespace Core
                     return false;
                 }
 
+                Key operator+(const size_t &Number) const
+                {
+                    size_t Other = Number;
+                    Key Result(Size);
+
+                    char Carry = 0;
+
+                    unsigned short Buffer = 0;
+
+                    for (int i = Size - 1; i >= 0; i--)
+                    {
+                        Buffer = Data[i] + (Other & 0xff) + Carry;
+
+                        Result[i] = Buffer & 0xFF;
+
+                        Carry = Buffer >> 8;
+                        Other = Other >> 8;
+
+                        if(Carry == 0 && Other == 0)
+                        {
+                            break;
+                        }
+                    }
+
+                    return Result;
+                }
+
                 Key operator+(const Key &Other) const
                 {
                     Key Result(Size);
@@ -339,6 +413,33 @@ namespace Core
                 Key operator-(const Key &Other) const
                 {
                     return *this + (-Other);
+                }
+
+                Key operator+=(const size_t &Number)
+                {
+                    size_t Other = Number;
+                    Key Result(Size);
+
+                    char Carry = 0;
+
+                    unsigned short Buffer = 0;
+
+                    for (int i = Size - 1; i >= 0; i--)
+                    {
+                        Buffer = Data[i] + (Other & 0xff) + Carry;
+
+                        Data[i] = Buffer & 0xFF;
+
+                        Carry = Buffer >> 8;
+                        Other = Other >> 8;
+
+                        if(Carry == 0 && Other == 0)
+                        {
+                            break;
+                        }
+                    }
+
+                    return Result;
                 }
 
                 Key &operator+=(const Key &Other)
@@ -401,6 +502,18 @@ namespace Core
                     return Result;
                 }
 
+                Key operator^(const Key &Other) const
+                {
+                    Key Result(Size);
+
+                    for (int i = Size - 1; i >= 0; i--)
+                    {
+                        Result[i] = Data[i] ^ Other.Data[i];
+                    }
+
+                    return Result;
+                }
+
                 Key &operator&=(const Key &Other)
                 {
                     for (size_t i = Size - 1; i >= 0; i--)
@@ -421,9 +534,19 @@ namespace Core
                     return *this;
                 }
 
-                friend std::ostream& operator<<(std::ostream& os, const Key& key)
+                friend std::ostream &operator<<(std::ostream &os, const Key &key)
                 {
                     return os << key.ToString();
+                }
+
+                Key &operator^=(const Key &Other)
+                {
+                    for (size_t i = Size - 1; i >= 0; i--)
+                    {
+                        Data[i] ^= Other.Data[i];
+                    }
+
+                    return *this;
                 }
 
                 // Key operator<<(size_t Count) const

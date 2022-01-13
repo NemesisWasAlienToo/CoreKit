@@ -104,17 +104,17 @@ namespace Core
 
             // ### Properties
 
-            T *Content()
+            T *Content() const
             {
                 return _Content;
             }
 
-            size_t Length()
+            size_t Length() const
             {
                 return _Length;
             }
 
-            size_t Capacity()
+            size_t Capacity() const
             {
                 return _Capacity;
             }

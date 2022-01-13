@@ -7,8 +7,6 @@
 #include <Iterable/List.cpp>
 #include <Iterable/Span.cpp>
 #include <Network/DNS.cpp>
-#include <Network/DHT/Server.cpp>
-#include <Network/DHT/Handler.cpp>
 #include <Network/DHT/Runner.cpp>
 
 using namespace Core;
@@ -91,9 +89,9 @@ int main(int argc, char const *argv[])
             Chord.Query(
                 Target,
                 Network::DHT::Key::Generate(4),
-                [](Network::DHT::Node Result, Network::DHT::Handler::EndCallback End)
+                [](Iterable::List<Network::DHT::Node> Result, Network::DHT::Handler::EndCallback End)
                 {
-                    Test::Log("Query") << Result.EndPoint << std::endl;
+                    Test::Log("Query") << Result[0].EndPoint << std::endl;
                     End();
                 },
                 []()
@@ -105,9 +103,9 @@ int main(int argc, char const *argv[])
         {
             Chord.Route(
                 Network::DHT::Key::Generate(4),
-                [](Network::DHT::Node Result, Network::DHT::Handler::EndCallback End)
+                [](Iterable::List<Network::DHT::Node> Result, Network::DHT::Handler::EndCallback End)
                 {
-                    Test::Log("Route") << Result.EndPoint << std::endl;
+                    Test::Log("Route") << Result[0].EndPoint << std::endl;
                     End();
                 },
                 []()
@@ -163,14 +161,14 @@ int main(int argc, char const *argv[])
 
             Chord.SendTo(Target, {Message.c_str(), Message.length()});
         }
-        else if (Command == "print")
-        {
-            Chord.Nodes.ForEach(
-                [](Network::DHT::Node &node)
-                {
-                    std::cout << node.Id.ToString() << std::endl;
-                });
-        }
+        // else if (Command == "print")
+        // {
+        //     Chord.Nodes.ForEach(
+        //         [](Network::DHT::Node &node)
+        //         {
+        //             std::cout << node.Id.ToString() << std::endl;
+        //         });
+        // }
 
         std::cout << "Waiting for command, master : " << std::endl;
 

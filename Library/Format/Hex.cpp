@@ -20,7 +20,7 @@ namespace Core
             {
                 return ((Digit(Big) << 4) + Digit(Small));
             }
-            
+
             inline int PlainSize(int Size)
             {
                 return Size / 2;
@@ -28,7 +28,23 @@ namespace Core
 
             inline int CypherSize(int Size)
             {
-                return 2 *  Size;
+                return 2 * Size;
+            }
+
+            template <typename T>
+            std::string From(const T &Item)
+            {
+                const char *Data = (char *)&Item;
+                std::stringstream ss;
+
+                for (size_t i = 0; i < sizeof(Item); i++)
+                {
+                    // @ todo optimize this
+
+                    ss << std::hex << std::setw(2) << std::setfill('0') << ((short)Data[i] & 0xff);
+                }
+
+                return ss.str();
             }
 
             std::string From(const char *Data, size_t Size)

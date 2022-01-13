@@ -77,5 +77,27 @@ Checked items are implemented completly at the moment and unchecked items are to
 
 ## To do
 
-- Optimize Http request, response and server
-- Optimize DHT node lookup, insert and remove using linked list or binary tree
+- Iterable:
+    - Add Map
+    - Add (red-black & AVL) binary search trees
+
+- Cryptography:
+    - Add SHA3
+    - Add AES
+
+- Http:
+    - Optimize Http request, response
+    - Add http Server server
+
+- DHT:
+    - Cache time out and swap out policy
+    - Remove dedicated thread for server
+    - Listen and Dispatch architecture for Server and Handler
+    - Task queue between Runner and Server-Handler
+    - Redefine fundamental operation data structures
+    - Node should perform self look up to notify others
+    - Node should update its key values after join
+    - End Callbakc Status
+    - Server Send and Receive time out
+    - Runner shared state for multiple operations
+    - Multiple values for a key

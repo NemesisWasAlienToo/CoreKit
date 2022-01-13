@@ -10,7 +10,7 @@
  *      Response   : [ [ Header - Size ] - My id ] - Response Specifier - Data
  *      Invalid    : [ [ Header - Size ] - My id ] - Invalid Specifier - Cause of failure
  *      Ping       : [ [ Header - Size ] - My id ] - Ping Specifier - My ID
- *      Query      : [ [ Header - Size ] - My id ] - Query Specifier - Target ID -> [ Header - Size - Their id ] - Response Specifier - Node
+ *      Query      : [ [ Header - Size ] - My id ] - Query Specifier - Target ID
  *      Set        : [ [ Header - Size ] - My id ] - Set Specifier - Key - Data
  *      Get        : [ [ Header - Size ] - My id ] - Get Specifier - Key
  *      Data       : [ [ Header - Size ] - My id ] - Data Specifier - Data
@@ -35,6 +35,7 @@
 #include "Network/EndPoint.cpp"
 #include "Network/DHT/Node.cpp"
 #include "Network/DHT/Server.cpp"
+#include "Network/DHT/Cache.cpp"
 #include "Network/DHT/Handler.cpp"
 #include "Iterable/List.cpp"
 #include "Iterable/Span.cpp"
@@ -42,8 +43,6 @@
 #include "Format/Serializer.cpp"
 #include "Duration.cpp"
 #include "Test.cpp"
-
-using namespace Core;
 
 namespace Core
 {
@@ -85,8 +84,7 @@ namespace Core
 
                 Iterable::List<std::thread> Pool;
 
-            public:
-                Iterable::List<Node> Nodes;
+                Network::DHT::Cache Cache;
 
             private:
                 std::function<void()> _PoolTask =
@@ -99,7 +97,7 @@ namespace Core
                     Poll.Add(Server.Listener(), Descriptor::In);
                     Poll.Add(Handler.Listener(), Descriptor::In);
 
-                    while (Server.State == Network::DHT::Server::States::Running)
+                    while (Server.State == Server::States::Running)
                     {
                         Network::DHT::Request Request;
                         Handler::Callback Task;
@@ -109,7 +107,7 @@ namespace Core
 
                         if (Poll[0].HasEvent())
                         {
-                            if (Server.State != Network::DHT::Server::States::Running)
+                            if (Server.State != Server::States::Running)
                             {
                                 break;
                             }
@@ -127,7 +125,7 @@ namespace Core
                                 node.EndPoint = Request.Peer;
                                 Ser >> node.Id;
 
-                                Add(node);
+                                Cache.Add(node);
 
                                 Task(node, Ser, End);
                             }
@@ -166,7 +164,7 @@ namespace Core
 
                     // Handle this new node
 
-                    Add(node);
+                    Cache.Add(node);
 
                     // Get request type
 
@@ -197,7 +195,7 @@ namespace Core
                             {
                                 Response << (char)Operations::Response;
 
-                                Response << Resolve(key);
+                                Response << Cache.Resolve(key);
                             });
 
                         break;
@@ -285,9 +283,9 @@ namespace Core
 
                 Runner() = default;
 
-                Runner(const Node &identity, Duration Timeout, size_t ThreadCount = 1) : Identity(identity), Server(identity.EndPoint), Handler(), Pool(ThreadCount, false), Nodes(Identity.Id.Size + 1), TimeOut(Timeout)
+                Runner(const Node &identity, Duration Timeout, size_t ThreadCount = 1) : Identity(identity), Server(identity.EndPoint), Handler(), Pool(ThreadCount, false), Cache(Identity.Id), TimeOut(Timeout)
                 {
-                    Nodes.Add({Identity.Id, {"0.0.0.0:0"}});
+                    Cache.Add({Identity.Id, {"0.0.0.0:0"}});
                 }
 
                 // ### Static functions
@@ -298,102 +296,6 @@ namespace Core
                 }
 
                 // ### Functionalities
-
-                Node &Resolve(const Key &key)
-                {
-                    size_t Index;
-
-                    if (Nodes.ContainsWhere(
-                            Index,
-                            [this, &key](Node &Item) -> bool
-                            {
-                                return Item.Id < key;
-                            }))
-                    {
-                        return Nodes[Index];
-                    }
-                    else
-                    {
-                        return Nodes.First();
-                    }
-                }
-
-                size_t ResolveAt(const Key &key)
-                {
-                    size_t Index;
-
-                    if (!Nodes.ContainsWhere(
-                            Index,
-                            [this, &key](Node &Item) -> bool
-                            {
-                                return Item.Id <= key;
-                            }))
-                    {
-                        Index = 0;
-                    }
-
-                    return Index;
-                }
-
-                void Add(Node &&node)
-                {
-                    size_t Index;
-
-                    if (Nodes.Contains(node))
-                        return;
-
-                    if (Nodes.ContainsWhere(
-                            Index,
-                            [this, &node](Node &Item) -> bool
-                            {
-                                return Item.Id <= node.Id;
-                            }))
-                    {
-                        if (Nodes.IsFull())
-                            Nodes[Index] = std::move(node);
-                        else
-                            Nodes.Squeeze(std::move(node), Index);
-                    }
-                    else
-                    {
-                        if (Nodes.IsFull())
-                            Nodes.Last() = std::move(node);
-                        else
-                            Nodes.Add(std::move(node));
-                    }
-                }
-
-                void Add(const Node &node) // @todo Improve this
-                {
-                    size_t Index;
-
-                    if (Nodes.ContainsWhere(
-                            [&node](Node &Item) -> bool
-                            {
-                                return Item.Id == node.Id;
-                            }))
-                        return;
-
-                    if (Nodes.ContainsWhere(
-                            Index,
-                            [this, &node](Node &Item) -> bool
-                            {
-                                return Item.Id <= node.Id;
-                            }))
-                    {
-                        if (Nodes.IsFull())
-                            Nodes[Index] = node;
-                        else
-                            Nodes.Squeeze(node, Index);
-                    }
-                    else
-                    {
-                        if (Nodes.IsFull())
-                            Nodes.Last() = node;
-                        else
-                            Nodes.Add(node);
-                    }
-                }
 
                 // void Await()
                 // {
@@ -439,28 +341,6 @@ namespace Core
 
                     Server.Ready.Listen();
                 }
-
-                // Network requests
-
-                Node &Closest(const Key &key)
-                {
-                    if (Nodes.Length() <= 0)
-                        throw std::out_of_range("Instance contains no node data");
-
-                    size_t Index;
-                    size_t Count = Nodes.Length();
-
-                    if (Count == 1)
-                        return Nodes[0];
-
-                    for (Index = 0; Index < Nodes.Length() && Nodes[Index].Id > key; Index++)
-                    {
-                    }
-
-                    return Nodes[Index];
-                }
-
-                // const Iterable::List<Node> &Nodes() { return Nodes; }
 
                 // Builders for new precedure
 
@@ -523,12 +403,11 @@ namespace Core
                             // @todo check retuened id as well
 
                             CB(DateTime::Now() - SendTime, End);
-                            End();
                         },
                         End);
                 }
 
-                typedef std::function<void(Node, Handler::EndCallback)> QueryCallback;
+                typedef std::function<void(Iterable::List<Node>, Handler::EndCallback)> QueryCallback;
 
                 void Query(const Network::EndPoint &Peer, const Key &Id, QueryCallback Callback, Handler::EndCallback End)
                 {
@@ -537,16 +416,12 @@ namespace Core
 
                         // Build buffer
 
-                        // Operation - Key
-
                         [&Id](Format::Serializer &Serializer)
                         {
                             Serializer << (char)Operations::Query << Id;
                         },
 
                         // Process response
-
-                        // Response - Node
 
                         [this, CB = std::move(Callback)](Node &Requester, Format::Serializer &Serializer, Handler::EndCallback End)
                         {
@@ -557,12 +432,12 @@ namespace Core
                             }
 
                             char Header;
-                            Node node(Identity.Id.Size); // <-- @todo clarify this
 
                             Serializer >> Header;
 
                             try
                             {
+                                Iterable::List<Node> node;
                                 Serializer >> node;
                                 CB(std::move(node), std::move(End));
                             }
@@ -575,55 +450,50 @@ namespace Core
                         std::move(End));
                 }
 
-                typedef std::function<void(Node, Handler::EndCallback)> RouteCallback;
+                typedef std::function<void(Iterable::List<Node>, Handler::EndCallback)> RouteCallback;
 
                 void Route(const Network::EndPoint &Peer, const Key &Id, RouteCallback Callback, Handler::EndCallback End)
                 {
                     if (Id == Identity.Id)
                     {
-                        Callback(Identity, std::move(End));
+                        Callback(Cache.Terminate(), std::move(End));
                         return;
                     }
 
                     Query( // @todo optimize functions in the argument
                         Peer,
                         Id,
-                        [this, Peer, Id, CB = std::move(Callback)](Node Response, const Handler::EndCallback &End)
+                        [this, Peer, Id, CB = std::move(Callback)](Iterable::List<Node> Response, const Handler::EndCallback &End)
                         {
-                            [[unlikely]] if (Response.Id == Identity.Id)
+                            [[unlikely]] if (Response[0].Id == Identity.Id)
                             {
-                                End();
+                                CB(Response, std::move(End));
                                 return;
                             }
 
-                            if (Response.EndPoint.address() == Network::Address("0.0.0.0")) // <-- @todo Optimize this
+                            if (Response[0].EndPoint.address() == Network::Address("0.0.0.0")) // <-- @todo Optimize this
                             {
-                                Response.EndPoint = Peer;
+                                Response[0].EndPoint = Peer;
                                 CB(std::move(Response), std::move(End));
+                                return;
                             }
-                            else
-                                Route(Response.EndPoint, Id, std::move(CB), std::move(End));
+                            
+                            Route(Response[0].EndPoint, Id, std::move(CB), std::move(End));
                         },
                         std::move(End));
                 }
 
                 void Route(const Key &Id, RouteCallback Callback, Handler::EndCallback End)
                 {
-                    if (Nodes.Length() <= 1)
-                    {
-                        End();
-                        throw std::underflow_error("No other node is known");
-                    }
+                    const auto &Peer = Cache.Resolve(Id);
 
-                    const auto &Peer = Resolve(Id);
-
-                    [[unlikely]] if (Peer.Id == Identity.Id)
+                    [[unlikely]] if (Peer[0].Id == Identity.Id)
                     {
-                        Callback(Identity, std::move(End));
+                        Callback(Cache.Terminate(), std::move(End));
                         return;
                     }
 
-                    Route(Peer.EndPoint, Id, std::move(Callback), std::move(End));
+                    Route(Peer[0].EndPoint, Id, std::move(Callback), std::move(End));
                 }
 
                 typedef std::function<void(Handler::EndCallback)> BootstrapCallback;
@@ -637,9 +507,9 @@ namespace Core
                     Route(
                         Peer,
                         Neighbor,
-                        [this, NthNeighbor, CB = std::move(Callback)](Node Response, Handler::EndCallback End)
+                        [this, NthNeighbor, CB = std::move(Callback)](Iterable::List<Node> Response, Handler::EndCallback End)
                         {
-                            if (Response.Id == Identity.Id)
+                            if (Response[0].Id == Identity.Id)
                             {
                                 // All nodes resode before my key
 
@@ -647,26 +517,9 @@ namespace Core
                                 return;
                             }
 
-                            Add(Response);
-
                             // @todo also not all nodes exist and need to be routed
 
-                            bool Found = false;
-                            size_t i;
-
-                            for (i = NthNeighbor - 1; i > 0; i--)
-                            {
-                                if (Identity.Id.Neighbor(i) < Response.Id)
-                                {
-                                    Found = true;
-                                    break;
-                                }
-                            }
-
-                            if (!Found)
-                            {
-                                i = Identity.Id.Critical();
-                            }
+                            size_t i = Cache.NeighborHood(Response[0].Id);
 
                             if (i > NthNeighbor)
                             {
@@ -676,16 +529,9 @@ namespace Core
                                 return;
                             }
 
-                            Network::EndPoint Next;
-
-                            while ((Next = Resolve(Identity.Id.Neighbor(i--)).EndPoint).address() == Network::Address("0.0.0.0") && i > 0)
-                            {
-                                //
-                            }
-
                             if (i > 0)
                             {
-                                Bootstrap(Next, i, std::move(CB), std::move(End));
+                                Bootstrap(Cache.Resolve(i)[0].EndPoint, i, std::move(CB), std::move(End));
                             }
                             else
                             {
@@ -714,10 +560,6 @@ namespace Core
                         {
                             Serializer << (char)Operations::Get << key;
                         },
-
-                        // Process response
-                        // Response - Data
-
                         [this, CB = std::move(Callback)](Node &Requester, Format::Serializer &Serializer, Handler::EndCallback End)
                         {
                             char Header;
@@ -737,9 +579,9 @@ namespace Core
                 {
                     Route(
                         key,
-                        [this, key, CB = std::move(Callback)](Node Peer, Handler::EndCallback End)
+                        [this, key, CB = std::move(Callback)](Iterable::List<Node> Peers, Handler::EndCallback End)
                         {
-                            if (Peer.Id == Identity.Id)
+                            if (Peers[0].Id == Identity.Id)
                             {
                                 OnGet(
                                     key,
@@ -751,19 +593,17 @@ namespace Core
                                 return;
                             }
 
-                            GetFrom(Peer.EndPoint, key, CB, std::move(End));
+                            GetFrom(Peers[0].EndPoint, key, CB, std::move(End));
                         },
                         std::move(End));
                 }
+
+                // @todo Maybe add send with call back too?
 
                 void SetTo(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data)
                 {
                     Fire(
                         Peer,
-
-                        // Build buffer
-                        // Set - Key - Data
-
                         [&key, &Data](Format::Serializer &Serializer)
                         {
                             Serializer << (char)Operations::Set << key << Data;
@@ -774,16 +614,16 @@ namespace Core
                 {
                     Route(
                         key,
-                        [this, key, Data](Node Peer, Handler::EndCallback End)
+                        [this, key, Data](Iterable::List<Node> Peers, Handler::EndCallback End)
                         {
-                            if (Peer.Id == Identity.Id)
+                            if (Peers[0].Id == Identity.Id)
                             {
                                 OnSet(key, Data);
                                 End(); // <-- Fix this
                                 return;
                             }
 
-                            SetTo(Peer.EndPoint, key, Data);
+                            SetTo(Peers[0].EndPoint, key, Data);
 
                             End();
                         },
@@ -796,10 +636,6 @@ namespace Core
                 {
                     Fire(
                         Peer,
-
-                        // Build buffer
-                        // Data - Data
-
                         [&Data](Format::Serializer &Serializer)
                         {
                             Serializer << (char)Operations::Data << Data;
@@ -809,16 +645,12 @@ namespace Core
                 void SendWhere(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data,
                                const std::function<bool(const Node &)> &Condition)
                 {
-                    Nodes.ForEach(
-                        [this, &Data, &Condition](Node &node)
+                    Cache.ForEach(
+                        [this, &Data, &Condition](const Node &node)
                         {
                             if (Condition(node))
                                 Fire(
                                     node.EndPoint,
-
-                                    // Build buffer
-                                    // Data - Data
-
                                     [this, &Data](Format::Serializer &Serializer)
                                     {
                                         Serializer << (char)Operations::Data << Data;
@@ -826,19 +658,15 @@ namespace Core
                         });
                 }
 
-                // Flood
+                // // Flood
 
                 void Flood(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data)
                 {
-                    Nodes.ForEach(
-                        [this, &Data](Node &Node)
+                    Cache.ForEach(
+                        [this, &Data](const Node &Node)
                         {
                             Fire(
                                 Node.EndPoint,
-
-                                // Build buffer
-                                // Data - Data
-
                                 [this, &Data](Format::Serializer &Serializer)
                                 {
                                     Serializer << (char)Operations::Data << Data;

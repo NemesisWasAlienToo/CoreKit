@@ -4,8 +4,9 @@
 #include <string>
 #include <arpa/inet.h>
 
-#include "Iterable/Queue.cpp"
 #include "Iterable/Span.cpp"
+#include "Iterable/List.cpp"
+#include "Iterable/Queue.cpp"
 #include "Network/EndPoint.cpp"
 #include "Network/DHT/Key.cpp"
 #include "Network/DHT/Node.cpp"
@@ -187,8 +188,25 @@ namespace Core
                 return *this;
             }
 
+            template<typename T>
+            Serializer &operator<<(const Iterable::List<T> &Value)
+            {
+                *this << Value.Length();
+
+                Value.ForEach(
+                    [this](const T& Item)
+                    {
+                        *this << Item;
+                    }
+                );
+
+                return *this;
+            }
+
             Serializer &operator<<(const Network::DHT::Key &Value)
             {
+                *this << Value.Size;
+
                 Queue.Add((char *) Value.Data, Value.Size);
 
                 return *this;
@@ -215,15 +233,9 @@ namespace Core
                 return *this << str;
             }
 
-            Serializer &operator>>(const Network::DHT::Node::States &Value)
-            {
-                Queue.Add(static_cast<const char>(Value));
-                return *this;
-            }
-
             Serializer &operator<<(const Network::DHT::Node &Value)
             {
-                return *this << Value.Id << Value.EndPoint << static_cast<const char>(Value.State);
+                return *this << Value.Id << Value.EndPoint;
             }
 
             Serializer &operator<<(Serializer &Value)
@@ -334,8 +346,33 @@ namespace Core
                 return *this;
             }
 
+            template<typename T>
+            Serializer &operator>>(Iterable::List<T> &Value)
+            {
+                size_t Size;
+
+                *this >> Size;
+
+                Value.Resize(Size);
+
+                for (size_t i = 0; i < Size; i++)
+                {
+                    T Taken;
+                    *this >> Taken;
+                    Value.Add(std::move(Taken));
+                }
+
+                return *this;
+            }
+
             Serializer &operator>>(Network::DHT::Key &Value) // @todo key size is not obvious to the user
             {
+                size_t Size;
+
+                *this >> Size;
+
+                if(Value.Size != Size) Value = Network::DHT::Key(Size);
+                
                 Queue.Take((char *)Value.Data, Value.Size);
 
                 return *this;
@@ -382,15 +419,9 @@ namespace Core
                 return *this;
             }
 
-            Serializer &operator>>(Network::DHT::Node::States &Value)
-            {
-                Value = static_cast<Network::DHT::Node::States>(Queue.Take());
-                return *this;
-            }
-
             Serializer &operator>>(Network::DHT::Node &Value)
             {
-                return *this >> Value.Id >> Value.EndPoint >> Value.State;
+                return *this >> Value.Id >> Value.EndPoint;
             }
 
             // Serializer &operator>>(Serializer &Value)

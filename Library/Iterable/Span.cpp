@@ -28,6 +28,15 @@ namespace Core
             Span() = default;
             Span(size_t Size) : _Length(Size), _Content(new T[Size]) {}
             Span(Span &&Other) : _Length(Other._Length), _Content(Other._Content) {}
+
+            Span(size_t Size, const T& Value) : _Length(Size), _Content(new T[Size])
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    _Content[i] = Value;
+                }
+            }
+
             Span(const Span &Other) : _Length(Other._Length), _Content(new T[Other._Length])
             {
                 for (size_t i = 0; i < Other._Length; i++)

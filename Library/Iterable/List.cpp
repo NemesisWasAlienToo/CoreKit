@@ -113,13 +113,6 @@ namespace Core
                 return this->_Content != Other->_Content;
             }
 
-            // friend List<char> &operator<<(List<char> &list, const std::string &Message)
-            // {
-            //     list.Add(Message.c_str(), Message.length());
-
-            //     return list;
-            // }
-
             friend std::ostream &operator<<(std::ostream &os, const List &List)
             {
                 // Check for << opeartor
