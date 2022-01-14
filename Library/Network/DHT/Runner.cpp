@@ -69,11 +69,10 @@ namespace Core
 
                 // ### Variables
 
-                enum class Events : char
+                enum class States : char
                 {
-                    Incomming = 0,
-                    Exit,
-                    TimeOut,
+                    Stopped = 0,
+                    Running,
                 };
 
                 Node Identity;
@@ -82,71 +81,95 @@ namespace Core
 
                 Network::DHT::Handler Handler;
 
+                Event Interrupt;
+
+                std::mutex Lock;
+
+                Iterable::Poll Poll;
+
                 Iterable::List<std::thread> Pool;
 
                 Network::DHT::Cache Cache;
 
-            private:
-                std::function<void()> _PoolTask =
-                    [this]()
+                States State;
+
+                void Await()
                 {
-                    // @todo Clear running event
+                    Poll[0].Mask = Server.Events();
+                    Poll[1].Mask = Timer::In; // Handler
+                    Poll[2].Mask = Event::In; // Interrupt
 
-                    Iterable::Poll Poll(2);
+                    Poll();
+                }
 
-                    Poll.Add(Server.Listener(), Descriptor::In);
-                    Poll.Add(Handler.Listener(), Descriptor::In);
-
-                    while (Server.State == Server::States::Running)
+                void EventLoop()
+                {
+                    while (State == States::Running)
                     {
-                        Network::DHT::Request Request;
-                        Handler::Callback Task;
-                        Handler::EndCallback End;
+                        // @todo Clean this
 
-                        Poll.Await();
+                        Lock.lock();
+
+                        Await();
 
                         if (Poll[0].HasEvent())
                         {
-                            if (Server.State != Server::States::Running)
+                            if (Poll[0].Happened(Iterable::Poll::Out))
                             {
-                                break;
+                                Server.Send();
+                                Lock.unlock();
                             }
-
-                            if (!Server.Take(Request)) // @todo Clarify this
-                                continue;
-
-                            if (Handler.Take(Request.Peer, Task, End))
+                            else if (Poll[0].Happened(Iterable::Poll::In))
                             {
-                                // Extract peer key and add it
+                                if(!Server.Receive(
 
-                                Format::Serializer Ser(Request.Buffer);
-                                Node node(Identity.Id.Size);
+                                    // Take the completed request
 
-                                node.EndPoint = Request.Peer;
-                                Ser >> node.Id;
+                                    [this](Request request)
+                                    {
+                                        // After taing out the request free the lock
 
-                                Cache.Add(node);
+                                        Lock.unlock();
 
-                                Task(node, Ser, End);
-                            }
-                            else
-                            {
-                                Respond(Request);
+                                        // Take the handler for request
+
+                                        if (!Handler.Take(
+                                                request.Peer,
+                                                [this, &request](const auto &CB, const auto &End)
+                                                {
+                                                    Format::Serializer Ser(request.Buffer);
+
+                                                    Node node(Identity.Id.Size);
+                                                    node.EndPoint = request.Peer;
+                                                    Ser >> node.Id;
+
+                                                    Cache.Add(node);
+
+                                                    CB(node, Ser, End);
+                                                }))
+                                        {
+                                            Respond(request);
+                                        }
+                                    }))
+                                    {
+                                        Lock.unlock();
+                                    }
                             }
                         }
-
-                        if (Poll[1].HasEvent())
+                        else if (Poll[1].HasEvent())
                         {
                             Test::Log("Handler") << "Request timed out" << std::endl;
                             Handler.Clean();
-                            // OnTimeOut()
+                            // OnTimeOut();
+                            Lock.unlock();
+                        }
+                        else if (Poll[2].HasEvent())
+                        {
+                            Interrupt.Listen();
+                            Lock.unlock();
                         }
                     }
-
-                    Server.Ready.Emit(1);
-
-                    Test::Log("Pool") << "Thread exited" << std::endl;
-                };
+                }
 
                 void OnTimeOut(const Network::EndPoint &Peer)
                 {
@@ -283,8 +306,13 @@ namespace Core
 
                 Runner() = default;
 
-                Runner(const Node &identity, Duration Timeout, size_t ThreadCount = 1) : Identity(identity), Server(identity.EndPoint), Handler(), Pool(ThreadCount, false), Cache(Identity.Id), TimeOut(Timeout)
+                Runner(const Node &identity, Duration Timeout, size_t ThreadCount = 1) : Identity(identity), Server(identity.EndPoint), Handler(), Poll(3),
+                                                                                         Pool(ThreadCount, false), Cache(Identity.Id), State(States::Stopped), TimeOut(Timeout)
                 {
+                    Poll.Add(Server.Listener(), Server.Events());
+                    Poll.Add(Handler.Listener(), Timer::In);
+                    Poll.Add(Interrupt.INode(), Event::In);
+
                     Cache.Add({Identity.Id, {"0.0.0.0:0"}});
                 }
 
@@ -292,7 +320,7 @@ namespace Core
 
                 inline static Network::EndPoint DefaultEndPoint()
                 {
-                    return {"0.0.0.0:8888"};
+                    return {};
                 }
 
                 // ### Functionalities
@@ -302,32 +330,37 @@ namespace Core
                 //     //
                 // }
 
-                inline void GetInPool()
+                std::function<void()> GetInPool = [this]()
                 {
-                    _PoolTask();
-                }
+                    try
+                    {
+                        EventLoop();
+                    }
+                    catch (const std::exception &e)
+                    {
+                        std::cerr << e.what() << '\n';
+                    }
+
+                    Test::Log("Pool") << "Exited" << std::endl;
+                };
 
                 void Run()
                 {
-                    // Start the udp server
-
-                    Server.Run();
-
                     // Setup thread pool task
 
-                    Pool.Reserver(Pool.Capacity());
+                    State = States::Running;
+
+                    Pool.Reserve(Pool.Capacity());
 
                     for (size_t i = 0; i < Pool.Capacity(); i++)
                     {
-                        Pool[i] = std::thread(_PoolTask);
+                        Pool[i] = std::thread(GetInPool);
                     }
                 }
 
                 void Stop()
                 {
-                    // Stop the server
-
-                    Server.Stop();
+                    State = States::Stopped;
 
                     // Join threads in pool
 
@@ -336,10 +369,6 @@ namespace Core
                         {
                             Thread.join();
                         });
-
-                    // Clear event
-
-                    Server.Ready.Listen();
                 }
 
                 // Builders for new precedure
@@ -360,6 +389,8 @@ namespace Core
 
                             Builder(Ser);
                         });
+
+                    Interrupt.Emit(1);
                 }
 
                 bool Build(
@@ -477,7 +508,7 @@ namespace Core
                                 CB(std::move(Response), std::move(End));
                                 return;
                             }
-                            
+
                             Route(Response[0].EndPoint, Id, std::move(CB), std::move(End));
                         },
                         std::move(End));
@@ -538,7 +569,7 @@ namespace Core
                                 End();
                             }
                         },
-                        std::move(End));
+                        std::move(End)); // @todo do a self look up in the end
                 }
 
                 inline void Bootstrap(const Network::EndPoint &Peer, BootstrapCallback Callback, Handler::EndCallback End)

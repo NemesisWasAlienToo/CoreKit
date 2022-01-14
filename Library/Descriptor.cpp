@@ -97,7 +97,6 @@ namespace Core
 
         Event Await(Event Events, int TimeoutMS = -1) const
         {
-
             _POLLFD PollStruct = {.fd = _INode, .events = Events};
 
             int Result = poll(&PollStruct, 1, TimeoutMS);

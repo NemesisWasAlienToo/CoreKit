@@ -262,7 +262,7 @@ namespace Core
                 this->_Length -= Count;
             }
 
-            bool ContainsWhere(std::function<bool(T &)> Condition)
+            bool ContainsWhere(const std::function<bool(T &)>& Condition)
             {
                 for (size_t i = 0; i < this->_Length; i++)
                 {
@@ -275,7 +275,7 @@ namespace Core
                 return false;
             }
 
-            bool ContainsWhere(size_t &First, std::function<bool(T &)> Condition)
+            bool ContainsWhere(size_t &First, const std::function<bool(T &)>& Condition)
             {
                 for (size_t i = 0; i < this->_Length; i++)
                 {

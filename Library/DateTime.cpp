@@ -217,6 +217,13 @@ namespace Core
 
         // Funtionality
 
+        bool Expired()
+        {
+            return *this <= Now();
+        }
+
+        // Operators
+
         Duration operator-(const DateTime &Other) const
         {
             struct timespec Diff = {

@@ -27,17 +27,19 @@ int main(int argc, char const *argv[])
 
     // Setup a target
 
-    std::cout << "Enter target ip : ";
+    // std::cout << "Enter target ip : ";
 
-    std::string TargetString;
+    // std::string TargetString;
 
-    std::cin >> TargetString;
+    // std::cin >> TargetString;
 
-    const Network::EndPoint Target(TargetString);
+    // const Network::EndPoint Target(TargetString);
+
+    const Network::EndPoint Target("127.0.0.1:4444");
 
     // Setup the server
 
-    Network::DHT::Runner Chord(Identity, {5, 0}, 1);
+    Network::DHT::Runner Chord(Identity, {5, 0}, 5);
 
     Chord.OnSet =
         [](const Core::Network::DHT::Key &Key, const Core::Iterable::Span<char> &Data)

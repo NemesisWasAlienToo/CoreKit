@@ -344,7 +344,14 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    throw std::system_error(errno, std::generic_category());
+                    if (errno == EAGAIN)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        throw std::system_error(errno, std::generic_category());
+                    }
                 }
 
                 return Result;
@@ -359,7 +366,14 @@ namespace Core
 
                 if (Result < 0)
                 {
-                    throw std::system_error(errno, std::generic_category());
+                    if (errno == EAGAIN)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        throw std::system_error(errno, std::generic_category());
+                    }
                 }
 
                 Target = EndPoint(&Client);
@@ -420,18 +434,18 @@ namespace Core
                 size_t _Size;
                 int Result;
 
-                for(;;)
+                for (;;)
                 {
                     _Size = queue.Chunk();
 
-                    if(_Size == 0)
+                    if (_Size == 0)
                     {
                         break;
                     }
 
                     Result = write(_INode, &queue.First(), _Size);
 
-                    if(Result > 0)
+                    if (Result > 0)
                     {
                         queue.Free(Result);
                     }
@@ -458,18 +472,18 @@ namespace Core
                 size_t _Size;
                 int Result;
 
-                for(;;)
+                for (;;)
                 {
                     _Size = queue.Chunk();
 
-                    if(_Size == 0)
+                    if (_Size == 0)
                     {
                         break;
                     }
 
                     Result = write(_INode, &queue.First(), _Size);
 
-                    if(Result > 0)
+                    if (Result > 0)
                     {
                         queue.Free(Result);
                     }

@@ -89,10 +89,11 @@ Checked items are implemented completly at the moment and unchecked items are to
     - Optimize Http request, response
     - Add http Server server
 
+- Socket:
+    - If non blocking sent and errno was EAGAIN return 0
+
 - DHT:
     - Cache time out and swap out policy
-    - Remove dedicated thread for server
-    - Listen and Dispatch architecture for Server and Handler
     - Task queue between Runner and Server-Handler
     - Redefine fundamental operation data structures
     - Node should perform self look up to notify others

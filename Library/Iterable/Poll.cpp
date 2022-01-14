@@ -40,11 +40,6 @@ namespace Core
 
         class Poll : public Iterable<CPoll>
         {
-        private:
-            // Types :
-
-            typedef std::function<void(Descriptor, size_t)> Callback;
-
         public:
             typedef short Event;
 
@@ -55,15 +50,11 @@ namespace Core
                 Error = POLLNVAL,
             };
 
-            Callback OnRead = NULL;
-            Callback OnWrite = NULL;
-            Callback OnError = NULL;
-
             Poll() = default;
 
             Poll(size_t Capacity) : Iterable<CPoll>(Capacity) {}
-            Poll(Poll &Other) : Iterable<CPoll>(Other), OnRead(Other.OnRead), OnWrite(Other.OnWrite), OnError(Other.OnError) {}
-            Poll(Poll &&Other) noexcept : Iterable<CPoll>(std::move(Other)), OnRead(Other.OnRead), OnWrite(Other.OnWrite), OnError(Other.OnError) {}
+            Poll(Poll &Other) : Iterable<CPoll>(Other) {}
+            Poll(Poll &&Other) noexcept : Iterable<CPoll>(std::move(Other)) {}
 
             void Resize(size_t Size) {
                 this->_Content = (CPoll *)std::realloc(this->_Content, Size);
@@ -85,23 +76,6 @@ namespace Core
                 Poll.Descriptor = Descriptor.INode();
                 Poll.Mask = Events;
             }
-
-            // void Add(const List<Descriptor> &Descriptors, Event Events)
-            // {
-            //     int Handler = Descriptor.INode();
-
-            //     if (Handler < 0)
-            //     {
-            //         std::cout << "Error : Invalid file descriptor (less than zero)" << std::endl;
-            //         exit(-1);
-            //     }
-
-            //     _IncreaseCapacity();
-
-            //     CPoll &Poll = _Content[_Length++];
-            //     Poll.Descriptor = Descriptor.INode();
-            //     Poll.Mask = Events;
-            // }
 
             void Add(CPoll &&Item)
             {
@@ -232,51 +206,7 @@ namespace Core
 
             // ### Additional functionalities
 
-            void Await(int TimeoutMS = -1)
-            {
-                int Result;
-
-                Result = poll((pollfd *)_Content, _Length, TimeoutMS);
-
-                if (Result == -1)
-                {
-                    throw std::system_error(errno, std::generic_category());
-                }
-
-                if (Result == 0)
-                    return;
-
-                int i = 0;
-                size_t j = 0;
-
-                for (; i < Result && j < _Length; j++)
-                {
-                    auto &item = _Content[j];
-
-                    if (item.Events)
-                    {
-                        i++;
-                        Descriptor Descriptor(item.Descriptor);
-
-                        if ((this->OnRead != NULL) && item.Happened(In))
-                        {
-                            this->OnRead(Descriptor, j);
-                        }
-
-                        if ((this->OnWrite != NULL) && item.Happened(Out))
-                        {
-                            this->OnWrite(Descriptor, j);
-                        }
-
-                        if ((this->OnError != NULL) && item.Happened(Error))
-                        {
-                            this->OnError(Descriptor, j);
-                        }
-                    }
-                }
-            }
-
-            void ForEach(std::function<void(Descriptor)> Action)
+            void ForEach(const std::function<void(Descriptor)>& Action)
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -284,12 +214,28 @@ namespace Core
                 }
             }
 
-            void ForEach(std::function<void(size_t, Descriptor)> Action)
+            void ForEach(const std::function<void(size_t, Descriptor)>& Action)
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
                     Action(i, _ElementAt(i).Descriptor);
                 }
+            }
+
+            
+
+            // Operators
+
+            int operator()(int TimeoutMS = -1)
+            {
+                int Result = poll((pollfd *)_Content, _Length, TimeoutMS);
+
+                if (Result == -1)
+                {
+                    throw std::system_error(errno, std::generic_category());
+                }
+                
+                return Result;
             }
 
             CPoll &operator[](size_t Index)
@@ -312,10 +258,6 @@ namespace Core
                 _Content = Other._Content;
                 _Capacity = Other._Capacity;
                 _Length = Other._Length;
-
-                OnRead = Other.OnRead;
-                OnWrite = Other.OnWrite;
-                OnError = Other.OnError;
 
                 std::swap(_Content, Other._Content);
 

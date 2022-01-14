@@ -9,8 +9,10 @@
 #include "Test.cpp"
 #include "Timer.cpp"
 #include "DateTime.cpp"
+#include "Format/Serializer.cpp"
 #include "Network/EndPoint.cpp"
 #include "Iterable/List.cpp"
+#include "Network/DHT/Node.cpp"
 #include "Network/DHT/Request.cpp"
 
 using namespace Core;
@@ -25,7 +27,7 @@ namespace Core
             {
             public:
                 typedef std::function<void()> EndCallback;
-                typedef std::function<void(Node&, Format::Serializer&, EndCallback)> Callback;
+                typedef std::function<void(Node &, Format::Serializer &, EndCallback)> Callback;
 
                 struct Handle // @todo Add move semmantics
                 {
@@ -50,9 +52,7 @@ namespace Core
 
                 void Wind()
                 {
-                    bool IsEmpty = (_Content.size() == 0);
-
-                    if (!IsEmpty)
+                    if (_Content.size() != 0)
                     {
                         _Closest = Soonest();
 
@@ -71,12 +71,12 @@ namespace Core
                     }
                     else
                     {
-                        ExpireEvent.Set({0, 0});
-                    }                    
+                        _Closest.second.Expire = DateTime::Now();
+                        ExpireEvent.Stop();
+                    }
                 }
 
             public:
-
                 // volatile bool IsEmpty = true;
 
                 Handler() : ExpireEvent(Timer::Monotonic, 0) {} // @todo Add default timeout
@@ -111,15 +111,14 @@ namespace Core
 
                 void Clean()
                 {
-                    // @todo return expired item
-                    
                     ExpireEvent.Value();
 
                     std::lock_guard<std::mutex> Lock(_Lock);
 
-                    if (Has(_Closest.first))
+                    if (Has(_Closest.first)) // @todo Not needed
                     {
-                        auto &handle = _Content[_Closest.first];
+                        Network::EndPoint Item = _Closest.first;
+                        auto &handle = _Content[Item];
 
                         if (handle.Expire <= DateTime::Now())
                         {
@@ -146,14 +145,12 @@ namespace Core
 
                     // New
 
-                    if (_Closest.second.Expire < Expire)
+                    if (_Closest.second.Expire <= DateTime::Now() || _Closest.second.Expire > Expire)
                     {
                         _Closest.first = EndPoint;
                         _Closest.second.Expire = Expire;
 
-                        auto Left = _Closest.second.Expire.Left();
-
-                        ExpireEvent.Set(Left);
+                        ExpireEvent.Set(_Closest.second.Expire.Left());
                     }
 
                     return true;
@@ -178,38 +175,40 @@ namespace Core
                     }
                 }
 
-                bool Take(const Network::EndPoint &EndPoint, Callback &Routine, EndCallback &End)
+                bool Take(const Network::EndPoint &EndPoint, const std::function<void(const Callback &, const EndCallback &)> &After)
                 {
-                    // @todo Optimize access
-
-                    std::lock_guard<std::mutex> Lock(_Lock);
-
-                    if (!Has(EndPoint))
-                    {
-                        return false;
-                    }
-
-                    auto &handle = _Content[EndPoint];
-
                     bool Ret;
+                    Callback CB;
+                    EndCallback End;
 
-                    if ((Ret = handle.Expire <= DateTime::Now()))
                     {
-                        handle.End();
+                        std::lock_guard<std::mutex> Lock(_Lock);
+
+                        if (!Has(EndPoint))
+                        {
+                            return false;
+                        }
+
+                        auto &handle = _Content[EndPoint];
+
+                        if ((Ret = handle.Expire > DateTime::Now()))
+                        {
+                            CB = std::move(handle.Routine);
+                            End = std::move(handle.End);
+                        }
+                        else
+                        {
+                            handle.End();
+                        }
 
                         _Content.erase(EndPoint);
-                    }
-                    else
-                    {
-                        Routine = std::move(handle.Routine);
-                        End = std::move(handle.End);
 
-                        _Content.erase(EndPoint);
+                        Wind();
                     }
 
-                    Wind();
+                    After(CB, End);
 
-                    return !Ret;
+                    return Ret;
                 }
 
                 Handler &operator=(const Handler &Other) = default;

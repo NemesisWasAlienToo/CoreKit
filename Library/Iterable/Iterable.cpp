@@ -185,7 +185,7 @@ namespace Core
                 this->_Capacity = Size;
             }
 
-            void Reserver(size_t Count)
+            void Reserve(size_t Count)
             {
                 this->_IncreaseCapacity(Count);
 
@@ -498,7 +498,7 @@ namespace Core
             }
 
             template <typename O>
-            Iterable<O> Map(std::function<O(T &)> Transform)
+            Iterable<O> Map(const std::function<O(T &)>& Transform)
             {
                 Iterable<O> result(_Capacity);
 
@@ -510,7 +510,7 @@ namespace Core
                 return result;
             }
 
-            void ForEach(std::function<void(const T &)> Action) const
+            void ForEach(const std::function<void(const T &)>& Action) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -518,7 +518,7 @@ namespace Core
                 }
             }
 
-            void ForEach(std::function<void(size_t, const T &)> Action) const
+            void ForEach(const std::function<void(size_t, const T &)>& Action) const
             {
                 for (int i = 0; i < _Length; i++)
                 {
@@ -526,7 +526,7 @@ namespace Core
                 }
             }
 
-            Iterable<T> Where(std::function<bool(const T &)> Condition) const
+            Iterable<T> Where(const std::function<bool(const T &)>& Condition) const
             {
                 Iterable<T> result(_Capacity);
 
@@ -541,7 +541,7 @@ namespace Core
                 return result;
             }
 
-            size_t CountWhere(std::function<bool(const T &)> Condition) const
+            size_t CountWhere(const std::function<bool(const T &)>& Condition) const
             {
                 size_t result;
 
@@ -556,7 +556,7 @@ namespace Core
                 return result;
             }
 
-            bool ContainsWhere(std::function<bool(const T &)> Condition) const
+            bool ContainsWhere(const std::function<bool(const T &)>& Condition) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -571,7 +571,7 @@ namespace Core
                 return false;
             }
 
-            bool ContainsWhere(std::function<bool(const T &)> Condition, size_t &First) const
+            bool ContainsWhere(const std::function<bool(const T &)>& Condition, size_t &First) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -588,7 +588,7 @@ namespace Core
             }
 
             template <typename O>
-            Iterable<O> Map(std::function<O(const T &)> Transform) const
+            Iterable<O> Map(const std::function<O(const T &)>& Transform) const
             {
                 Iterable<O> result(_Capacity);
 
