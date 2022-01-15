@@ -39,7 +39,7 @@ int main(int argc, char const *argv[])
 
     // Setup the server
 
-    Network::DHT::Runner Chord(Identity, {5, 0}, 5);
+    Network::DHT::Runner Chord(Identity, {5, 0}, 2);
 
     Chord.OnSet =
         [](const Core::Network::DHT::Key &Key, const Core::Iterable::Span<char> &Data)
@@ -66,6 +66,8 @@ int main(int argc, char const *argv[])
     // Run the server
 
     Chord.Run();
+
+    // Chord.GetInPool();
 
     // Chord.Await(); // <--- Await all requests to be finished
 

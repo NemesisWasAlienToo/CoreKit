@@ -96,8 +96,8 @@ namespace Core
                 void Await()
                 {
                     Poll[0].Mask = Server.Events();
-                    Poll[1].Mask = Timer::In; // Handler
-                    Poll[2].Mask = Event::In; // Interrupt
+                    // Poll[1].Mask = Timer::In; // Handler
+                    // Poll[2].Mask = Event::In; // Interrupt
 
                     Poll();
                 }
@@ -110,7 +110,7 @@ namespace Core
 
                         Lock.lock();
 
-                        Await();
+calc:                   Await();
 
                         if (Poll[0].HasEvent())
                         {
@@ -121,39 +121,39 @@ namespace Core
                             }
                             else if (Poll[0].Happened(Iterable::Poll::In))
                             {
-                                if(!Server.Receive(
+                                if (!Server.Receive(
 
-                                    // Take the completed request
+                                        // Take the completed request
 
-                                    [this](Request request)
-                                    {
-                                        // After taing out the request free the lock
-
-                                        Lock.unlock();
-
-                                        // Take the handler for request
-
-                                        if (!Handler.Take(
-                                                request.Peer,
-                                                [this, &request](const auto &CB, const auto &End)
-                                                {
-                                                    Format::Serializer Ser(request.Buffer);
-
-                                                    Node node(Identity.Id.Size);
-                                                    node.EndPoint = request.Peer;
-                                                    Ser >> node.Id;
-
-                                                    Cache.Add(node);
-
-                                                    CB(node, Ser, End);
-                                                }))
+                                        [this](Request request)
                                         {
-                                            Respond(request);
-                                        }
-                                    }))
-                                    {
-                                        Lock.unlock();
-                                    }
+                                            // After taing out the request free the lock
+
+                                            Lock.unlock();
+
+                                            // Take the handler for request
+
+                                            if (!Handler.Take(
+                                                    request.Peer,
+                                                    [this, &request](const auto &CB, const auto &End)
+                                                    {
+                                                        Format::Serializer Ser(request.Buffer);
+
+                                                        Node node(Identity.Id.Size);
+                                                        node.EndPoint = request.Peer;
+                                                        Ser >> node.Id;
+
+                                                        Cache.Add(node);
+
+                                                        CB(node, Ser, End);
+                                                    }))
+                                            {
+                                                Respond(request);
+                                            }
+                                        }))
+                                {
+                                    Lock.unlock();
+                                }
                             }
                         }
                         else if (Poll[1].HasEvent())
@@ -166,7 +166,8 @@ namespace Core
                         else if (Poll[2].HasEvent())
                         {
                             Interrupt.Listen();
-                            Lock.unlock();
+                            Server.Send();
+                            goto calc;
                         }
                     }
                 }
