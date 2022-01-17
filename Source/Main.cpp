@@ -3,6 +3,7 @@
 #include <functional>
 
 #include <Test.cpp>
+#include <File.cpp>
 #include <DateTime.cpp>
 #include <Iterable/List.cpp>
 #include <Iterable/Span.cpp>
@@ -17,8 +18,6 @@ int main(int argc, char const *argv[])
 
     const Network::DHT::Node Identity(Network::DHT::Key::Generate(4), {"0.0.0.0:8888"});
 
-    Test::Log("Identity") << Identity.Id.ToString() << std::endl;
-
     // Log End Point
 
     Test::Log(Network::DNS::HostName()) << Identity.EndPoint << std::endl;
@@ -27,11 +26,11 @@ int main(int argc, char const *argv[])
 
     // Setup a target
 
-    // std::cout << "Enter target ip : ";
-
     // std::string TargetString;
 
-    // std::cin >> TargetString;
+    // STDOUT << "Enter target ip : ";
+
+    // STDIN >> TargetString;
 
     // const Network::EndPoint Target(TargetString);
 
@@ -39,7 +38,7 @@ int main(int argc, char const *argv[])
 
     // Setup the server
 
-    Network::DHT::Runner Chord(Identity, {5, 0}, 2);
+    Network::DHT::Runner Chord(Identity, {5, 0}, 5);
 
     Chord.OnSet =
         [](const Core::Network::DHT::Key &Key, const Core::Iterable::Span<char> &Data)

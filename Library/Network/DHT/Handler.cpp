@@ -130,6 +130,40 @@ namespace Core
                     Wind();
                 }
 
+                bool Clean(std::function<void(const EndPoint &)> Callback)
+                {
+                    bool Ret = false;
+                    Network::EndPoint EP;
+
+                    ExpireEvent.Value();
+
+                    {
+                        std::lock_guard<std::mutex> Lock(_Lock);
+
+                        if (Has(_Closest.first)) // @todo Not needed
+                        {
+                            Network::EndPoint Item = _Closest.first;
+                            auto &handle = _Content[Item];
+
+                            if ((Ret = handle.Expire <= DateTime::Now()))
+                            {
+                                handle.End();
+                                _Content.erase(_Closest.first);
+                                EP = _Closest.first;
+                            }
+                        }
+
+                        Wind();
+                    }
+
+                    if (Ret)
+                    {
+                        Callback(EP);
+                    }
+
+                    return Ret;
+                }
+
                 bool Put(const Network::EndPoint &EndPoint, const DateTime &Expire, const Callback &Routine, const EndCallback &End)
                 {
                     // @todo THis function must return a pointer to the added item for std::function to be moved when adding a req
@@ -175,7 +209,7 @@ namespace Core
                     }
                 }
 
-                bool Take(const Network::EndPoint &EndPoint, const std::function<void(const Callback &, const EndCallback &)> &After)
+                bool Take(const Network::EndPoint &EndPoint, const std::function<void(Callback &, EndCallback &)> &After)
                 {
                     bool Ret;
                     Callback CB;

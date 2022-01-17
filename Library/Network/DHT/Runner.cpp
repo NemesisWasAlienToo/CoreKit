@@ -110,7 +110,8 @@ namespace Core
 
                         Lock.lock();
 
-calc:                   Await();
+                    calc:
+                        Await();
 
                         if (Poll[0].HasEvent())
                         {
@@ -121,11 +122,11 @@ calc:                   Await();
                             }
                             else if (Poll[0].Happened(Iterable::Poll::In))
                             {
-                                if (!Server.Receive(
+                                if (!Server.Take(
 
                                         // Take the completed request
 
-                                        [this](Request request)
+                                        [this](Request &request)
                                         {
                                             // After taing out the request free the lock
 
@@ -135,7 +136,7 @@ calc:                   Await();
 
                                             if (!Handler.Take(
                                                     request.Peer,
-                                                    [this, &request](const auto &CB, const auto &End)
+                                                    [this, &request](auto &CB, auto &End)
                                                     {
                                                         Format::Serializer Ser(request.Buffer);
 
@@ -143,9 +144,28 @@ calc:                   Await();
                                                         node.EndPoint = request.Peer;
                                                         Ser >> node.Id;
 
-                                                        Cache.Add(node);
-
                                                         CB(node, Ser, End);
+
+                                                        // Cache Test
+
+                                                        // Cache.Add(node);
+
+                                                        Cache.Test(
+                                                            node,
+                                                            [this](Node Peer, auto OnFail)
+                                                            {
+                                                                Ping(
+                                                                    Peer.EndPoint,
+                                                                    [](Duration duration, Handler::EndCallback End)
+                                                                    {
+                                                                        // if it is successfull dont call end
+                                                                    },
+                                                                    [CB = std::move(OnFail)]()
+                                                                    {
+                                                                        Test::Log("Cache") << "Replaced" << std::endl;
+                                                                        CB();
+                                                                    });
+                                                            });
                                                     }))
                                             {
                                                 Respond(request);
@@ -159,22 +179,21 @@ calc:                   Await();
                         else if (Poll[1].HasEvent())
                         {
                             Test::Log("Handler") << "Request timed out" << std::endl;
-                            Handler.Clean();
-                            // OnTimeOut();
+                            Handler.Clean(
+                                [this](const EndPoint& Target)
+                                {
+                                    Cache.Remove(Target);
+                                    Test::Log("cache") << "Timed out and removed" << std::endl;
+                                }
+                            );
                             Lock.unlock();
                         }
                         else if (Poll[2].HasEvent())
                         {
                             Interrupt.Listen();
-                            Server.Send();
                             goto calc;
                         }
                     }
-                }
-
-                void OnTimeOut(const Network::EndPoint &Peer)
-                {
-                    //
                 }
 
                 void Respond(Network::DHT::Request &Request)
@@ -313,8 +332,6 @@ calc:                   Await();
                     Poll.Add(Server.Listener(), Server.Events());
                     Poll.Add(Handler.Listener(), Timer::In);
                     Poll.Add(Interrupt.INode(), Event::In);
-
-                    Cache.Add({Identity.Id, {"0.0.0.0:0"}});
                 }
 
                 // ### Static functions
@@ -333,16 +350,18 @@ calc:                   Await();
 
                 std::function<void()> GetInPool = [this]()
                 {
-                    try
-                    {
-                        EventLoop();
-                    }
-                    catch (const std::exception &e)
-                    {
-                        std::cerr << e.what() << '\n';
-                    }
+                    EventLoop();
+                    
+                    // try
+                    // {
+                    //     EventLoop();
+                    // }
+                    // catch (const std::exception &e)
+                    // {
+                    //     std::cerr << e.what() << '\n';
+                    // }
 
-                    Test::Log("Pool") << "Exited" << std::endl;
+                    // Test::Log("Pool") << "Exited" << std::endl;
                 };
 
                 void Run()
@@ -436,7 +455,7 @@ calc:                   Await();
 
                             CB(DateTime::Now() - SendTime, End);
                         },
-                        End);
+                        std::move(End));
                 }
 
                 typedef std::function<void(Iterable::List<Node>, Handler::EndCallback)> QueryCallback;

@@ -24,6 +24,12 @@ Core Kit is a header based library, so to use it basically download it, point yo
 
 Compile with `-lssl -lcrypto` flags for open ssl and `-std=c++2a` for c++ 20 standard libraries.
 
+As an example to compile Main.cpp using g++ :
+```sh
+g++ Source/Main.cpp -o CoreKit.elf \
+     -std=c++2a -Wall -ILibrary -pthread -lssl -lcrypto
+```
+
 ## Features
 
 Checked items are implemented completly at the moment and unchecked items are to be implemented or completed.
@@ -93,10 +99,9 @@ Checked items are implemented completly at the moment and unchecked items are to
     - If non blocking sent and errno was EAGAIN return 0
 
 - DHT:
-    - Cache time out and swap out policy
     - Task queue between Runner and Server-Handler
     - Redefine fundamental operation data structures
-    - Node should perform self look up to notify others
+    - Node should perform prev node look up to notify others
     - Node should update its key values after join
     - End Callbakc Status
     - Server Send and Receive time out

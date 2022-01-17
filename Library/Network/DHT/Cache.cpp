@@ -4,6 +4,7 @@
  * @brief
  * @todo Add multiple layer buffer
  * @todo Resolve must return a list of resolved values
+ * @todo Prevent an endpoint from having multiple identities
  * @version 0.1
  * @date 2022-01-11
  *
@@ -43,7 +44,6 @@ namespace Core
                     return (Index + (Entries.Length() - (BreakPoint + 1))) % Entries.Length();
                 }
 
-
             public:
                 Iterable::Span<Iterable::List<Node>> Entries;
 
@@ -66,22 +66,22 @@ namespace Core
 
                 // Funtionalities
 
-                const Node& Identity()
+                const Node &Identity()
                 {
                     return Entries[0][0];
                 }
 
-                const Iterable::List<Node>& Terminate()
+                const Iterable::List<Node> &Terminate()
                 {
                     return Entries[0];
                 }
-                
-                size_t NeighborHood(const Key& key)
+
+                size_t NeighborHood(const Key &key)
                 {
                     return (key - Identity().Id).MSNB();
                 }
 
-                const Iterable::List<Node>& Resolve(const Key &key)
+                const Iterable::List<Node> &Resolve(const Key &key)
                 {
                     size_t Index;
                     bool Found = false;
@@ -124,6 +124,71 @@ namespace Core
                     return Ordered(Index);
                 }
 
+                bool Remove(const Node &node)
+                {
+                    auto NeighborHood = (node.Id - Identity().Id).MSNB();
+
+                    auto &Neighbor = Entries[NeighborHood];
+
+                    size_t Index;
+
+                    if (Neighbor.ContainsWhere(
+                            Index,
+                            [&node](Node &Item)
+                            {
+                                return Item.EndPoint == node.EndPoint;
+                            }))
+                    {
+                        Neighbor.Remove(Index);
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                bool Remove(const EndPoint &endPoint, size_t NeighborHood)
+                {
+                    auto &Neighbor = Entries[NeighborHood];
+
+                    size_t Index;
+
+                    if (Neighbor.ContainsWhere(
+                            Index,
+                            [&endPoint](Node &Item)
+                            {
+                                return Item.EndPoint == endPoint;
+                            }))
+                    {
+                        Neighbor.Remove(Index);
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                bool Remove(const EndPoint &endPoint)
+                {
+                    size_t Index;
+
+                    for (size_t i = 0; i < Entries.Length(); i++)
+                    {
+                        auto &Neighbor = Entries[i];
+
+                        if (Neighbor.ContainsWhere(
+                                Index,
+                                [&endPoint](Node &Item)
+                                {
+                                    return Item.EndPoint == endPoint;
+                                }))
+                        {
+                            Neighbor.Remove(Index);
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }
+
                 bool Add(const Node &node)
                 {
                     auto NeighborHood = (node.Id - Identity().Id).MSNB();
@@ -144,17 +209,75 @@ namespace Core
                     }
                 }
 
-                void ForEach(const std::function<void(const Node&)>& Callback)
+                bool Add(const Node &node, size_t NeighborHood)
+                {
+                    auto &Neighbor = Entries[NeighborHood];
+
+                    if (Neighbor.IsFull()) // @todo Fix this
+                    {
+                        Neighbor.Last() = node;
+
+                        return true;
+                    }
+                    else
+                    {
+                        Neighbor.Add(node);
+
+                        return false;
+                    }
+                }
+
+                bool Test(const Node &node, const std::function<void(Node, std::function<void()>)> &Callback)
+                {
+                    auto NeighborHood = (node.Id - Identity().Id).MSNB();
+
+                    // if(NeighborHood == 0) return;
+
+                    auto &Neighbor = Entries[NeighborHood];
+
+                    // if Exists already do nothing
+
+                    if (Neighbor.ContainsWhere(
+                            [&node](Node &Item)
+                            {
+                                return Item.EndPoint == node.EndPoint;
+                            }))
+                    {
+                        return false;
+                    }
+
+                    // if list is not full add it
+
+                    if (!Neighbor.IsFull())
+                    {
+                        Neighbor.Add(node);
+                        return false;
+                    }
+
+                    // if its full test
+
+                    // @todo fix dead lock
+
+                    Callback(
+                        Neighbor.Last(),
+                        [this, node, NeighborHood]()
+                        {
+                            Add(node, NeighborHood);
+                        });
+
+                    return true;
+                }
+
+                void ForEach(const std::function<void(const Node &)> &Callback)
                 {
                     Entries.ForEach(
-                        [this, &Callback](const Iterable::List<Node>& entry)
+                        [this, &Callback](const Iterable::List<Node> &entry)
                         {
-                            if(entry.Length() > 0)
+                            if (entry.Length() > 0)
                             {
                                 Callback(entry[0]); // @todo Fix this
                             }
-                        }
-                    );
+                        });
                 }
             };
 

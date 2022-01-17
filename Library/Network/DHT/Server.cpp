@@ -53,8 +53,6 @@ namespace Core
                     Stopped,
                 };
 
-                // std::function<void(Request &)> OnReady;
-
                 Server() = default;
 
                 Server(const Network::EndPoint &EndPoint) : _Socket(Network::Socket::IPv4, Network::Socket::UDP | Network::Socket::NonBlocking), _Incomming(1), _Outgoing(1)
@@ -87,7 +85,30 @@ namespace Core
                         _Outgoing.Take();
                 }
 
-                bool Receive(const std::function<void(Request&)> &OnReady)
+                bool Put(const Network::EndPoint &Peer, const std::function<void(Format::Serializer &)> &Builder, size_t Size = 1024)
+                {
+                    // @todo Optimize and generalize this
+
+                    Request request(Peer, Size + 9 /* 9 is default header size */);
+
+                    Format::Serializer Serializer(request.Buffer);
+
+                    Serializer.Add((char *)"CHRD", 4) << (int)0;
+
+                    Builder(Serializer);
+
+                    Serializer.Modify<uint32_t>(4) = htonl(request.Buffer.Length());
+
+                    {
+                        std::lock_guard<std::mutex> lock(_OutgoingLock);
+
+                        _Outgoing.Add(std::move(request));
+                    }
+
+                    return true;
+                }
+
+                bool Take(const std::function<void(Request &)> &OnReady)
                 {
                     auto len = _Socket.Received();
                     char Data[len];
@@ -105,7 +126,7 @@ namespace Core
 
                     {
                         std::lock_guard _Lock(_IncommingLock); // @todo Not needed just to be sure for now
-                        
+
                         if (_Incomming.ContainsWhere(
                                 Index,
                                 [Peer](Request &Item)
@@ -156,35 +177,12 @@ namespace Core
                         }
                     }
 
-                    if(Ret)
+                    if (Ret)
                     {
                         OnReady(request);
                     }
 
                     return Ret;
-                }
-
-                bool Put(const Network::EndPoint &Peer, const std::function<void(Format::Serializer &)> &Builder, size_t Size = 1024)
-                {
-                    // @todo Optimize and generalize this
-
-                    Request request(Peer, Size + 9 /* 9 is default header size */);
-
-                    Format::Serializer Serializer(request.Buffer);
-
-                    Serializer.Add((char *)"CHRD", 4) << (int)0;
-
-                    Builder(Serializer);
-
-                    Serializer.Modify<uint32_t>(4) = htonl(request.Buffer.Length());
-
-                    {
-                        std::lock_guard<std::mutex> lock(_OutgoingLock);
-
-                        _Outgoing.Add(std::move(request));
-                    }
-
-                    return true;
                 }
             };
         }

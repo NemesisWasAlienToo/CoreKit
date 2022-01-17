@@ -153,7 +153,7 @@ namespace Core
                     return std::move(Result += *this);
                 }
 
-                // 
+                //
                 size_t Critical() const // @todo Important Fix and optimize this
                 {
                     size_t Index = 0;
@@ -163,7 +163,7 @@ namespace Core
                     for (size_t i = 2; i <= NeighborCount(); i++)
                     {
                         Key Next = Neighbor(i);
-                        
+
                         if (Next > key)
                         {
                             key = std::move(Next);
@@ -349,7 +349,7 @@ namespace Core
                         Carry = Buffer >> 8;
                         Other = Other >> 8;
 
-                        if(Carry == 0 && Other == 0)
+                        if (Carry == 0 && Other == 0)
                         {
                             break;
                         }
@@ -400,9 +400,9 @@ namespace Core
 
                     for (int i = Size - 1; i >= 0; i--)
                     {
-                        Buffer = (~Data[i]) + Carry;
+                        Buffer = ((unsigned char)(~Data[i])) + Carry;
 
-                        Result[i] = Buffer & 0xFF;
+                        Result.Data[i] = Buffer & 0xFF;
 
                         Carry = Buffer >> 8;
                     }
@@ -410,9 +410,29 @@ namespace Core
                     return Result;
                 }
 
+                // Key operator-(const Key &Other) const
+                // {
+                //     return *this + (-Other);
+                // }
+
                 Key operator-(const Key &Other) const
                 {
-                    return *this + (-Other);
+                    Key Result(Size);
+
+                    char Carry = 1;
+
+                    unsigned short Buffer = 0;
+
+                    for (int i = Size - 1; i >= 0; i--)
+                    {
+                        Buffer = Data[i] + ((unsigned char)(~Other.Data[i])) + Carry;
+
+                        Result[i] = Buffer & 0xFF;
+
+                        Carry = Buffer >> 8;
+                    }
+
+                    return Result;
                 }
 
                 Key operator+=(const size_t &Number)
@@ -433,7 +453,7 @@ namespace Core
                         Carry = Buffer >> 8;
                         Other = Other >> 8;
 
-                        if(Carry == 0 && Other == 0)
+                        if (Carry == 0 && Other == 0)
                         {
                             break;
                         }

@@ -285,26 +285,25 @@ namespace Core
 
         File &operator>>(std::string &Message)
         {
-            size_t Size = Received() + 1;
+            int Result = 0;
+            size_t Size = 128;
 
-            if (Size <= 0)
-                return *this;
+            do
+            {
+                char buffer[Size];
 
-            char buffer[Size];
+                Result = read(_INode, buffer, Size);
 
-            int Result = read(_INode, buffer, Size);
+                if(Result <= 0) break;
 
-            // Instead, can increase string size by
-            // available bytes in socket buffer
-            // and call read on c_str at the new memory index
+                Message.append(buffer, Result);
+
+            } while ((Size = Received()) > 0);
 
             if (Result < 0 && errno != EAGAIN)
             {
                 throw std::system_error(errno, std::generic_category());
             }
-
-            buffer[Result] = 0;
-            Message.append(buffer);
 
             return *this;
         }
@@ -342,4 +341,8 @@ namespace Core
             return os << str;
         }
     };
+
+    File STDIN = STDIN_FILENO;
+    File STDOUT = STDOUT_FILENO;
+    File STDERR = STDERR_FILENO;
 }
