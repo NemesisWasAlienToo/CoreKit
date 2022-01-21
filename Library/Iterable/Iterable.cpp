@@ -20,19 +20,19 @@ namespace Core
         {
 
         protected:
-            static_assert(std::is_move_assignable<T>::value, "T must be move assignable");
+            static_assert(std::is_move_assignable<T>::value, "T must be at least move assignable");
 
             // ### Private variables
 
             size_t _Capacity = 0;
             size_t _Length = 0;
-            T *_Content = NULL;
+            T *_Content = nullptr;
             bool _Growable = true;
 
-            size_t _ResizeCallback(size_t Current, size_t Minimum)
+            _FORCE_INLINE inline size_t _CalculateNewSize(size_t Minimum)
             {
-                return (Current * 2) + Minimum;
-            };
+                return (_Capacity * 2) + Minimum;
+            }
 
             // ### Pre-defined Functions
 
@@ -44,13 +44,13 @@ namespace Core
                 if (!_Growable)
                     throw std::out_of_range("");
 
-                Resize(_ResizeCallback(_Capacity, Minimum));
+                Resize(_CalculateNewSize(Minimum));
             }
 
             // ### Virtual Functions
 
-            _FORCE_INLINE inline T &_ElementAt(size_t Index) { return _Content[Index]; }
-            _FORCE_INLINE inline const T &_ElementAt(size_t Index) const { return _Content[Index]; }
+            _FORCE_INLINE inline virtual T &_ElementAt(size_t Index) { return _Content[Index]; }
+            _FORCE_INLINE inline virtual const T &_ElementAt(size_t Index) const { return _Content[Index]; }
 
             // ### Constructors
 
@@ -66,7 +66,7 @@ namespace Core
                 }
             }
 
-            Iterable(const Iterable &Other) : _Capacity(Other._Capacity), _Length(Other._Length), _Content(new T[Other._Capacity]), _Growable(Other._Growable)//, _ResizeCallback(Other._ResizeCallback)
+            Iterable(const Iterable &Other) : _Capacity(Other._Capacity), _Length(Other._Length), _Content(new T[Other._Capacity]), _Growable(Other._Growable)
             {
                 for (size_t i = 0; i < Other._Length; i++)
                 {
@@ -74,7 +74,7 @@ namespace Core
                 }
             }
 
-            Iterable(Iterable &&Other) noexcept : _Capacity(Other._Capacity), _Length(Other._Length), _Growable(Other._Growable)//, _ResizeCallback(std::move(Other._ResizeCallback))
+            Iterable(Iterable &&Other) noexcept : _Capacity(Other._Capacity), _Length(Other._Length), _Growable(Other._Growable)
             {
                 std::swap(_Content, Other._Content);
             }
@@ -244,6 +244,14 @@ namespace Core
                 this->_Length += Count;
             }
 
+            void Add(Iterable<T>& Other)
+            {
+                while (!Other.IsEmpty())
+                {
+                    Add(Other.Take());
+                }
+            }
+
             void Squeeze(T &&Item, size_t Index) // @todo Add perfect forwarding
             {
                 if (this->_Length <= Index)
@@ -369,14 +377,6 @@ namespace Core
                     throw std::out_of_range("");
 
                 std::swap(_ElementAt(First), _ElementAt(Second));
-            }
-
-            void Trim(size_t Additional = 0)
-            {
-                if (this->_Length <= 0)
-                    return;
-
-                Resize(Length() + Additional);
             }
 
             // // ### To be implemented

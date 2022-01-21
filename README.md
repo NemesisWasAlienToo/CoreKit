@@ -26,8 +26,7 @@ Compile with `-lssl -lcrypto` flags for open ssl and `-std=c++2a` for c++ 20 sta
 
 As an example to compile Main.cpp using g++ :
 ```sh
-g++ Source/Main.cpp -o CoreKit.elf \
-     -std=c++2a -Wall -ILibrary -pthread -lssl -lcrypto
+g++ Source/Main.cpp -o CoreKit.elf -std=c++2a -Wall -ILibrary -pthread -lssl -lcrypto
 ```
 
 ## Features

@@ -86,7 +86,7 @@ namespace Core
                     size_t Index;
                     bool Found = false;
 
-                    size_t Biggest;
+                    size_t Biggest = 0;
                     bool BFournd = false;
 
                     Iterable::List<Node> Res;

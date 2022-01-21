@@ -27,12 +27,12 @@ namespace Core
 
             // ### Private Functions
 
-            _FORCE_INLINE inline T &_ElementAt(size_t Index)
+            _FORCE_INLINE inline T &_ElementAt(size_t Index) override
             {
                 return this->_Content[(_First + Index) % this->_Capacity];
             }
 
-            _FORCE_INLINE inline const T &_ElementAt(size_t Index) const
+            _FORCE_INLINE inline const T &_ElementAt(size_t Index) const override
             {
                 return this->_Content[(_First + Index) % this->_Capacity];
             }
@@ -62,147 +62,23 @@ namespace Core
             }
 
             // ### Public Functions
+            
+            // void _IncreaseCapacity(size_t Minimum = 1) // @todo Fix this bug
+            // {
+            //     if (_Capacity - _Length >= Minimum)
+            //         return;
 
-            void Resize(size_t Size)
+            //     if (!_Growable)
+            //         throw std::out_of_range("");
+
+            //     Resize(this->_CalculateNewSize(Minimum));
+            // }
+
+            void Resize(size_t Size) // @todo Fix this bug
             {
-                T *_New = new T[Size];
-
-                for (size_t i = 0; i < this->_Length; i++)
-                {
-                    _New[i] = std::move(_ElementAt(i));
-                }
-
-                delete[] this->_Content;
-
-                this->_Content = _New;
+                Iterable<T>::Resize(Size);
 
                 _First = 0;
-
-                this->_Capacity = Size;
-            }
-
-            void Add(T &&Item)
-            {
-                this->_IncreaseCapacity();
-
-                _ElementAt(this->_Length) = std::move(Item);
-                this->_Length++;
-            }
-
-            void Add(const T &Item)
-            {
-                this->_IncreaseCapacity();
-
-                _ElementAt(this->_Length) = Item;
-                this->_Length++;
-            }
-
-            void Add(const T &Item, size_t Count)
-            {
-                this->_IncreaseCapacity(Count);
-
-                for (size_t i = 0; i < Count; i++) // optimize loop
-                {
-                    _ElementAt(this->_Length + i) = Item;
-                }
-
-                this->_Length += Count;
-            }
-
-            void Add(T &&Item, size_t Count)
-            {
-                this->_IncreaseCapacity(Count);
-
-                for (size_t i = 0; i < Count; i++)
-                {
-                    _ElementAt(this->_Length + i) = std::forward<T>(Item);
-                }
-
-                this->_Length += Count;
-            }
-
-            void Add(T *Items, size_t Count)
-            {
-                this->_IncreaseCapacity(Count);
-
-                for (size_t i = 0; i < Count; i++)
-                {
-                    _ElementAt(this->_Length + i) = std::move(Items[i]);
-                }
-
-                this->_Length += Count;
-            }
-
-            void Add(const T *Items, size_t Count)
-            {
-                this->_IncreaseCapacity(Count);
-
-                for (size_t i = 0; i < Count; i++)
-                {
-                    _ElementAt(this->_Length + i) = Items[i];
-                }
-
-                this->_Length += Count;
-            }
-
-            void Add(Queue &Other)
-            {
-                this->_IncreaseCapacity(Other._Length);
-
-                while (!Other.IsEmpty())
-                {
-                    Add(Other.Take());
-                }
-            }
-
-            void Add(const Queue &Other)
-            {
-                this->_IncreaseCapacity(Other._Length);
-
-                for (size_t i = 0; i < Other._Length; i++)
-                {
-                    Add(Other[i]);
-                }
-            }
-
-            void Remove(size_t Index)
-            {
-                if (Index >= this->_Length)
-                    throw std::out_of_range("");
-
-                this->_Length--;
-
-                if constexpr (std::is_arithmetic<T>::value)
-                {
-                    for (size_t i = Index; i < this->_Length; i++)
-                    {
-                        _ElementAt(i) = std::move(_ElementAt(i + 1));
-                    }
-                }
-                else
-                {
-                    if (Index == this->_Length)
-                    {
-                        _ElementAt(Index).~T();
-                    }
-                    else
-                    {
-                        for (size_t i = Index; i < this->_Length; i++)
-                        {
-                            _ElementAt(i) = std::move(_ElementAt(i + 1));
-                        }
-                    }
-                }
-            }
-
-            void Fill(const T &Item)
-            {
-                for (size_t i = this->_Length; i < this->_Capacity; i++)
-                {
-                    _ElementAt(i) = Item;
-                }
-
-                this->_Length = this->_Capacity;
             }
 
             T Take()
@@ -257,60 +133,9 @@ namespace Core
                         _ElementAt(i).~T();
                     }
                 }
-                
+
                 _First = (_First + Count) % this->_Capacity;
                 this->_Length -= Count;
-            }
-
-            bool ContainsWhere(const std::function<bool(T &)>& Condition)
-            {
-                for (size_t i = 0; i < this->_Length; i++)
-                {
-                    T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                        return true;
-                }
-
-                return false;
-            }
-
-            bool ContainsWhere(size_t &First, const std::function<bool(T &)>& Condition)
-            {
-                for (size_t i = 0; i < this->_Length; i++)
-                {
-                    T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                    {
-                        First = i;
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            std::string Peek(size_t Size)
-            {
-                if (Size > this->_Capacity)
-                    throw std::out_of_range("");
-
-                std::string str; // Optimization needed
-
-                str.resize(Size * sizeof(T));
-
-                for (size_t i = 0; i < Size; i++)
-                {
-                    str += this->_Content[i];
-                }
-
-                return str;
-            }
-
-            std::string Peek()
-            {
-                return Peek(this->_Capacity);
             }
 
             std::string ToString(size_t Size)

@@ -182,11 +182,6 @@ namespace Core
             file.Close();
         }
 
-        // void Run(const std::string& Path)
-        // {
-        //     int execve(Path.c_str(), char *const argv[], char *const envp[]);
-        // }
-
         // ### Functions
 
         int Received() const
@@ -243,6 +238,31 @@ namespace Core
             return static_cast<size_t>(Result);
         }
 
+        void WriteLine(const std::string& Message)
+        {
+            *this << Message << '\n';
+        }
+
+        std::string ReadLine()
+        {
+            // @todo Fix and optimize this maybe with string stream?
+            char c;
+            size_t RRead;
+            std::string Res;
+
+            while ((RRead = Read(&c, 1)) > 0)
+            {
+                if(c == '\n')
+                {
+                    break;
+                }
+
+                Res += c;
+            }
+
+            return Res;
+        }
+
         // ### Operators
 
         File &operator<<(const char Message)
@@ -288,13 +308,16 @@ namespace Core
             int Result = 0;
             size_t Size = 128;
 
+            Message.resize(0);
+
             do
             {
                 char buffer[Size];
 
                 Result = read(_INode, buffer, Size);
 
-                if(Result <= 0) break;
+                if (Result <= 0)
+                    break;
 
                 Message.append(buffer, Result);
 
@@ -310,26 +333,28 @@ namespace Core
 
         const File &operator>>(std::string &Message) const
         {
-            size_t Size = Received() + 1;
+            int Result = 0;
+            size_t Size = 128;
 
-            if (Size <= 0)
-                return *this;
+            Message.resize(0);
 
-            char buffer[Size];
+            do
+            {
+                char buffer[Size];
 
-            int Result = read(_INode, buffer, Size);
+                Result = read(_INode, buffer, Size);
 
-            // Instead, can increase string size by
-            // avalable bytes in socket buffer
-            // and call read on c_str at the new memory index
+                if (Result <= 0)
+                    break;
+
+                Message.append(buffer, Result);
+
+            } while ((Size = Received()) > 0);
 
             if (Result < 0 && errno != EAGAIN)
             {
                 throw std::system_error(errno, std::generic_category());
             }
-
-            buffer[Result] = 0;
-            Message.append(buffer);
 
             return *this;
         }

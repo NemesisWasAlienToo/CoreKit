@@ -16,12 +16,12 @@ namespace Core
         protected:
             // ### Private Functions
 
-            _FORCE_INLINE inline T &_ElementAt(size_t Index)
+            inline T &_ElementAt(size_t Index) override
             {
                 return this->_Content[Index];
             }
 
-            _FORCE_INLINE inline const T &_ElementAt(size_t Index) const
+            inline const T &_ElementAt(size_t Index) const override
             {
                 return this->_Content[Index];
             }

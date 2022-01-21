@@ -12,7 +12,7 @@
 #include "Network/DHT/Node.cpp"
 
 #ifndef NETWORK_BYTE_ORDER
-#define NETWORK_BYTE_ORDER LITTLE_ENDIAN
+#define NETWORK_BYTE_ORDER BIG_ENDIAN
 #endif
 
 // @todo Seperate serializer and deserializer IMPORTANT
@@ -21,25 +21,24 @@ namespace Core
 {
     namespace Format
     {
-        // @todo Add endianness maybe?
-
         class Serializer
         {
-        private:
+        public:
 #if BYTE_ORDER == NETWORK_BYTE_ORDER
 
             template <typename T>
-            void Order(const T &Source, T &Destination)
+            static std::void_t<std::enable_if<std::is_integral<T>::value>>
+            static void Order(const T &Source, T &Destination)
             {
                 Destination = Source;
             }
 #else
-
             template <typename T>
-            void Order(const T &Source, T &Destination)
+            static std::void_t<std::enable_if<std::is_integral<T>::value>>
+            Order(const T &Source, T &Destination)
             {
-                const void *SourcePointer = (void *)&Source;
-                const void *DestinationPointer = (void *)&Destination;
+                const char *SourcePointer = (char *)&Source;
+                char *DestinationPointer = (char *)&Destination;
 
                 for (size_t i = 0; i < sizeof(T); i++)
                 {
@@ -47,8 +46,16 @@ namespace Core
                 }
             }
 #endif
+            template <typename T>
+            static T Order(const T &Source)
+            {
+                T Res;
 
-        public:
+                Order(Source, Res);
+
+                return Res;
+            }
+
             // Public variables
 
             Iterable::Queue<char> &Queue;
@@ -188,17 +195,16 @@ namespace Core
                 return *this;
             }
 
-            template<typename T>
+            template <typename T>
             Serializer &operator<<(const Iterable::List<T> &Value)
             {
                 *this << Value.Length();
 
                 Value.ForEach(
-                    [this](const T& Item)
+                    [this](const T &Item)
                     {
                         *this << Item;
-                    }
-                );
+                    });
 
                 return *this;
             }
@@ -207,7 +213,7 @@ namespace Core
             {
                 *this << Value.Size;
 
-                Queue.Add((char *) Value.Data, Value.Size);
+                Queue.Add((char *)Value.Data, Value.Size);
 
                 return *this;
             }
@@ -346,7 +352,7 @@ namespace Core
                 return *this;
             }
 
-            template<typename T>
+            template <typename T>
             Serializer &operator>>(Iterable::List<T> &Value)
             {
                 size_t Size;
@@ -371,8 +377,9 @@ namespace Core
 
                 *this >> Size;
 
-                if(Value.Size != Size) Value = Network::DHT::Key(Size);
-                
+                if (Value.Size != Size)
+                    Value = Network::DHT::Key(Size);
+
                 Queue.Take((char *)Value.Data, Value.Size);
 
                 return *this;
@@ -383,7 +390,7 @@ namespace Core
                 size_t Index = 0;
 
                 Queue.ContainsWhere(Index, [](char &item) -> bool
-                                 { return item == 0; });
+                                    { return item == 0; });
 
                 Value.resize(Index++);
 

@@ -38,7 +38,7 @@ int main(int argc, char const *argv[])
 
     // Setup the server
 
-    Network::DHT::Runner Chord(Identity, {5, 0}, 5);
+    Network::DHT::Runner Chord(Identity, {5, 0}, 1);
 
     Chord.OnSet =
         [](const Core::Network::DHT::Key &Key, const Core::Iterable::Span<char> &Data)
@@ -66,11 +66,9 @@ int main(int argc, char const *argv[])
 
     Chord.Run();
 
-    // Chord.GetInPool();
+    STDOUT.WriteLine("Waiting for commands");
 
-    // Chord.Await(); // <--- Await all requests to be finished
-
-    std::string Command = "";
+    std::string Command = STDIN.ReadLine();
 
     while (Command != "exit")
     {
@@ -164,18 +162,12 @@ int main(int argc, char const *argv[])
 
             Chord.SendTo(Target, {Message.c_str(), Message.length()});
         }
-        // else if (Command == "print")
-        // {
-        //     Chord.Nodes.ForEach(
-        //         [](Network::DHT::Node &node)
-        //         {
-        //             std::cout << node.Id.ToString() << std::endl;
-        //         });
-        // }
+        else
+        {
+            Chord.SendTo(Target, {Command.c_str(), Command.length()});
+        }
 
-        std::cout << "Waiting for command, master : " << std::endl;
-
-        std::cin >> Command;
+        Command = STDIN.ReadLine();
     }
 
     Chord.Stop();

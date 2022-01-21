@@ -93,11 +93,11 @@ namespace Core
 
                     Format::Serializer Serializer(request.Buffer);
 
-                    Serializer.Add((char *)"CHRD", 4) << (int)0;
+                    Serializer.Add((char *)"CHRD", 4) << (uint32_t)0;
 
                     Builder(Serializer);
 
-                    Serializer.Modify<uint32_t>(4) = htonl(request.Buffer.Length());
+                    Serializer.Modify<uint32_t>(4) = Format::Serializer::Order((uint32_t) request.Buffer.Length());
 
                     {
                         std::lock_guard<std::mutex> lock(_OutgoingLock);
