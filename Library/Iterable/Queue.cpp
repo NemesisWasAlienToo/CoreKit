@@ -40,7 +40,7 @@ namespace Core
         public:
             // ### Constructors
 
-            Queue() : Iterable<T>(), _First(0) {}
+            Queue() = default;
 
             Queue(size_t Capacity, bool Growable = true) : Iterable<T>(Capacity, Growable), _First(0) {}
 
@@ -62,17 +62,6 @@ namespace Core
             }
 
             // ### Public Functions
-            
-            // void _IncreaseCapacity(size_t Minimum = 1) // @todo Fix this bug
-            // {
-            //     if (_Capacity - _Length >= Minimum)
-            //         return;
-
-            //     if (!_Growable)
-            //         throw std::out_of_range("");
-
-            //     Resize(this->_CalculateNewSize(Minimum));
-            // }
 
             void Resize(size_t Size) // @todo Fix this bug
             {

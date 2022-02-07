@@ -1,5 +1,5 @@
 /**
- * @file Cache.cpp
+ * @file Chord.cpp
  * @author Nemesis (github.com/NemesisWasAlienToo)
  * @brief
  * @todo Add multiple layer buffer
@@ -19,6 +19,7 @@
 #include <mutex>
 
 #include <Network/EndPoint.cpp>
+#include <Network/DHT/DHT.cpp>
 #include <Network/DHT/Node.cpp>
 #include <Iterable/Span.cpp>
 #include <Iterable/List.cpp>
@@ -29,7 +30,7 @@ namespace Core
     {
         namespace DHT
         {
-            class Cache
+            class Chord
             {
             private:
                 size_t BreakPoint;
@@ -45,11 +46,12 @@ namespace Core
                 }
 
             public:
+                std::function<void(Node, std::function<void()>)> OnTest; //EndCallback
                 Iterable::Span<Iterable::List<Node>> Entries;
 
-                Cache() = default;
+                Chord() = default;
 
-                Cache(const Key &Identity) : Entries((Identity.Size * 8) + 1)
+                Chord(const Key &Identity) : Entries((Identity.Size * 8) + 1)
                 {
                     BreakPoint = Identity.Critical();
 
@@ -62,7 +64,7 @@ namespace Core
                     Entries[0].Add({Identity, {"0.0.0.0:0"}});
                 }
 
-                ~Cache() = default;
+                ~Chord() = default;
 
                 // Funtionalities
 
@@ -227,7 +229,7 @@ namespace Core
                     }
                 }
 
-                bool Test(const Node &node, const std::function<void(Node, std::function<void()>)> &Callback)
+                bool Test(const Node &node)
                 {
                     auto NeighborHood = (node.Id - Identity().Id).MSNB();
 
@@ -258,7 +260,7 @@ namespace Core
 
                     // @todo fix dead lock
 
-                    Callback(
+                    OnTest(
                         Neighbor.Last(),
                         [this, node, NeighborHood]()
                         {
@@ -280,7 +282,6 @@ namespace Core
                         });
                 }
             };
-
         }
     }
 }

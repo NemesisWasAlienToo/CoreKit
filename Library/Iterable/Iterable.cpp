@@ -54,7 +54,7 @@ namespace Core
 
             // ### Constructors
 
-            Iterable() : _Capacity(1), _Length(0), _Content(new T[1]), _Growable(true) {}
+            Iterable() = default;
 
             Iterable(size_t Capacity, bool Growable = true) : _Capacity(Capacity), _Length(0), _Content(new T[Capacity]), _Growable(Growable) {}
 
@@ -416,21 +416,6 @@ namespace Core
 
                     if (Condition(item))
                         result.Add(item);
-                }
-
-                return result;
-            }
-
-            size_t CountWhere(std::function<bool(T &)> Condition)
-            {
-                size_t result;
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                        result++;
                 }
 
                 return result;

@@ -1,18 +1,8 @@
-/**
- * @file Server.cpp
- * @author Nemesis (github.com/NemesisWasAlienToo)
- * @brief
- * @todo Add time out for _Incomming and out going requests
- * @version 0.1
- * @date 2022-01-11
- *
- * @copyright Copyright (c) 2022
- *
- */
 #pragma once
 
 #include <iostream>
 #include <string>
+#include <map>
 #include <mutex>
 #include <thread>
 #include <functional>
@@ -24,11 +14,11 @@
 #include <Network/Socket.cpp>
 
 #include <Iterable/List.cpp>
+#include <Iterable/Span.cpp>
 #include <Iterable/Poll.cpp>
 
 #include <Format/Serializer.cpp>
-#include <Network/DHT/Request.cpp>
-#include <Network/Handler.cpp>
+#include <Network/DHT/Node.cpp>
 
 namespace Core
 {
@@ -36,11 +26,6 @@ namespace Core
     {
         class Server
         {
-        private:
-            Network::Socket _Socket;
-            Iterable::Queue<Network::DHT::Request> _Outgoing;
-            Network::Handler _Handler;
-
         public:
             enum class States : uint8_t
             {
@@ -48,12 +33,42 @@ namespace Core
                 Stopped,
             };
 
+            typedef std::function<void()> EndCallback;
+            typedef std::function<bool()> OutgoingCallback;
+            typedef std::function<bool(const Iterable::Span<char> &)> IncommingCallback;
+            typedef std::function<void(const EndPoint &, const Iterable::Span<char> &)> BuilderCallback;
+
+            // template <typename T>
+            // struct Entry
+            // {
+            //     DateTime Expire;
+            //     EndCallback End;
+            //     T Callback;
+            // };
+
+            // typedef Entry<OutgoingCallback> OutEntry;
+            // typedef Entry<IncommingCallback> InEntry;
+
+        private:
+            Network::Socket _Socket;
+            Iterable::Queue<OutgoingCallback> _Outgoing;
+            std::map<Network::EndPoint, IncommingCallback> _Incomming;
+
+        public:
+            // Variables
+            
+            BuilderCallback Builder;
+
+            // Constructors
+
             Server() = default;
 
             Server(const Network::EndPoint &EndPoint) : _Socket(Network::Socket::IPv4, Network::Socket::UDP), _Outgoing(1)
             {
                 _Socket.Bind(EndPoint);
             }
+
+            // Functionalities
 
             inline Descriptor Listener()
             {
@@ -74,9 +89,7 @@ namespace Core
 
                 auto &Last = _Outgoing.Last();
 
-                Last.Buffer.Free(_Socket.SendTo(Last.Buffer.Content(), Last.Buffer.Length(), Last.Peer));
-
-                if (Last.Buffer.IsEmpty())
+                if (Last())
                 {
                     _Outgoing.Take();
                 }
@@ -84,17 +97,93 @@ namespace Core
 
             void OnReceive()
             {
-                // Setup buffers
+                auto [Data, Peer] = _Socket.ReceiveFrom();
 
-                size_t len = _Socket.Received();
-                Iterable::Span<char> Data(len);
-                Network::EndPoint Peer;
+                if (!_Incomming.contains(Peer))
+                {
+                    Builder(Peer, Data);
+                }
+                else
+                {
+                    if (_Incomming[Peer](Data))
+                    {
+                        // If its done
 
-                // Read arrived data
+                        _Incomming.erase(Peer);
+                    }
+                }
+            }
 
-                len = _Socket.ReceiveFrom(Data.Content(), len, Peer);
+            Iterable::Queue<char> Prepare(const std::function<void(Format::Serializer &)> &Builder, size_t Size = 1024)
+            {
+                Iterable::Queue<char> request(Size + 9);
 
-                _Handler.Feed(Peer, Data);
+                Format::Serializer Serializer(request);
+
+                Serializer.Add((char *)"CHRD", 4) << (uint32_t)0;
+
+                Builder(Serializer);
+
+                Serializer.Modify<uint32_t>(4) = Format::Serializer::Order((uint32_t)request.Length());
+
+                return request;
+            }
+
+            inline void Fire(const Network::EndPoint &Peer, const std::function<void(Format::Serializer &)> &Builder)
+            {
+                auto Request = Prepare(
+                    [this, &Builder](Format::Serializer &Ser)
+                    {
+                        // Fill in my id for me
+
+                        Ser << DHT::Key::Generate(4);
+
+                        // Build
+
+                        Builder(Ser);
+                    });
+
+                _Outgoing.Add(
+                    [this, Peer, QU = std::move(Request)]() mutable -> bool
+                    {
+                        // @todo Can still improve this
+
+                        QU.Free(_Socket.SendTo(QU.Content(), QU.Chunk(), Peer));
+
+                        return QU.IsEmpty();
+                    });
+            }
+
+            bool Attach(const Network::EndPoint &Peer, const IncommingCallback &Callback)
+            {
+                if (_Incomming.contains(Peer))
+                {
+                    return false;
+                }
+
+                _Incomming.insert({Peer, Callback});
+                return true;
+            }
+
+            bool Attach(const Network::EndPoint &Peer, IncommingCallback &&Callback)
+            {
+                if (_Incomming.contains(Peer))
+                {
+                    return false;
+                }
+
+                _Incomming.insert({Peer, std::move(Callback)});
+                return true;
+            }
+
+            void Replace(const Network::EndPoint &Peer, const IncommingCallback &Callback)
+            {
+                _Incomming[Peer] = Callback;
+            }
+
+            void Replace(const Network::EndPoint &Peer, IncommingCallback &&Callback)
+            {
+                _Incomming[Peer] = std::move(Callback);
             }
         };
     }

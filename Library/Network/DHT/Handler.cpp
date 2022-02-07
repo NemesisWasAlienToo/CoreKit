@@ -12,10 +12,9 @@
 #include "Format/Serializer.cpp"
 #include "Network/EndPoint.cpp"
 #include "Iterable/List.cpp"
+#include "Network/DHT/DHT.cpp"
 #include "Network/DHT/Node.cpp"
 #include "Network/DHT/Request.cpp"
-
-using namespace Core;
 
 namespace Core
 {
@@ -26,10 +25,9 @@ namespace Core
             class Handler
             {
             public:
-                typedef std::function<void()> EndCallback;
                 typedef std::function<void(Node &, Format::Serializer &, EndCallback)> Callback;
 
-                struct Handle // @todo Add move semmantics
+                struct Handle
                 {
                     Callback Routine;
                     DateTime Expire;
@@ -43,7 +41,7 @@ namespace Core
                 std::pair<Network::EndPoint, Handle> _Closest;
                 Timer ExpireEvent;
 
-                // Shall not be used brfore accuring the lock
+                // Should not be used brfore accuring the lock
 
                 inline bool Has(const Network::EndPoint &EndPoint)
                 {
@@ -122,7 +120,7 @@ namespace Core
 
                         if (handle.Expire <= DateTime::Now())
                         {
-                            handle.End();
+                            handle.End({Report::Codes::TimeOut});
                             _Content.erase(_Closest.first);
                         }
                     }
@@ -147,7 +145,7 @@ namespace Core
 
                             if ((Ret = handle.Expire <= DateTime::Now()))
                             {
-                                handle.End();
+                                handle.End({Report::Codes::TimeOut});
                                 _Content.erase(_Closest.first);
                                 EP = _Closest.first;
                             }
@@ -232,7 +230,7 @@ namespace Core
                         }
                         else
                         {
-                            handle.End();
+                            handle.End({Report::Codes::TimeOut});
                         }
 
                         _Content.erase(EndPoint);

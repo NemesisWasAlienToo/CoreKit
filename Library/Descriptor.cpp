@@ -90,7 +90,7 @@ namespace Core
             }
         }
 
-        bool Blocking() const
+        bool IsBlocking() const
         {
             return (fcntl(_INode, F_GETFL, 0) & O_NONBLOCK) == 0;
         }

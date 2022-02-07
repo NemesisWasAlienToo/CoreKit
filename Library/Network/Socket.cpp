@@ -9,6 +9,7 @@
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <system_error>
+#include <tuple>
 
 #include "Descriptor.cpp"
 #include "Network/EndPoint.cpp"
@@ -171,7 +172,7 @@ namespace Core
                 }
             }
 
-            Socket Accept() const
+            std::tuple<Socket, EndPoint> Accept() const
             {
                 struct sockaddr_storage ClientAddress;
                 socklen_t Size;
@@ -187,7 +188,7 @@ namespace Core
                     throw std::system_error(errno, std::generic_category());
                 }
 
-                return ClientDescriptor;
+                return {ClientDescriptor, (struct sockaddr *)&ClientAddress};
             }
 
             Socket Accept(EndPoint &Peer) const
@@ -208,12 +209,11 @@ namespace Core
 
                 Peer = EndPoint((struct sockaddr *)&ClientAddress);
 
-                // FIX : The descriptor will not have NonBlocking flag in its type
+                // @todo : The descriptor will not have NonBlocking flag in its type
 
                 Socket Ret(ClientDescriptor);
 
-                if (fcntl(_INode, F_GETFL, 0) & O_NONBLOCK)
-                    Ret.Blocking(false);
+                if (!IsBlocking()) Ret.Blocking(false);
 
                 return Ret;
             }
@@ -328,9 +328,19 @@ namespace Core
                 return send(_INode, Data, Length, Flags);
             }
 
+            ssize_t Send(const Iterable::Span<char> &Data, int Flags = 0) const
+            {
+                return send(_INode, Data.Content(), Data.Length(), Flags);
+            }
+
             ssize_t Receive(char *Data, size_t Length, int Flags = 0) const
             {
                 return recv(_INode, Data, Length, Flags);
+            }
+
+            ssize_t Receive(Iterable::Span<char> &Data, int Flags = 0) const
+            {
+                return recv(_INode, Data.Content(), Data.Length(), Flags);
             }
 
             ssize_t SendTo(const char *Data, size_t Length, const EndPoint &Target, int Flags = 0) const
@@ -357,12 +367,14 @@ namespace Core
                 return Result;
             }
 
-            ssize_t ReceiveFrom(char *Data, size_t Length, EndPoint &Target, int Flags = 0) const
+            ssize_t SendTo(const Iterable::Span<char> &Data, const EndPoint &Target, int Flags = 0) const
             {
-                struct sockaddr_storage Client;
-                socklen_t len = sizeof(Client);
+                struct sockaddr_storage Client = {0, 0};
+                socklen_t len = Target.sockaddr((struct sockaddr *)&Client);
 
-                int Result = recvfrom(_INode, Data, Length, Flags, (struct sockaddr *)&Client, &len);
+                Network::EndPoint a((struct sockaddr *)&Client);
+
+                int Result = sendto(_INode, Data.Content(), Data.Length(), Flags, (struct sockaddr *)&Client, len);
 
                 if (Result < 0)
                 {
@@ -376,9 +388,108 @@ namespace Core
                     }
                 }
 
+                return Result;
+            }
+
+            ssize_t ReceiveFrom(char *Data, size_t Length, EndPoint &Target, int Flags = 0) const
+            {
+                struct sockaddr_storage Client;
+                socklen_t len = sizeof(Client);
+
+                ssize_t Result = recvfrom(_INode, Data, Length, Flags, (struct sockaddr *)&Client, &len);
+
                 Target = EndPoint(&Client);
 
+                if (Result < 0)
+                {
+                    if (errno == EAGAIN)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        throw std::system_error(errno, std::generic_category());
+                    }
+                }
+
                 return Result;
+            }
+
+            ssize_t ReceiveFrom(Iterable::Span<char> &Data, EndPoint &Target, int Flags = 0) const
+            {
+                struct sockaddr_storage Client;
+                socklen_t len = sizeof(Client);
+
+                ssize_t Result = recvfrom(_INode, Data.Content(), Data.Length(), Flags, (struct sockaddr *)&Client, &len);
+
+                Target = EndPoint(&Client);
+
+                if (Result < 0)
+                {
+                    if (errno == EAGAIN)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        throw std::system_error(errno, std::generic_category());
+                    }
+                }
+
+                return Result;
+            }
+
+            Iterable::Span<char> ReceiveFrom(EndPoint &Target, int Flags = 0) const
+            {
+                Iterable::Span<char> Data(Received());
+
+                struct sockaddr_storage Client;
+                socklen_t len = sizeof(Client);
+
+                ssize_t Result = recvfrom(_INode, Data.Content(), Data.Length(), Flags, (struct sockaddr *)&Client, &len);
+
+                Target = EndPoint(&Client);
+
+                if (Result < 0)
+                {
+                    if (errno == EAGAIN)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        throw std::system_error(errno, std::generic_category());
+                    }
+                }
+
+                return Data;
+            }
+
+            std::tuple<Iterable::Span<char>, EndPoint> ReceiveFrom(int Flags = 0) const
+            {
+                Iterable::Span<char> Data(Received());
+                EndPoint Target;
+
+                struct sockaddr_storage Client;
+                socklen_t len = sizeof(Client);
+
+                ssize_t Result = recvfrom(_INode, Data.Content(), Data.Length(), Flags, (struct sockaddr *)&Client, &len);
+
+                Target = EndPoint(&Client);
+
+                if (Result < 0)
+                {
+                    if (errno == EAGAIN)
+                    {
+                        return {0, Target};
+                    }
+                    else
+                    {
+                        throw std::system_error(errno, std::generic_category());
+                    }
+                }
+
+                return {std::move(Data), Target};
             }
 
             Socket &operator<<(const std::string &Message)
@@ -614,6 +725,13 @@ namespace Core
             // Maybe add rvalue later?
 
             Socket &operator=(const Socket &Other) = delete;
+
+            Socket &operator=(Socket &&Other)
+            {
+                _INode = Other._INode;
+
+                return *this;
+            }
 
             // Friend operators
 

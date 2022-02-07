@@ -11,6 +11,8 @@
 #include <openssl/evp.h>
 #include <openssl/engine.h>
 
+#include <Iterable/Span.cpp>
+
 namespace Core
 {
     namespace Format
@@ -26,10 +28,10 @@ namespace Core
             {
                 return 4 * ((Size + 2) / 3);
             }
-            
+
             std::string From(const unsigned char *Data, int Size)
             {
-                int _Size = 4 * ((Size + 2) / 3);
+                int _Size = CypherSize(Size);
                 char Output[_Size + 1];
 
                 int Result = EVP_EncodeBlock(reinterpret_cast<unsigned char *>(Output), Data, Size);
@@ -43,10 +45,29 @@ namespace Core
                 return Output;
             }
 
+            std::string From(const Iterable::Span<char> &Data)
+            {
+                int _Size = CypherSize(Data.Length());
+                char Output[_Size + 1];
+
+                int Result = EVP_EncodeBlock(reinterpret_cast<unsigned char *>(Output),
+                                             reinterpret_cast<const unsigned char *>(Data.Content()), Data.Length());
+
+                if (_Size != Result)
+                {
+                    std::cout << "Base64 String" << std::endl;
+                    exit(-1);
+                }
+
+                return Output;
+            }
+
             int Bytes(const std::string &Base64String, unsigned char *Data)
             {
-                int Result = EVP_DecodeBlock(Data, reinterpret_cast<const unsigned char *>(Base64String.c_str()), Base64String.length());
-                
+                int Result = EVP_DecodeBlock(Data,
+                                             reinterpret_cast<const unsigned char *>(Base64String.c_str()),
+                                             Base64String.length());
+
                 if (Result != PlainSize(Base64String.length()))
                 {
                     std::cout << "Base64 String" << std::endl;
@@ -54,6 +75,23 @@ namespace Core
                 }
 
                 return Result;
+            }
+
+            Iterable::Span<char> Bytes(const std::string &Base64String)
+            {
+                Iterable::Span<char> Data(PlainSize(Base64String.length()));
+
+                int Result = EVP_DecodeBlock(reinterpret_cast<unsigned char *>(Data.Content()),
+                                             reinterpret_cast<const unsigned char *>(Base64String.c_str()),
+                                             Base64String.length());
+
+                if (Result != Data.Length())
+                {
+                    std::cout << "Base64 String" << std::endl;
+                    exit(-1);
+                }
+
+                return Data;
             }
         };
     }

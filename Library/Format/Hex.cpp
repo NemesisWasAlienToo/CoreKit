@@ -31,13 +31,11 @@ namespace Core
                 return 2 * Size;
             }
 
-            template <typename T>
-            std::string From(const T &Item)
+            std::string From(const char *Data, size_t Size)
             {
-                const char *Data = (char *)&Item;
                 std::stringstream ss;
 
-                for (size_t i = 0; i < sizeof(Item); i++)
+                for (size_t i = 0; i < Size; i++)
                 {
                     // @ todo optimize this
 
@@ -47,11 +45,11 @@ namespace Core
                 return ss.str();
             }
 
-            std::string From(const char *Data, size_t Size)
+            std::string From(const Iterable::Span<char> &Data)
             {
                 std::stringstream ss;
 
-                for (size_t i = 0; i < Size; i++)
+                for (size_t i = 0; i < Data.Length(); i++)
                 {
                     // @ todo optimize this
 
@@ -71,6 +69,18 @@ namespace Core
                 }
 
                 return Len;
+            }
+
+            Iterable::Span<char> Bytes(const std::string &HexString, bool Upper = false)
+            {
+                Iterable::Span<char> Data(HexString.length() / 2);
+
+                for (size_t i = 0; i < Data.Length(); i++)
+                {
+                    Data[i] = Number(HexString[2 * i], HexString[(2 * i) + 1], Upper);
+                }
+
+                return Data;
             }
         }
     }

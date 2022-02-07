@@ -6,7 +6,6 @@ namespace Core
 {
     namespace Iterable
     {
-        // Destructor must be deterministic
         template <typename T>
         class Span
         {
@@ -59,12 +58,17 @@ namespace Core
                 _Content = nullptr;
             }
 
-            T *Content() const
+            inline T *Content()
             {
                 return _Content;
             }
 
-            size_t Length() const
+            inline const T *Content() const
+            {
+                return _Content;
+            }
+
+            inline size_t Length() const
             {
                 return _Length;
             }

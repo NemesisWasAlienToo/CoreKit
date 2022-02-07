@@ -47,7 +47,7 @@ Checked items are implemented completly at the moment and unchecked items are to
     - [x] Serializer : Data serializer and deserializer for network data serialization
 
 - [ ] Iterable:
-    - [ ] Span : Generic array wrapper
+    - [x] Span : Generic array wrapper
     - [x] List : Generic list
     - [x] Queue : Generic FIFO Queue
     - [ ] Map : Generic red black binary tree map
@@ -83,12 +83,16 @@ Checked items are implemented completly at the moment and unchecked items are to
 ## To do
 
 - Iterable:
+    - Chande ForEach std::function to Template for optimzing access to lambda
+    - Add Linked-List
     - Add Map
     - Add (red-black & AVL) binary search trees
 
 - Cryptography:
+    - Improve digest interfaces
     - Add SHA3
     - Add AES
+    - Move States to heap due to protect the user against disclosed stated after buffer overflow
 
 - Http:
     - Optimize Http request, response
@@ -99,10 +103,14 @@ Checked items are implemented completly at the moment and unchecked items are to
 
 - DHT:
     - Task queue between Runner and Server-Handler
+    - Server Send and Receive time out
     - Redefine fundamental operation data structures
+    - Multiple values for a key
+    - SendTo needs a version waiting for a response too
+
+## Doing
+
+- DHT:
+    - End Callbakc Status
     - Node should perform prev node look up to notify others
     - Node should update its key values after join
-    - End Callbakc Status
-    - Server Send and Receive time out
-    - Runner shared state for multiple operations
-    - Multiple values for a key

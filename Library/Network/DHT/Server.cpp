@@ -79,7 +79,7 @@ namespace Core
 
                     auto &Last = _Outgoing.Last();
 
-                    Last.Buffer.Free(_Socket.SendTo(Last.Buffer.Content(), Last.Buffer.Length(), Last.Peer));
+                    Last.Buffer.Free(_Socket.SendTo(Last.Buffer.Content(), Last.Buffer.Chunk(), Last.Peer));
 
                     if (Last.Buffer.IsEmpty())
                         _Outgoing.Take();

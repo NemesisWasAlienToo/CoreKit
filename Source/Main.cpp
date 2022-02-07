@@ -8,6 +8,7 @@
 #include <Iterable/List.cpp>
 #include <Iterable/Span.cpp>
 #include <Network/DNS.cpp>
+#include <Network/DHT/Chord.cpp>
 #include <Network/DHT/Runner.cpp>
 
 using namespace Core;
@@ -38,16 +39,24 @@ int main(int argc, char const *argv[])
 
     // Setup the server
 
-    Network::DHT::Runner Chord(Identity, {5, 0}, 1);
+    Network::DHT::Runner<Network::DHT::Chord> Chord(Identity, {5, 0}, 1);
+
+    Chord.OnKeys =
+        [](Network::DHT::OnKeysCallback CB)
+        {
+            Iterable::List<Network::DHT::Key> Keys;
+            
+            CB(Keys);
+        };
 
     Chord.OnSet =
-        [](const Core::Network::DHT::Key &Key, const Core::Iterable::Span<char> &Data)
+        [](/*const Network::DHT::Node Peer,*/ const Core::Network::DHT::Key &Key, const Core::Iterable::Span<char> &Data)
         {
             Test::Log("Set") << "{ " << Key << ", " << Data << " }" << std::endl;
         };
 
     Chord.OnGet =
-        [&Chord](const Core::Network::DHT::Key &Key, Network::DHT::Runner::OnGetCallback CB)
+        [&Chord](/*const Network::DHT::Node Peer,*/ const Core::Network::DHT::Key &Key, Network::DHT::OnGetCallback CB)
         {
             Test::Log("Get") << "{ " << Key << " }" << std::endl;
 
@@ -57,7 +66,7 @@ int main(int argc, char const *argv[])
         };
 
     Chord.OnData =
-        [](Core::Iterable::Span<char> &Data)
+        [](const Network::DHT::Node Peer, Iterable::Span<char> &Data)
         {
             Test::Log("Data") << Data << std::endl;
         };
@@ -76,11 +85,11 @@ int main(int argc, char const *argv[])
         {
             Chord.Ping(
                 Target,
-                [](Duration Result, Network::DHT::Handler::EndCallback End)
+                [](Duration Result, Network::DHT::EndCallback End)
                 {
                     Test::Log("Ping") << Result << "s" << std::endl;
                 },
-                []()
+                [](const Network::DHT::Report& Report)
                 {
                     Test::Log("Ping") << "Ended" << std::endl;
                 });
@@ -90,12 +99,12 @@ int main(int argc, char const *argv[])
             Chord.Query(
                 Target,
                 Network::DHT::Key::Generate(4),
-                [](Iterable::List<Network::DHT::Node> Result, Network::DHT::Handler::EndCallback End)
+                [](Iterable::List<Network::DHT::Node> Result, Network::DHT::EndCallback End)
                 {
                     Test::Log("Query") << Result[0].EndPoint << std::endl;
-                    End();
+                    End({Network::DHT::Report::Codes::None});
                 },
-                []()
+                [](const Network::DHT::Report& Report)
                 {
                     Test::Log("Query") << "Ended" << std::endl;
                 });
@@ -104,12 +113,12 @@ int main(int argc, char const *argv[])
         {
             Chord.Route(
                 Network::DHT::Key::Generate(4),
-                [](Iterable::List<Network::DHT::Node> Result, Network::DHT::Handler::EndCallback End)
+                [](Iterable::List<Network::DHT::Node> Result, Network::DHT::EndCallback End)
                 {
                     Test::Log("Route") << Result[0].EndPoint << std::endl;
-                    End();
+                    End({Network::DHT::Report::Codes::None});
                 },
-                []()
+                [](const Network::DHT::Report& Report)
                 {
                     Test::Log("Route") << "Ended" << std::endl;
                 });
@@ -118,13 +127,23 @@ int main(int argc, char const *argv[])
         {
             Chord.Bootstrap(
                 Target,
-                [](std::function<void()> End)
-                {
-                    End();
-                },
-                []()
+                [](const Network::DHT::Report& Report)
                 {
                     std::cout << "Bootstrap ended" << std::endl;
+                });
+        }
+        else if (Command == "keys")
+        {
+            Chord.Keys(
+                Target,
+                [](const Iterable::List<Network::DHT::Key> &keys, Network::DHT::EndCallback End)
+                {
+                    Test::Log("Keys") << "{ " << keys << " }" << std::endl;
+                    End({Network::DHT::Report::Codes::None});
+                },
+                [](const Network::DHT::Report& Report)
+                {
+                    std::cout << "Keys ended" << std::endl;
                 });
         }
         else if (Command == "set")
@@ -133,7 +152,7 @@ int main(int argc, char const *argv[])
             Chord.Set(
                 Network::DHT::Key::Generate(4),
                 {Data.c_str(), Data.length()},
-                []()
+                [](const Network::DHT::Report& Report)
                 {
                     std::cout << "Set ended" << std::endl;
                 });
@@ -142,12 +161,12 @@ int main(int argc, char const *argv[])
         {
             Chord.Get(
                 Network::DHT::Key::Generate(4),
-                [](Iterable::Span<char> &Data, std::function<void()> End)
+                [](Iterable::Span<char> &Data, Network::DHT::EndCallback End)
                 {
                     Test::Log("Get") << "{ " << Data << " }" << std::endl;
-                    End();
+                    End({Network::DHT::Report::Codes::None});
                 },
-                []()
+                [](const Network::DHT::Report& Report)
                 {
                     std::cout << "Get ended" << std::endl;
                 });

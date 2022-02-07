@@ -7,7 +7,6 @@
 #include <openssl/sha.h>
 #include <openssl/md5.h>
 #include <openssl/md4.h>
-#include <openssl/md2.h>
 
 // ## Add SHA3
 
@@ -15,88 +14,83 @@ namespace Core
 {
     namespace Cryptography
     {
-        template <typename T = SHA_CTX>
-        struct HashScheme
+        template <typename TState>
+        struct Functionality
         {
-            size_t Lenght;
-            unsigned char *(*Name)(const unsigned char *, size_t, unsigned char *);
-            int (*Init)(T *);
-            int (*Update)(T *, const void *, size_t);
-            int (*Final)(unsigned char *, T *);
+            typedef TState StateType;
+            typedef unsigned char *(*TName)(const unsigned char *, size_t, unsigned char *);
+            typedef int (*TInit)(TState *);
+            typedef int (*TUpdate)(TState *, const void *, size_t);
+            typedef int (*TFinal)(unsigned char *, TState *);
         };
 
-        template <typename T, HashScheme<T> &O>
+        template <typename Scheme>
         class Digest
         {
         private:
-            T _State;
+            Scheme _State;
 
         public:
             Digest()
             {
-                O.Init(&_State);
+                Scheme::Init(&_State);
             }
 
             Digest(const Digest &Other) = delete;
 
-            ~Digest() {}
+            ~Digest() = default;
 
             int Add(unsigned char *Data, size_t Size)
             {
-                return O.Update(&_State, Data, Size);
+                return Scheme::Update(&_State, Data, Size);
             }
 
             std::string Hex()
             {
-                unsigned char _Content[O.Lenght];
+                unsigned char _Content[Scheme::Lenght];
                 std::stringstream ss;
 
-                O.Final(_Content, &_State);
+                Scheme::Final(_Content, &_State);
 
-                for (int i = 0; i < O.Lenght; i++)
+                for (int i = 0; i < Scheme::Lenght; i++)
                 {
                     ss << std::hex << std::setw(2) << std::setfill('0') << (int)_Content[i];
                 }
                 return ss.str();
             }
 
-            void Bytes(unsigned char * Data)
+            void Bytes(unsigned char *Data)
             {
-                O.Final(Data, &_State);
+                Scheme::Final(Data, &_State);
             }
 
-            Digest &operator=(const Digest &Other) = delete;
+            // Static funtions
 
-            Digest &operator<<(const std::string& Data)
+            static constexpr size_t Size()
             {
-                O.Update(&_State, Data.c_str(), Data.size());
-            }
-
-            static size_t Size()
-            {
-                return O.Lenght;
+                return Scheme::Lenght;
             }
 
             static void Bytes(const std::string &Data, unsigned char *Digest)
             {
-                O.Name((unsigned char *)Data.c_str(), Data.length(), Digest);
+                Scheme::Name((unsigned char *)Data.c_str(), Data.length(), Digest);
             }
 
             static void Bytes(const unsigned char *Data, size_t Size, unsigned char *Digest)
             {
-                O.Name(Data, Size, Digest);
+                Scheme::Name(Data, Size, Digest);
             }
 
             // ## Remove this
             static std::string Hex(const std::string &Data)
             {
-                unsigned char _Content[O.Lenght];
+                unsigned char _Content[Scheme::Lenght];
 
-                O.Name((unsigned char *)Data.c_str(), Data.length(), _Content);
+                Scheme::Name((unsigned char *)Data.c_str(), Data.length(), _Content);
 
                 std::stringstream ss;
 
-                for (size_t i = 0; i < O.Lenght; i++)
+                for (size_t i = 0; i < Scheme::Lenght; i++)
                 {
                     ss << std::hex << std::setw(2) << std::setfill('0') << (int)_Content[i];
                 }
@@ -104,109 +98,108 @@ namespace Core
                 return ss.str();
             }
 
-            // ## Remove this
-            static std::string Hex(const char *Data, size_t Size)
+            // Operators
+
+            Digest &operator=(const Digest &Other) = delete;
+
+            Digest &operator<<(const std::string &Data)
             {
-                unsigned char _Content[O.Lenght];
-
-                O.Name((unsigned char *)Data, Size, _Content);
-
-                std::stringstream ss;
-
-                for (size_t i = 0; i < O.Lenght; i++)
-                {
-                    ss << std::hex << std::setw(2) << std::setfill('0') << (int)_Content[i];
-                }
-
-                return ss.str();
+                Scheme::Update(&_State, Data.c_str(), Data.size());
             }
         };
 
         // SHA
 
 #ifndef OPENSSL_NO_SHA1
-        HashScheme<SHA_CTX> SHA1Functionality = {
-            .Lenght = SHA_DIGEST_LENGTH,
-            .Name = ::SHA1,
-            .Init = ::SHA1_Init,
-            .Update = ::SHA1_Update,
-            .Final = ::SHA1_Final,
+        struct SHA1Functionality : Functionality<SHA_CTX>
+        {
+            static constexpr size_t Lenght = SHA_DIGEST_LENGTH;
+            static constexpr TName Name = ::SHA1;
+            static constexpr TInit Init = ::SHA1_Init;
+            static constexpr TUpdate Update = ::SHA1_Update;
+            static constexpr TFinal Final = ::SHA1_Final;
         };
 
-        typedef Digest<SHA_CTX, SHA1Functionality> SHA1;
+        typedef Digest<SHA1Functionality> SHA1;
 #endif
 
 #ifndef OPENSSL_NO_SHA224
-        HashScheme<SHA256_CTX> SHA224Functionality = {
-            .Lenght = SHA224_DIGEST_LENGTH,
-            .Name = ::SHA224,
-            .Init = ::SHA224_Init,
-            .Update = ::SHA224_Update,
-            .Final = ::SHA224_Final,
+        struct SHA224Functionality : Functionality<SHA256_CTX>
+        {
+            static constexpr size_t Lenght = SHA224_DIGEST_LENGTH;
+            static constexpr TName Name = ::SHA224;
+            static constexpr TInit Init = ::SHA224_Init;
+            static constexpr TUpdate Update = ::SHA224_Update;
+            static constexpr TFinal Final = ::SHA224_Final;
         };
 
-        typedef Digest<SHA256_CTX, SHA224Functionality> SHA224;
+        typedef Digest<SHA224Functionality> SHA224;
 #endif
 
 #ifndef OPENSSL_NO_SHA256
-        HashScheme<SHA256_CTX> SHA256Functionality = {
-            .Lenght = SHA256_DIGEST_LENGTH,
-            .Name = ::SHA256,
-            .Init = ::SHA256_Init,
-            .Update = ::SHA256_Update,
-            .Final = ::SHA256_Final,
+        struct SHA256Functionality : Functionality<SHA256_CTX>
+        {
+            static constexpr size_t Lenght = SHA256_DIGEST_LENGTH;
+            static constexpr TName Name = ::SHA256;
+            static constexpr TInit Init = ::SHA256_Init;
+            static constexpr TUpdate Update = ::SHA256_Update;
+            static constexpr TFinal Final = ::SHA256_Final;
         };
 
-        typedef Digest<SHA256_CTX, SHA256Functionality> SHA256;
+        typedef Digest<SHA256Functionality> SHA256;
 #endif
 
 #ifndef OPENSSL_NO_SHA384
-        HashScheme<SHA512_CTX> SHA384Functionality = {
-            .Lenght = SHA384_DIGEST_LENGTH,
-            .Name = ::SHA384,
-            .Init = ::SHA384_Init,
-            .Update = ::SHA384_Update,
-            .Final = ::SHA384_Final,
+        struct SHA384Functionality : Functionality<SHA512_CTX>
+        {
+            static constexpr size_t Lenght = SHA384_DIGEST_LENGTH;
+            static constexpr TName Name = ::SHA384;
+            static constexpr TInit Init = ::SHA384_Init;
+            static constexpr TUpdate Update = ::SHA384_Update;
+            static constexpr TFinal Final = ::SHA384_Final;
         };
 
-        typedef Digest<SHA512_CTX, SHA384Functionality> SHA384;
+        typedef Digest<SHA384Functionality> SHA384;
 #endif
 
 #ifndef OPENSSL_NO_SHA512
-        HashScheme<SHA512_CTX> SHA512Functionality = {
-            .Lenght = SHA512_DIGEST_LENGTH,
-            .Name = ::SHA512,
-            .Init = ::SHA512_Init,
-            .Update = ::SHA512_Update,
-            .Final = ::SHA512_Final,
+        struct SHA512Functionality : Functionality<SHA512_CTX>
+        {
+            static constexpr size_t Lenght = SHA512_DIGEST_LENGTH;
+            static constexpr TName Name = ::SHA512;
+            static constexpr TInit Init = ::SHA512_Init;
+            static constexpr TUpdate Update = ::SHA512_Update;
+            static constexpr TFinal Final = ::SHA512_Final;
         };
 
-        typedef Digest<SHA512_CTX, SHA512Functionality> SHA512;
+        typedef Digest<SHA512Functionality> SHA512;
 #endif
         // ## MD
 
 #ifndef OPENSSL_NO_MD5
-        HashScheme<MD5_CTX> MD5Functionality = {
-            .Lenght = MD5_DIGEST_LENGTH,
-            .Name = ::MD5,
-            .Init = ::MD5_Init,
-            .Update = ::MD5_Update,
-            .Final = ::MD5_Final,
+        struct MD5Functionality : Functionality<MD5_CTX>
+        {
+            static constexpr size_t Lenght = MD5_DIGEST_LENGTH;
+            static constexpr TName Name = ::MD5;
+            static constexpr TInit Init = ::MD5_Init;
+            static constexpr TUpdate Update = ::MD5_Update;
+            static constexpr TFinal Final = ::MD5_Final;
         };
 
-        typedef Digest<MD5_CTX, MD5Functionality> MD5;
+        typedef Digest<MD5Functionality> MD5;
 #endif
 
 #ifndef OPENSSL_NO_MD4
-        HashScheme<MD4_CTX> MD4Functionality = {
-            .Lenght = MD4_DIGEST_LENGTH,
-            .Name = ::MD4,
-            .Init = ::MD4_Init,
-            .Update = ::MD4_Update,
-            .Final = ::MD4_Final,
+        struct MD4Functionality : Functionality<MD4_CTX>
+        {
+            static constexpr size_t Lenght = MD4_DIGEST_LENGTH;
+            static constexpr TName Name = ::MD4;
+            static constexpr TInit Init = ::MD4_Init;
+            static constexpr TUpdate Update = ::MD4_Update;
+            static constexpr TFinal Final = ::MD4_Final;
         };
 
-        typedef Digest<MD4_CTX, MD4Functionality> MD4;
+        typedef Digest<MD4Functionality> MD4;
 #endif
     }
 }

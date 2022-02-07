@@ -331,7 +331,7 @@ namespace Core
                     return false;
                 }
 
-                Key operator+(const size_t &Number) const
+                Key operator+(size_t Number) const
                 {
                     size_t Other = Number;
                     Key Result(Size);
@@ -410,10 +410,12 @@ namespace Core
                     return Result;
                 }
 
-                // Key operator-(const Key &Other) const
-                // {
-                //     return *this + (-Other);
-                // }
+                Key operator-(size_t Number) const
+                {
+                    size_t Other = (~Number) + 1;
+                    
+                    return *this + Other;
+                }
 
                 Key operator-(const Key &Other) const
                 {
