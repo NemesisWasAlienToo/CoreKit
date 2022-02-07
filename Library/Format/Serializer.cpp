@@ -93,7 +93,7 @@ namespace Core
                 return *((T *)Pointer);
             }
 
-            Iterable::Span<char> Blob()
+            Iterable::Span<char> Dump()
             {
                 Iterable::Span<char> Result(Queue.Length());
 
@@ -430,13 +430,6 @@ namespace Core
             {
                 return *this >> Value.Id >> Value.EndPoint;
             }
-
-            // Serializer &operator>>(Serializer &Value)
-            // {
-            //     Queue.Add(Value.Queue);
-
-            //     return *this;
-            // }
 
             friend std::ostream &operator<<(std::ostream &os, Serializer &Serializer)
             {

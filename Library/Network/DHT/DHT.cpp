@@ -29,7 +29,7 @@ namespace Core
             {
                 enum class Codes : size_t
                 {
-                    None = 0,
+                    Normal = 0,
                     Occupied,
                     TimeOut,
                     InvalidResponse,
@@ -64,17 +64,24 @@ namespace Core
                     "EndPoint is occupied",
                     "EndPoint has timed out",
                     "EndPoint's response is invalid",
-                    "",
+                    "Provided argument is invalid",
             };
 
-            typedef std::function<void(const Report &)> EndCallback;
             typedef std::function<void(const Iterable::List<Key> &)> OnKeysCallback;
             typedef std::function<void(Iterable::Span<char> &)> OnGetCallback;
-            typedef std::function<void(Duration, EndCallback)> PingCallback;
-            typedef std::function<void(Iterable::List<Node>, EndCallback)> QueryCallback;
-            typedef std::function<void(Iterable::List<Node>, EndCallback)> RouteCallback;
-            typedef std::function<void(const Iterable::List<Key> &, EndCallback)> KeysCallback;
-            typedef std::function<void(Iterable::Span<char> &Data, EndCallback)> GetCallback;
+
+            typedef std::function<void(const Report &)> EndCallback;
+            template<typename TRes>
+            using SuccessCallback = std::function<void(TRes, EndCallback)>;
+
+            // @todo Optimize arguments by passing with refrence
+            
+            typedef SuccessCallback<Duration> PingCallback;
+            typedef SuccessCallback<Iterable::List<Node>> QueryCallback;
+            typedef SuccessCallback<Iterable::List<Node>> RouteCallback;
+            typedef SuccessCallback<Iterable::List<Key> &> KeysCallback;
+            typedef SuccessCallback<Iterable::Span<char> &> GetCallback;
+            typedef SuccessCallback<Iterable::Span<char> &> SendToCallback;
         }
     }
 }

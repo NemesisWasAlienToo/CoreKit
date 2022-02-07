@@ -16,7 +16,7 @@
  *      Data       : [ [ Header - Size ] - My id ] - Data Specifier - Data
  *
  * @todo Optimize adding and removing node by using binary tree or linked list
- * @todo Nodes mutex and lock
+ * @todo Optimize changing std::function to template where possible
  * @todo Optimization
  * @version 0.1
  * @date 2022-01-03
@@ -231,7 +231,7 @@ namespace Core
                         Key key(Identity.Id.Size);
                         ReqSerializer >> key;
 
-                        Iterable::Span<char> Data = ReqSerializer.Blob();
+                        Iterable::Span<char> Data = ReqSerializer.Dump();
 
                         OnSet(key, Data);
 
@@ -260,7 +260,7 @@ namespace Core
                     }
                     case Operations::Data:
                     {
-                        Iterable::Span<char> Data = ReqSerializer.Blob();
+                        Iterable::Span<char> Data = ReqSerializer.Dump();
 
                         OnData(node, Data);
 
@@ -399,9 +399,10 @@ namespace Core
                     Interrupt.Emit(1);
                 }
 
+                template<class TBuilder>
                 bool Build(
                     const Core::Network::EndPoint &Peer,
-                    const std::function<void(Core::Format::Serializer &)> &Builder,
+                    const TBuilder &Builder,
                     Core::Network::DHT::Handler::Callback Callback,
                     Core::Network::DHT::EndCallback End)
                 {
@@ -527,8 +528,6 @@ namespace Core
 
                 void FillCache(const Network::EndPoint &Peer, size_t NthNeighbor, EndCallback End)
                 {
-                    // @todo Add the bootstrap node after asked for its id
-
                     auto Neighbor = Identity.Id.Neighbor(NthNeighbor);
 
                     Route(
@@ -540,7 +539,7 @@ namespace Core
                             {
                                 // All nodes reside before my key
 
-                                End({Report::Codes::None});
+                                End({Report::Codes::Normal});
                                 return;
                             }
 
@@ -552,7 +551,7 @@ namespace Core
                             {
                                 // Wrapped around and bootstrap is done
 
-                                End({Report::Codes::None});
+                                End({Report::Codes::Normal});
                                 return;
                             }
 
@@ -576,7 +575,7 @@ namespace Core
                         {
                             if (Response.IsEmpty())
                             {
-                                End({Report::Codes::None});
+                                End({Report::Codes::Normal});
                                 return;
                             }
 
@@ -584,7 +583,7 @@ namespace Core
 
                             if (Target.Id == Identity.Id)
                             {
-                                End({Report::Codes::None});
+                                End({Report::Codes::Normal});
                                 return;
                             }
 
@@ -605,7 +604,7 @@ namespace Core
                                                     {});
                                         });
 
-                                    End({Report::Codes::None});
+                                    End({Report::Codes::Normal});
                                 },
                                 std::move(End));
                         },
@@ -717,18 +716,16 @@ namespace Core
                             if (Peers[0].Id == Identity.Id) // @todo Check all nodes in response
                             {
                                 OnSet(key, Data);
-                                End({Report::Codes::None}); // <-- Fix this
+                                End({Report::Codes::Normal}); // <-- Fix this
                                 return;
                             }
 
                             SetTo(Peers[0].EndPoint, key, Data);
 
-                            End({Report::Codes::None});
+                            End({Report::Codes::Normal});
                         },
                         std::move(End));
                 }
-
-                // Send data
 
                 void SendTo(const Network::EndPoint &Peer, const Iterable::Span<char> &Data)
                 {
@@ -740,8 +737,29 @@ namespace Core
                         });
                 }
 
-                void SendWhere(const Iterable::Span<char> &Data,
-                               const std::function<bool(const Node &)> &Condition)
+                void SendTo(const Network::EndPoint &Peer, const Iterable::Span<char> &Data, SendToCallback Callback, EndCallback End)
+                {
+                    Build(
+                        Peer,
+                        [&Data](Format::Serializer &Serializer)
+                        {
+                            Serializer << (char)Operations::Data << Data;
+                        },
+                        [this, CB = std::move(Callback)](Node &Requester, Format::Serializer &Serializer, EndCallback End)
+                        {
+                            char Header;
+
+                            Serializer >> Header;
+
+                            Iterable::Span<char> Data = Serializer.Dump();
+
+                            CB(Data, End);
+                        },
+                        std::move(End));
+                }
+
+                template<class TCondition>
+                void SendWhere(const Iterable::Span<char> &Data, const TCondition &Condition)
                 {
                     Cache.ForEach(
                         [this, &Data, &Condition](const Node &node)

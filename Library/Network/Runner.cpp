@@ -5,7 +5,7 @@
 #include <thread>
 
 #include "Network/EndPoint.cpp"
-#include "Network/Server.cpp"
+#include "Network/UDPServer.cpp"
 #include "Iterable/List.cpp"
 #include "Iterable/Span.cpp"
 #include "Iterable/Poll.cpp"

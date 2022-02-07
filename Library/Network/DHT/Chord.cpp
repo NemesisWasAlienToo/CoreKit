@@ -46,7 +46,7 @@ namespace Core
                 }
 
             public:
-                std::function<void(Node, std::function<void()>)> OnTest; //EndCallback
+                std::function<void(Node, std::function<void()>)> OnTest;
                 Iterable::Span<Iterable::List<Node>> Entries;
 
                 Chord() = default;

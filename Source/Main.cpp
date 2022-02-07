@@ -102,7 +102,7 @@ int main(int argc, char const *argv[])
                 [](Iterable::List<Network::DHT::Node> Result, Network::DHT::EndCallback End)
                 {
                     Test::Log("Query") << Result[0].EndPoint << std::endl;
-                    End({Network::DHT::Report::Codes::None});
+                    End({Network::DHT::Report::Codes::Normal});
                 },
                 [](const Network::DHT::Report& Report)
                 {
@@ -116,7 +116,7 @@ int main(int argc, char const *argv[])
                 [](Iterable::List<Network::DHT::Node> Result, Network::DHT::EndCallback End)
                 {
                     Test::Log("Route") << Result[0].EndPoint << std::endl;
-                    End({Network::DHT::Report::Codes::None});
+                    End({Network::DHT::Report::Codes::Normal});
                 },
                 [](const Network::DHT::Report& Report)
                 {
@@ -139,7 +139,7 @@ int main(int argc, char const *argv[])
                 [](const Iterable::List<Network::DHT::Key> &keys, Network::DHT::EndCallback End)
                 {
                     Test::Log("Keys") << "{ " << keys << " }" << std::endl;
-                    End({Network::DHT::Report::Codes::None});
+                    End({Network::DHT::Report::Codes::Normal});
                 },
                 [](const Network::DHT::Report& Report)
                 {
@@ -164,7 +164,7 @@ int main(int argc, char const *argv[])
                 [](Iterable::Span<char> &Data, Network::DHT::EndCallback End)
                 {
                     Test::Log("Get") << "{ " << Data << " }" << std::endl;
-                    End({Network::DHT::Report::Codes::None});
+                    End({Network::DHT::Report::Codes::Normal});
                 },
                 [](const Network::DHT::Report& Report)
                 {

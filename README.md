@@ -67,12 +67,12 @@ Checked items are implemented completly at the moment and unchecked items are to
         - [ ] : Server
 
     - [ ] DHT : Distributed Hash Table runners and tools
-        - [ ] Bucket : Peer bucket lists
+        - [ ] Cache : Peer cache policy
         - [x] Handler : _Request_ to _Function_ Mapper for handling incomming new or pending requests
         - [x] Key : N-Byte key (id)
         - [x] Node
         - [x] Server : UDP Server
-        - [ ] Runner : A DHT node runner
+        - [x] Runner : A DHT node runner
 
 - [ ] Cryptography:
     - [x] Random : Cryptographicly secure random number generation and tools
@@ -89,10 +89,9 @@ Checked items are implemented completly at the moment and unchecked items are to
     - Add (red-black & AVL) binary search trees
 
 - Cryptography:
-    - Improve digest interfaces
     - Add SHA3
     - Add AES
-    - Move States to heap due to protect the user against disclosed stated after buffer overflow
+    - Move States to heap to protect user against leaks after buffer overflow
 
 - Http:
     - Optimize Http request, response
