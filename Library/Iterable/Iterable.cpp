@@ -74,8 +74,7 @@ namespace Core
                 }
             }
 
-            Iterable(Iterable &&Other) noexcept : _Content(Other._Content), _Capacity(Other._Capacity),
-                                                  _Length(Other._Length), _Growable(Other._Growable)
+            Iterable(Iterable &&Other) noexcept : _Capacity(Other._Capacity), _Length(Other._Length), _Content(Other._Content), _Growable(Other._Growable)
             {
                 Other._Content = nullptr;
                 Other._Capacity = 0;
