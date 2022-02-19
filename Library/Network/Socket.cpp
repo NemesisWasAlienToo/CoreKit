@@ -489,7 +489,7 @@ namespace Core
                     }
                 }
 
-                return {std::move(Data), Target};
+                return std::tuple(std::move(Data), Target);
             }
 
             Socket &operator<<(const std::string &Message)
@@ -540,21 +540,20 @@ namespace Core
 
             const Socket &operator<<(Iterable::Queue<char> &queue) const
             {
-                // @todo Clarify on blocking and nnon-blocking
+                // @todo Clarify on blocking and non-blocking
 
-                size_t _Size;
                 int Result;
 
                 for (;;)
                 {
-                    _Size = queue.Chunk();
+                    auto [Data, Size] = queue.Chunk();
 
-                    if (_Size == 0)
+                    if (Size == 0)
                     {
                         break;
                     }
 
-                    Result = write(_INode, &queue.First(), _Size);
+                    Result = write(_INode, Data, Size);
 
                     if (Result > 0)
                     {
@@ -578,21 +577,20 @@ namespace Core
 
             Socket &operator<<(Iterable::Queue<char> &queue)
             {
-                // @todo Clarify on blocking and nnon-blocking
+                // @todo Clarify on blocking and non-blocking
 
-                size_t _Size;
                 int Result;
 
                 for (;;)
                 {
-                    _Size = queue.Chunk();
+                    auto [Data, Size] = queue.Chunk();
 
-                    if (_Size == 0)
+                    if (Size == 0)
                     {
                         break;
                     }
 
-                    Result = write(_INode, &queue.First(), _Size);
+                    Result = write(_INode, Data, Size);
 
                     if (Result > 0)
                     {

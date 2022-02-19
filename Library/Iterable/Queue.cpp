@@ -48,7 +48,10 @@ namespace Core
 
             Queue(const Queue &Other) : Iterable<T>(Other), _First(0) {}
 
-            Queue(Queue &&Other) noexcept : Iterable<T>(std::move(Other)), _First(Other._First) {}
+            Queue(Queue &&Other) noexcept : Iterable<T>(std::move(Other)), _First(Other._First)
+            {
+                Other._First = 0;
+            }
 
             // ### Destructor
 
@@ -56,9 +59,9 @@ namespace Core
 
             // ### Properties
 
-            size_t Chunk()
+            std::tuple<const T*, size_t> Chunk()
             {
-                return std::min((this->_Capacity - this->_Length), this->_Length);
+                return std::tuple(&_ElementAt(0), std::min((this->_Capacity - this->_Length), this->_Length));
             }
 
             // ### Public Functions
@@ -181,11 +184,11 @@ namespace Core
 
             Queue &operator=(Queue &&Other) noexcept
             {
-                this->_Capacity = Other._Capacity;
-                _First = Other._First;
-                this->_Length = Other._Length;
-
                 std::swap(this->_Content, Other._Content);
+                std::swap(this->_Capacity, Other._Capacity);
+                std::swap(this->_Length, Other._Length);
+                std::swap(this->_Growable, Other._Growable);
+                std::swap(_First, Other._First);
 
                 return *this;
             }

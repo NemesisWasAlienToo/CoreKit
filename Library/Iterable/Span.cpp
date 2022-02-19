@@ -26,7 +26,11 @@ namespace Core
         public:
             Span() = default;
             Span(size_t Size) : _Length(Size), _Content(new T[Size]) {}
-            Span(Span &&Other) : _Length(Other._Length), _Content(Other._Content) {}
+            Span(Span &&Other)
+            {
+                std::swap(_Content, Other._Content);
+                std::swap(_Length, Other._Length);
+            }
 
             Span(size_t Size, const T& Value) : _Length(Size), _Content(new T[Size])
             {
@@ -163,8 +167,8 @@ namespace Core
 
             Span &operator=(Span &&Other)
             {
-                _Length = Other._Length;
                 std::swap(_Content, Other._Content);
+                std::swap(_Length, Other._Length);
 
                 return *this;
             }

@@ -83,7 +83,7 @@ namespace Core
                 {
                     Key Result(size);
 
-                    Cryptography::Random::Load();
+                    // Cryptography::Random::Load();
 
                     Cryptography::Random::Bytes((unsigned char *)Result.Data, size);
 
@@ -91,6 +91,20 @@ namespace Core
                 }
 
                 // Functionalities
+
+                void Resize(size_t NewSize)
+                {
+                    auto NewData = new unsigned char[Size];
+
+                    for (size_t i = 0; i < Size; i++)
+                    {
+                        NewData[i] = Data[i];
+                    }
+
+                    free(Data);
+
+                    Data = NewData;
+                }
 
                 void Fill(const char Init)
                 {

@@ -1,6 +1,7 @@
 /**
  * @file Runner.cpp
- * @author Nemesis (github.com/NemesisWasAlienToo)
+ * @author Nemesis (github.com/NemesisWasAlienToo)m
+ * 
  * @brief DHT node runner
  *
  *      Supported operations: [ Response, Invalid, Ping, Query, Keys, Set, Get, Data ]
@@ -75,7 +76,7 @@ namespace Core
 
                 CachePolicy Cache;
 
-                States State;
+                volatile States State;
 
                 void Await()
                 {
@@ -150,8 +151,10 @@ namespace Core
                                 [this](const EndPoint &Target)
                                 {
                                     Cache.Remove(Target);
+                                    Server.Remove(Target);
                                     Test::Log("cache") << "Timed out and removed" << std::endl;
                                 });
+
                             Lock.unlock();
                         }
                         else if (Poll[2].HasEvent())
@@ -401,14 +404,14 @@ namespace Core
 
                 template<class TBuilder>
                 bool Build(
-                    const Core::Network::EndPoint &Peer,
+                    const Network::EndPoint &Peer,
                     const TBuilder &Builder,
-                    Core::Network::DHT::Handler::Callback Callback,
-                    Core::Network::DHT::EndCallback End)
+                    Network::DHT::Handler::Callback Callback,
+                    Network::DHT::EndCallback End)
                 {
                     if (!Handler.Put(Peer, DateTime::FromNow(TimeOut), std::move(Callback), std::move(End)))
                     {
-                        End({Report::Codes::Occupied});
+                        End(Report::Codes::Occupied);
                         Test::Error("Handler") << "Handler already exists" << std::endl;
                         return false;
                     }

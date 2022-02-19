@@ -93,12 +93,10 @@ namespace Core
 
             List &operator=(List &&Other) noexcept
             {
-                if (this == &Other)
-                    return *this;
-
-                this->_Capacity = Other._Capacity;
-                this->_Length = Other._Length;
                 std::swap(this->_Content, Other._Content);
+                std::swap(this->_Capacity, Other._Capacity);
+                std::swap(this->_Length, Other._Length);
+                std::swap(this->_Growable, Other._Growable);
 
                 return *this;
             }

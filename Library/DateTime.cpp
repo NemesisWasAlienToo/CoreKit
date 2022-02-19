@@ -217,7 +217,7 @@ namespace Core
 
         // Funtionality
 
-        bool Expired()
+        bool IsExpired()
         {
             return *this <= Now();
         }
@@ -233,12 +233,12 @@ namespace Core
 
             if (Diff.tv_sec < 0)
             {
-                return {0, 1};
+                return Diff;
             }
 
             if (Diff.tv_sec == 0 && Diff.tv_nsec < 0)
             {
-                return {0, 1};
+                return Diff;
             }
 
             if (Diff.tv_nsec < 0)

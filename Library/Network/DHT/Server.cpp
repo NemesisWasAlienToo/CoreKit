@@ -26,8 +26,8 @@
 #include "Iterable/List.cpp"
 #include "Iterable/Poll.cpp"
 
-#include <Format/Serializer.cpp>
-#include "Network/DHT/Request.cpp"
+#include "Format/Serializer.cpp"
+#include "Network/DHT/DHT.cpp"
 
 namespace Core
 {
@@ -70,6 +70,23 @@ namespace Core
                     return _Outgoing.IsEmpty() ? (Iterable::Poll::In) : (Iterable::Poll::In | Iterable::Poll::Out);
                 }
 
+                void Remove(const EndPoint& Peer)
+                {
+                    std::lock_guard _Lock(_IncommingLock);
+
+                    size_t Index;
+
+                    if (_Incomming.ContainsWhere(
+                                Index,
+                                [Peer](Request &Item)
+                                {
+                                    return !Item.Buffer.IsFull() && Item.Peer == Peer;
+                                }))
+                        {
+                            _Incomming.Remove(Index);
+                        }
+                }
+
                 void Send()
                 {
                     std::lock_guard _Lock(_OutgoingLock);
@@ -79,7 +96,9 @@ namespace Core
 
                     auto &Last = _Outgoing.Last();
 
-                    Last.Buffer.Free(_Socket.SendTo(Last.Buffer.Content(), Last.Buffer.Chunk(), Last.Peer));
+                    auto [Pointer, Size] = Last.Buffer.Chunk();
+
+                    Last.Buffer.Free(_Socket.SendTo(Pointer, Size, Last.Peer));
 
                     if (Last.Buffer.IsEmpty())
                         _Outgoing.Take();
