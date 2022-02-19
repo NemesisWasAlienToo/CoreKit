@@ -250,19 +250,7 @@ namespace Core
 
             Poll &operator=(const Poll &Other) = delete;
 
-            Poll &operator=(Poll &&Other) noexcept
-            {
-                if (this == &Other)
-                    return *this;
-
-                _Content = Other._Content;
-                _Capacity = Other._Capacity;
-                _Length = Other._Length;
-
-                std::swap(_Content, Other._Content);
-
-                return *this;
-            }
+            Poll &operator=(Poll &&Other) noexcept = default;
         };
     }
 }

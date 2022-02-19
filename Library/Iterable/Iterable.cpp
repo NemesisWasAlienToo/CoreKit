@@ -74,12 +74,13 @@ namespace Core
                 }
             }
 
-            Iterable(Iterable &&Other) noexcept
+            Iterable(Iterable &&Other) noexcept : _Content(Other._Content), _Capacity(Other._Capacity),
+                                                  _Length(Other._Length), _Growable(Other._Growable)
             {
-                std::swap(_Content, Other._Content);
-                std::swap(_Capacity, Other._Capacity);
-                std::swap(_Length, Other._Length);
-                std::swap(_Growable, Other._Growable);
+                Other._Content = nullptr;
+                Other._Capacity = 0;
+                Other._Length = 0;
+                Other._Growable = false;
             }
 
         public:
@@ -247,7 +248,7 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Add(Iterable<T>& Other)
+            void Add(Iterable<T> &Other)
             {
                 while (!Other.IsEmpty())
                 {
@@ -264,9 +265,9 @@ namespace Core
 
                 for (size_t i = this->_Length; i > Index; i--)
                 {
-                    _ElementAt(i) = std::move(_ElementAt(i - 1)); 
+                    _ElementAt(i) = std::move(_ElementAt(i - 1));
                 }
-                
+
                 _ElementAt(Index) = std::move(Item);
 
                 (this->_Length)++;
@@ -281,9 +282,9 @@ namespace Core
 
                 for (size_t i = this->_Length; i > Index; i--)
                 {
-                    _ElementAt(i) = std::move(_ElementAt(i - 1)); 
+                    _ElementAt(i) = std::move(_ElementAt(i - 1));
                 }
-                
+
                 _ElementAt(Index) = Item;
 
                 (this->_Length)++;
@@ -486,7 +487,7 @@ namespace Core
             }
 
             template <typename O>
-            Iterable<O> Map(const std::function<O(T &)>& Transform)
+            Iterable<O> Map(const std::function<O(T &)> &Transform)
             {
                 Iterable<O> result(_Capacity);
 
@@ -498,7 +499,7 @@ namespace Core
                 return result;
             }
 
-            void ForEach(const std::function<void(const T &)>& Action) const
+            void ForEach(const std::function<void(const T &)> &Action) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -506,7 +507,7 @@ namespace Core
                 }
             }
 
-            void ForEach(const std::function<void(size_t, const T &)>& Action) const
+            void ForEach(const std::function<void(size_t, const T &)> &Action) const
             {
                 for (int i = 0; i < _Length; i++)
                 {
@@ -514,7 +515,7 @@ namespace Core
                 }
             }
 
-            Iterable<T> Where(const std::function<bool(const T &)>& Condition) const
+            Iterable<T> Where(const std::function<bool(const T &)> &Condition) const
             {
                 Iterable<T> result(_Capacity);
 
@@ -529,7 +530,7 @@ namespace Core
                 return result;
             }
 
-            size_t CountWhere(const std::function<bool(const T &)>& Condition) const
+            size_t CountWhere(const std::function<bool(const T &)> &Condition) const
             {
                 size_t result;
 
@@ -544,7 +545,7 @@ namespace Core
                 return result;
             }
 
-            bool ContainsWhere(const std::function<bool(const T &)>& Condition) const
+            bool ContainsWhere(const std::function<bool(const T &)> &Condition) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -559,7 +560,7 @@ namespace Core
                 return false;
             }
 
-            bool ContainsWhere(const std::function<bool(const T &)>& Condition, size_t &First) const
+            bool ContainsWhere(const std::function<bool(const T &)> &Condition, size_t &First) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -576,7 +577,7 @@ namespace Core
             }
 
             template <typename O>
-            Iterable<O> Map(const std::function<O(const T &)>& Transform) const
+            Iterable<O> Map(const std::function<O(const T &)> &Transform) const
             {
                 Iterable<O> result(_Capacity);
 
@@ -616,6 +617,46 @@ namespace Core
             // ### Operators
 
             // ### Pre-defined Operators
+
+            Iterable &operator=(Iterable &&Other) noexcept
+            {
+                if (this != &Other)
+                {
+                    delete[] _Content;
+
+                    _Content = Other._Content;
+                    _Capacity = Other._Capacity;
+                    _Length = Other._Length;
+                    _Growable = Other._Growable;
+
+                    Other._Content = nullptr;
+                    Other._Capacity = 0;
+                    Other._Length = 0;
+                    Other._Growable = false;
+                }
+
+                return *this;
+            }
+
+            Iterable &operator=(const Iterable &Other) noexcept
+            {
+                if (this != &Other)
+                {
+                    delete[] _Content;
+
+                    _Content = new T[Other._Capacity];
+                    _Capacity = Other._Capacity;
+                    _Length = Other._Length;
+                    _Growable = Other._Growable;
+
+                    for (size_t i = 0; i < _Length; i++)
+                    {
+                        _ElementAt(i) = Other._ElementAt(i);
+                    }
+                }
+
+                return *this;
+            }
 
             T &operator[](const size_t &Index)
             {

@@ -66,6 +66,8 @@ namespace Core
 
             Serializer(Iterable::Queue<char> &queue) : Queue(queue) {}
 
+            Serializer(const Serializer&) = delete;
+
             ~Serializer() = default;
 
             // Peroperties
@@ -440,6 +442,8 @@ namespace Core
 
                 return os;
             }
+
+            Serializer& operator=(const Serializer&) = delete;
         };
     }
 }

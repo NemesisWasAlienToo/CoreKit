@@ -32,7 +32,7 @@ namespace Core
                 std::swap(_Length, Other._Length);
             }
 
-            Span(size_t Size, const T& Value) : _Length(Size), _Content(new T[Size])
+            Span(size_t Size, const T &Value) : _Length(Size), _Content(new T[Size])
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -48,7 +48,7 @@ namespace Core
                 }
             }
 
-            Span(const T *Array, size_t Size) : _Length(Size) , _Content(new T[Size])
+            Span(const T *Array, size_t Size) : _Length(Size), _Content(new T[Size])
             {
                 for (size_t i = 0; i < Size; i++)
                 {
@@ -152,14 +152,17 @@ namespace Core
 
             Span &operator=(const Span &Other)
             {
-                _Length = Other._Length;
-
-                delete[] _Content;
-                _Content = new T[_Length];
-
-                for (size_t i = 0; i < _Length; i++)
+                if (this != &Other)
                 {
-                    _Content[i] = Other._Content[i];
+                    _Length = Other._Length;
+
+                    delete[] _Content;
+                    _Content = new T[_Length];
+
+                    for (size_t i = 0; i < _Length; i++)
+                    {
+                        _Content[i] = Other._Content[i];
+                    }
                 }
 
                 return *this;
@@ -167,8 +170,16 @@ namespace Core
 
             Span &operator=(Span &&Other)
             {
-                std::swap(_Content, Other._Content);
-                std::swap(_Length, Other._Length);
+                if (this != &Other)
+                {
+                    delete[] _Content;
+
+                    _Content = Other._Content;
+                    _Length = Other._Length;
+
+                    Other._Content = nullptr;
+                    Other._Length = 0;
+                }
 
                 return *this;
             }

@@ -73,38 +73,9 @@ namespace Core
 
             // ### Operators
 
-            List &operator=(const List &Other)
-            {
-                this->_Capacity = Other._Capacity;
-                this->_Length = Other._Length;
-                this->_Growable = Other._Growable;
+            List &operator=(List &&Other) noexcept = default;
 
-                delete[] this->_Content;
-
-                this->_Content = new T[Other._Capacity];
-
-                for (size_t i = 0; i < Other._Length; i++)
-                {
-                    this->_Content[i] = Other._ElementAt(i);
-                }
-
-                return *this;
-            }
-
-            List &operator=(List &&Other) noexcept
-            {
-                std::swap(this->_Content, Other._Content);
-                std::swap(this->_Capacity, Other._Capacity);
-                std::swap(this->_Length, Other._Length);
-                std::swap(this->_Growable, Other._Growable);
-
-                return *this;
-            }
-
-            bool operator==(const List &Other) noexcept // Add more
-            {
-                return this->_Content == Other->_Content;
-            }
+            List &operator=(const List &Other) = default;
 
             bool operator!=(const List &Other) noexcept
             {

@@ -156,41 +156,16 @@ namespace Core
 
             // ### Operators
 
+            Queue &operator=(const Queue &Other) = default;
+
+            Queue &operator=(Queue &&Other) noexcept = default;
+
             T &operator[](const size_t &Index)
             {
                 if (Index >= this->_Length)
                     throw std::out_of_range("");
 
                 return _ElementAt(Index);
-            }
-
-            Queue &operator=(const Queue &Other)
-            {
-                this->_Capacity = Other._Capacity;
-                this->_Length = Other._Length;
-                _First = 0;
-
-                delete[] this->_Content;
-
-                this->_Content = new T[Other._Capacity];
-
-                for (size_t i = 0; i < Other._Length; i++)
-                {
-                    _ElementAt(i) = Other._ElementAt(i);
-                }
-
-                return *this;
-            }
-
-            Queue &operator=(Queue &&Other) noexcept
-            {
-                std::swap(this->_Content, Other._Content);
-                std::swap(this->_Capacity, Other._Capacity);
-                std::swap(this->_Length, Other._Length);
-                std::swap(this->_Growable, Other._Growable);
-                std::swap(_First, Other._First);
-
-                return *this;
             }
 
             Queue &operator>>(T &Item)

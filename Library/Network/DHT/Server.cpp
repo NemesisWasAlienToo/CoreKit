@@ -16,6 +16,8 @@
 #include <mutex>
 #include <thread>
 #include <functional>
+#include <map>
+#include <tuple>
 
 #include "Test.cpp"
 #include "Event.cpp"
@@ -38,21 +40,35 @@ namespace Core
             class Server
             {
             private:
+                struct OutEntry
+                {
+                    EndCallback End;
+                    Iterable::Queue<char> Buffer;
+                };
+
+                struct InEntry
+                {
+                    DateTime Expire;
+                    EndCallback End;
+                    Iterable::Queue<char> Buffer;
+                };
+
+                using Map = std::map<Network::EndPoint, InEntry>;
+                using Queue = Iterable::Queue<OutEntry>;
+
                 Network::Socket _Socket;
 
                 std::mutex _IncommingLock;
                 Iterable::Queue<Network::DHT::Request> _Incomming;
+                // Map Incomming;
 
                 std::mutex _OutgoingLock;
                 Iterable::Queue<Network::DHT::Request> _Outgoing;
+                // Queue Outgoing;
+
+                // Map::iterator Tracking;
 
             public:
-                enum class States : uint8_t
-                {
-                    Running,
-                    Stopped,
-                };
-
                 Server() = default;
 
                 Server(const Network::EndPoint &EndPoint) : _Socket(Network::Socket::IPv4, Network::Socket::UDP | Network::Socket::NonBlocking), _Incomming(1), _Outgoing(1)
@@ -70,21 +86,21 @@ namespace Core
                     return _Outgoing.IsEmpty() ? (Iterable::Poll::In) : (Iterable::Poll::In | Iterable::Poll::Out);
                 }
 
-                void Remove(const EndPoint& Peer)
+                void Remove(const EndPoint &Peer)
                 {
                     std::lock_guard _Lock(_IncommingLock);
 
                     size_t Index;
 
                     if (_Incomming.ContainsWhere(
-                                Index,
-                                [Peer](Request &Item)
-                                {
-                                    return !Item.Buffer.IsFull() && Item.Peer == Peer;
-                                }))
-                        {
-                            _Incomming.Remove(Index);
-                        }
+                            Index,
+                            [Peer](Request &Item)
+                            {
+                                return !Item.Buffer.IsFull() && Item.Peer == Peer;
+                            }))
+                    {
+                        _Incomming.Remove(Index);
+                    }
                 }
 
                 void Send()
@@ -116,7 +132,7 @@ namespace Core
 
                     Builder(Serializer);
 
-                    Serializer.Modify<uint32_t>(4) = Format::Serializer::Order((uint32_t) request.Buffer.Length());
+                    Serializer.Modify<uint32_t>(4) = Format::Serializer::Order((uint32_t)request.Buffer.Length());
 
                     {
                         std::lock_guard<std::mutex> lock(_OutgoingLock);

@@ -59,15 +59,17 @@ namespace Core
                 _Keys = Generate(Lenght);
             }
 
-            RSA(Key * Keys)
+            RSA(Key *Keys)
             {
                 _Keys = Keys;
             }
 
-            RSA(RSA& Other) = delete;
+            RSA(const RSA &Other) = delete;
 
-            RSA(RSA&& Other){
-                std::swap(_Keys, Other._Keys);
+            RSA(RSA &&Other) noexcept : _Keys(Other._Keys), _Padding(Other._Padding)
+            {
+                Other._Keys = nullptr;
+                Other._Padding = OAEP;
             }
 
             // ## Destructor
@@ -78,14 +80,6 @@ namespace Core
             }
 
             // ## Functions
-
-            // void New()
-            // {
-            //     if (_Keys != NULL)
-            //         RSA_free(_Keys);
-
-            //     _Keys = RSA_new();
-            // }
 
             void New(int Length)
             {
@@ -252,7 +246,7 @@ namespace Core
             }
 
             template <KeyType T>
-            void Keys(Key * Keys)
+            void Keys(Key *Keys)
             {
                 if (T == Public)
                 {
@@ -299,7 +293,7 @@ namespace Core
             template <KeyType T>
             static RSA From(const std::string &Value)
             {
-                Key * _New = RSA_new();
+                Key *_New = RSA_new();
 
                 if (T == Public)
                 {
@@ -340,7 +334,7 @@ namespace Core
             template <KeyType T>
             static RSA FromFile(const std::string &Name)
             {
-                Key * _New = RSA_new();
+                Key *_New = RSA_new();
 
                 if (T == Public)
                 {
@@ -359,7 +353,7 @@ namespace Core
                 {
 
                     BIO *PrivateKeyBuffer = BIO_new_file(Name.c_str(), "r+");
-                    Key * Result = PEM_read_bio_RSAPrivateKey(PrivateKeyBuffer, &_New, NULL, NULL);
+                    Key *Result = PEM_read_bio_RSAPrivateKey(PrivateKeyBuffer, &_New, NULL, NULL);
 
                     if (Result != _New)
                     {
@@ -378,12 +372,12 @@ namespace Core
                 return RSA_check_key(Keys) == 1;
             }
 
-            static inline Key * Generate()
+            static inline Key *Generate()
             {
                 return RSA_new();
             }
 
-            static Key * Generate(int Lenght)
+            static Key *Generate(int Lenght)
             {
                 Key *Keys = RSA_new();
                 BIGNUM *bn = BN_new();
@@ -405,10 +399,21 @@ namespace Core
 
             // ## Operators
 
-            RSA& operator=(RSA& Other) = delete;
+            RSA &operator=(const RSA &Other) = delete;
 
-            RSA& operator=(RSA&& Other){
-                std::swap(_Keys, Other._Keys);
+            RSA &operator=(RSA &&Other) noexcept
+            {
+                if (this != &Other)
+                {
+                    delete[] _Keys;
+                    
+                    _Keys = Other._Keys;
+                    _Padding = Other._Padding;
+                    
+                    Other._Keys = nullptr;
+                    Other._Padding = OAEP;
+                }
+
                 return *this;
             }
         };
