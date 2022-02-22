@@ -197,18 +197,14 @@ namespace Core
 
                     auto &Neighbor = Entries[NeighborHood];
 
-                    if (Neighbor.IsFull()) // @todo Fix this
+                    if (Neighbor.IsFull())
                     {
-                        Neighbor.Last() = node;
-
                         return true;
                     }
-                    else
-                    {
-                        Neighbor.Add(node);
 
-                        return false;
-                    }
+                    Neighbor.Add(node);
+
+                    return false;
                 }
 
                 bool Add(const Node &node, size_t NeighborHood)

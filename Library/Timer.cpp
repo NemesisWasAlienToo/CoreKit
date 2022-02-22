@@ -16,10 +16,10 @@ namespace Core
     public:
         enum TimerTypes
         {
-            Realtime = CLOCK_REALTIME,
-            RealtimeAlarm = CLOCK_REALTIME_ALARM,
-            Boottime = CLOCK_BOOTTIME,
-            BoottimeAlarm = CLOCK_BOOTTIME_ALARM,
+            RealTime = CLOCK_REALTIME,
+            RealTimeAlarm = CLOCK_REALTIME_ALARM,
+            BootTime = CLOCK_BOOTTIME,
+            BootTimeAlarm = CLOCK_BOOTTIME_ALARM,
             Monotonic = CLOCK_MONOTONIC,
         };
 

@@ -102,6 +102,8 @@ namespace Core
 
             // Functionalities
 
+            // @todo Make this callback based like ReceiveFrom
+
             void SendTo(OutgoingCallback Handler, EndCallback End)
             {
                 OLock.lock();
@@ -114,9 +116,27 @@ namespace Core
             }
 
             template<class TCallback>
-            void ReceiveFrom(const EndPoint& Peer, const TCallback& Callback)
+            void SendTo(const TCallback& Callback)
+            {
+                OLock.lock();
+
+                Outgoing.Add({nullptr, nullptr});
+
+                // @todo Fix : Due to reallocation, Address might change
+
+                Callback(Outgoing.Last());
+
+                OLock.unlock();
+
+                Interrupt.Emit(1);
+            }
+
+            template<class TCallback>
+            bool ReceiveFrom(const EndPoint& Peer, const TCallback& Callback)
             {
                 ILock.lock();
+
+                // @todo Fix : Due to reallocation, Address might change
 
                 auto [Iterator, Inserted] = Incomming.try_emplace(Peer, InEntry());
 
@@ -125,6 +145,8 @@ namespace Core
                 Wind();
 
                 ILock.unlock();
+
+                return Inserted;
             }
 
             void OnSend()
@@ -145,7 +167,14 @@ namespace Core
                 {
                     Lock.unlock();
 
-                    auto entry = Outgoing.Take();
+                    OutEntry entry = std::move(Last);
+
+                    Outgoing.Take();
+
+                    // if(Outgoing.IsEmpty())
+                    // {
+                    //     Empty.Emit(1);
+                    // }
 
                     OLock.unlock();
 

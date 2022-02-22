@@ -77,7 +77,7 @@ namespace Core
                 return Queue.Length();
             }
 
-            inline Serializer &Add(char *Data, size_t Size)
+            inline Serializer &Add(const char *Data, size_t Size)
             {
                 Queue.Add(Data, Size);
 

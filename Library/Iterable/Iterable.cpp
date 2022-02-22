@@ -393,7 +393,8 @@ namespace Core
             //     std::sort(First(), Last());
             // }
 
-            void ForEach(std::function<void(T &)> Action)
+            template<class TCallback>
+            void ForEach(const TCallback& Action)
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -401,7 +402,8 @@ namespace Core
                 }
             }
 
-            void ForEach(std::function<void(size_t, T &)> Action)
+            template<class TCallback>
+            void ForEach(const TCallback& Action)
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -409,7 +411,8 @@ namespace Core
                 }
             }
 
-            Iterable<T> Where(std::function<bool(T &)> Condition)
+            template<class TCallback>
+            Iterable<T> Where(const TCallback& Condition)
             {
                 Iterable<T> result(_Capacity);
 
@@ -424,7 +427,8 @@ namespace Core
                 return result;
             }
 
-            bool ContainsWhere(std::function<bool(T &)> Condition)
+            template<class TCallback>
+            bool ContainsWhere(const TCallback& Condition)
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -437,7 +441,8 @@ namespace Core
                 return false;
             }
 
-            bool ContainsWhere(size_t &First, std::function<bool(T &)> Condition)
+            template<class TCallback>
+            bool ContainsWhere(size_t &First, const TCallback& Condition)
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -446,6 +451,140 @@ namespace Core
                     if (Condition(item))
                     {
                         First = i;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            template <typename O, class TCallback>
+            Iterable<O> Map(const TCallback &Transform)
+            {
+                Iterable<O> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    result.Add(Transform(_ElementAt(i)));
+                }
+
+                return result;
+            }
+
+            template<class TCallback>
+            void ForEach(const TCallback &Action) const
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    Action(_ElementAt(i));
+                }
+            }
+
+            template<class TCallback>
+            void ForEach(const TCallback &Action) const
+            {
+                for (int i = 0; i < _Length; i++)
+                {
+                    Action(i, _ElementAt(i));
+                }
+            }
+
+            template<class TCallback>
+            Iterable<T> Where(const TCallback &Condition) const
+            {
+                Iterable<T> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    const T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                        result.Add(item);
+                }
+
+                return result;
+            }
+
+            template<class TCallback>
+            size_t CountWhere(const TCallback &Condition) const
+            {
+                size_t result;
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    const T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                        result++;
+                }
+
+                return result;
+            }
+
+            template<class TCallback>
+            bool ContainsWhere(const TCallback &Condition) const
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    const T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            template<class TCallback>
+            bool ContainsWhere(const TCallback &Condition, size_t &First) const
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    const T &item = _ElementAt(i);
+
+                    if (Condition(item))
+                    {
+                        First = i;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            template <typename O, class TCallback>
+            Iterable<O> Map(const TCallback &Transform) const
+            {
+                Iterable<O> result(_Capacity);
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    result.Add(Transform(_ElementAt(i)));
+                }
+
+                return result;
+            }
+
+            bool Contains(const T &Item) const
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    if (_ElementAt(i) == Item)
+                        return true;
+                }
+
+                return false;
+            }
+
+            bool Contains(const T &Item, int &Index) const
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    if (_ElementAt(i) == Item)
+                    {
+                        Index = i;
                         return true;
                     }
                 }
@@ -483,134 +622,6 @@ namespace Core
                 }
 
                 return _ElementAt(result);
-            }
-
-            template <typename O>
-            Iterable<O> Map(const std::function<O(T &)> &Transform)
-            {
-                Iterable<O> result(_Capacity);
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    result.Add(Transform(_ElementAt(i)));
-                }
-
-                return result;
-            }
-
-            void ForEach(const std::function<void(const T &)> &Action) const
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    Action(_ElementAt(i));
-                }
-            }
-
-            void ForEach(const std::function<void(size_t, const T &)> &Action) const
-            {
-                for (int i = 0; i < _Length; i++)
-                {
-                    Action(i, _ElementAt(i));
-                }
-            }
-
-            Iterable<T> Where(const std::function<bool(const T &)> &Condition) const
-            {
-                Iterable<T> result(_Capacity);
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    const T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                        result.Add(item);
-                }
-
-                return result;
-            }
-
-            size_t CountWhere(const std::function<bool(const T &)> &Condition) const
-            {
-                size_t result;
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    const T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                        result++;
-                }
-
-                return result;
-            }
-
-            bool ContainsWhere(const std::function<bool(const T &)> &Condition) const
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    const T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            bool ContainsWhere(const std::function<bool(const T &)> &Condition, size_t &First) const
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    const T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                    {
-                        First = i;
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            template <typename O>
-            Iterable<O> Map(const std::function<O(const T &)> &Transform) const
-            {
-                Iterable<O> result(_Capacity);
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    result.Add(Transform(_ElementAt(i)));
-                }
-
-                return result;
-            }
-
-            bool Contains(const T &Item) const
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    if (_ElementAt(i) == Item)
-                        return true;
-                }
-
-                return false;
-            }
-
-            bool Contains(const T &Item, int &Index) const
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    if (_ElementAt(i) == Item)
-                    {
-                        Index = i;
-                        return true;
-                    }
-                }
-
-                return false;
             }
 
             // ### Operators
