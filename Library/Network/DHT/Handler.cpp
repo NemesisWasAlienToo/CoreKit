@@ -14,7 +14,6 @@
 #include "Iterable/List.cpp"
 #include "Network/DHT/DHT.cpp"
 #include "Network/DHT/Node.cpp"
-#include "Network/DHT/DHT.cpp"
 
 namespace Core
 {

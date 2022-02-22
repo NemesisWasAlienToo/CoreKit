@@ -8,7 +8,7 @@
 #include "Iterable/List.cpp"
 #include "Iterable/Queue.cpp"
 #include "Network/EndPoint.cpp"
-#include "Network/DHT/Key.cpp"
+#include "Cryptography/Key.cpp"
 #include "Network/DHT/Node.cpp"
 
 #ifndef NETWORK_BYTE_ORDER

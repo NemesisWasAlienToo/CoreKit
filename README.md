@@ -39,12 +39,13 @@ Checked items are implemented completly at the moment and unchecked items are to
 - [x] DateTime
 - [x] File
 - [x] Directory : Directory functionality including content list
-- [x] Event : Linux Eventfd file based event mechanism
-- [x] Timer : Linux Timerfd file based event mechanism
+- [x] Event : Linux Eventfd based event mechanism
+- [x] Timer : Linux Timerfd based timer mechanism
+- [ ] Coroutine : Linux implementation of a asymmetric coroutine
 - [x] Foramt:
     - [x] Base64 : Base64 Encoding
     - [x] Hex : Hexadecimal String Encoding
-    - [x] Serializer : Data serializer and deserializer for network data serialization
+    - [x] Serializer : Data serializer and deserializer for network data packing
 
 - [ ] Iterable:
     - [x] Span : Generic array wrapper

@@ -5,7 +5,7 @@
 #include <thread>
 
 #include "Network/EndPoint.cpp"
-#include "Network/DHT/Key.cpp"
+#include "Cryptography/Key.cpp"
 
 using namespace Core;
 
