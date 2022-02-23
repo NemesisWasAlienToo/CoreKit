@@ -403,15 +403,6 @@ namespace Core
             }
 
             template<class TCallback>
-            void ForEach(const TCallback& Action)
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    Action(i, _ElementAt(i));
-                }
-            }
-
-            template<class TCallback>
             Iterable<T> Where(const TCallback& Condition)
             {
                 Iterable<T> result(_Capacity);
@@ -477,15 +468,6 @@ namespace Core
                 for (size_t i = 0; i < _Length; i++)
                 {
                     Action(_ElementAt(i));
-                }
-            }
-
-            template<class TCallback>
-            void ForEach(const TCallback &Action) const
-            {
-                for (int i = 0; i < _Length; i++)
-                {
-                    Action(i, _ElementAt(i));
                 }
             }
 
