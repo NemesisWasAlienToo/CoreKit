@@ -124,7 +124,7 @@ namespace Core
 
                 // @todo Fix : Due to reallocation, Address might change
 
-                Callback(Outgoing.Last());
+                Callback(Outgoing.Length() - 1);
 
                 OLock.unlock();
 
