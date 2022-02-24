@@ -394,7 +394,7 @@ namespace Core
             // }
 
             template<class TCallback>
-            void ForEach(const TCallback& Action)
+            void ForEach(TCallback Action)
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -403,7 +403,7 @@ namespace Core
             }
 
             template<class TCallback>
-            Iterable<T> Where(const TCallback& Condition)
+            Iterable<T> Where(TCallback Condition)
             {
                 Iterable<T> result(_Capacity);
 
@@ -419,7 +419,7 @@ namespace Core
             }
 
             template<class TCallback>
-            bool ContainsWhere(const TCallback& Condition)
+            bool ContainsWhere(TCallback Condition)
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -433,7 +433,7 @@ namespace Core
             }
 
             template<class TCallback>
-            bool ContainsWhere(size_t &First, const TCallback& Condition)
+            bool ContainsWhere(size_t &First, TCallback Condition)
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -450,7 +450,7 @@ namespace Core
             }
 
             template <typename O, class TCallback>
-            Iterable<O> Map(const TCallback &Transform)
+            Iterable<O> Map(TCallback Transform)
             {
                 Iterable<O> result(_Capacity);
 
@@ -463,7 +463,7 @@ namespace Core
             }
 
             template<class TCallback>
-            void ForEach(const TCallback &Action) const
+            void ForEach(TCallback Action) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -472,7 +472,7 @@ namespace Core
             }
 
             template<class TCallback>
-            Iterable<T> Where(const TCallback &Condition) const
+            Iterable<T> Where(TCallback Condition) const
             {
                 Iterable<T> result(_Capacity);
 
@@ -488,7 +488,7 @@ namespace Core
             }
 
             template<class TCallback>
-            size_t CountWhere(const TCallback &Condition) const
+            size_t CountWhere(TCallback Condition) const
             {
                 size_t result;
 
@@ -504,7 +504,7 @@ namespace Core
             }
 
             template<class TCallback>
-            bool ContainsWhere(const TCallback &Condition) const
+            bool ContainsWhere(TCallback Condition) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -520,7 +520,7 @@ namespace Core
             }
 
             template<class TCallback>
-            bool ContainsWhere(const TCallback &Condition, size_t &First) const
+            bool ContainsWhere(TCallback Condition, size_t &First) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -537,7 +537,7 @@ namespace Core
             }
 
             template <typename O, class TCallback>
-            Iterable<O> Map(const TCallback &Transform) const
+            Iterable<O> Map(TCallback Transform) const
             {
                 Iterable<O> result(_Capacity);
 

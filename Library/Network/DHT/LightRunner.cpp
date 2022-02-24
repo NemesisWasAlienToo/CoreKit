@@ -19,7 +19,7 @@ namespace Core
         namespace DHT
         {
             template <class TCache>
-            class TestRunner
+            class LightRunner
             {
             public:
                 using EndCallback = UDPServer::EndCallback;
@@ -46,9 +46,9 @@ namespace Core
 
                 // Constructors
 
-                TestRunner() = default;
+                LightRunner() = default;
 
-                TestRunner(const Network::DHT::Node identity, size_t ThreadCount, Duration Timeout) : Identity(identity), Pool(ThreadCount, false), TimeOut(Timeout), Server(identity.EndPoint), State(States::Stopped), Cache(Identity.Id)
+                LightRunner(const Network::DHT::Node identity, Duration Timeout, size_t ThreadCount) : Identity(identity), Pool(ThreadCount, false), TimeOut(Timeout), Server(identity.EndPoint), State(States::Stopped), Cache(Identity.Id)
                 {
                     Server.Builder = [this](UDPServer::Map::iterator &Iterator)
                     {
@@ -144,18 +144,17 @@ namespace Core
                     while (State == States::Running)
                     {
                         Server.Loop();
-                        
-                    //     try
-                    //     {
-                    //         Server.Loop();
-                    //     }
-                    //     catch (const std::exception &e)
-                    //     {
-                    //         std::cout << e.what() << '\n';
-                    //         break;
-                    //     }
+
+                        //     try
+                        //     {
+                        //         Server.Loop();
+                        //     }
+                        //     catch (const std::exception &e)
+                        //     {
+                        //         std::cout << e.what() << '\n';
+                        //         break;
+                        //     }
                     }
-                    
 
                     std::cout << "Thread exited" << std::endl;
                 }
@@ -335,7 +334,7 @@ namespace Core
                         {
                             // @todo Due to reallocation memory location might change
 
-                            if(!Inserted)
+                            if (!Inserted)
                             {
                                 return;
                             }
@@ -354,7 +353,7 @@ namespace Core
                                   TCallback Callback,
                                   EndCallback End)
                 {
-                    if(!ReceiveFrom(Peer, std::move(Callback), std::move(End)))
+                    if (!ReceiveFrom(Peer, std::move(Callback), std::move(End)))
                     {
                         std::cout << "EndPoint is occupied\n";
                         return false;
