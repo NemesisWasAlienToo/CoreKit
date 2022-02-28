@@ -51,7 +51,7 @@ namespace Core
 
                 Chord() = default;
 
-                Chord(const Key &Identity) : Entries((Identity.Size * 8) + 1)
+                Chord(const Cryptography::Key &Identity) : Entries((Identity.Size * 8) + 1)
                 {
                     BreakPoint = Identity.Critical();
 
@@ -78,12 +78,12 @@ namespace Core
                     return Entries[0];
                 }
 
-                size_t NeighborHood(const Key &key)
+                size_t NeighborHood(const Cryptography::Key &key)
                 {
                     return (key - Identity().Id).MSNB();
                 }
 
-                const Iterable::List<Node> &Resolve(const Key &key)
+                const Iterable::List<Node> &Resolve(const Cryptography::Key &key)
                 {
                     size_t Index;
                     bool Found = false;

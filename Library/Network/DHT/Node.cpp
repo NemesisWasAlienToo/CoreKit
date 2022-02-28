@@ -21,7 +21,7 @@ namespace Core
 
                 // ### Variables
 
-                Key Id;
+                Cryptography::Key Id;
                 Network::EndPoint EndPoint;
 
                 // ### Constructors
@@ -30,7 +30,7 @@ namespace Core
 
                 Node(size_t KeySize) : Id(KeySize) {}
 
-                Node(Key id, Network::EndPoint endPoint) : Id(id), EndPoint(endPoint) {}
+                Node(Cryptography::Key id, Network::EndPoint endPoint) : Id(id), EndPoint(endPoint) {}
 
                 Node(Node &&Other) : Id(std::move(Other.Id)), EndPoint(Other.EndPoint) {}
 

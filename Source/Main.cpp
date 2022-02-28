@@ -17,7 +17,7 @@ int main(int argc, char const *argv[])
 {
     // Init Identity
 
-    const Network::DHT::Node Identity(Network::DHT::Key::Generate(4), {"0.0.0.0:8888"});
+    const Network::DHT::Node Identity(Cryptography::Key::Generate(4), {"0.0.0.0:8888"});
 
     // Log End Point
 
@@ -44,19 +44,19 @@ int main(int argc, char const *argv[])
     Chord.OnKeys =
         [](Network::DHT::OnKeysCallback CB)
         {
-            Iterable::List<Network::DHT::Key> Keys;
+            Iterable::List<Cryptography::Key> Keys;
             
             CB(Keys);
         };
 
     Chord.OnSet =
-        [](/*const Network::DHT::Node Peer,*/ const Core::Network::DHT::Key &Key, const Core::Iterable::Span<char> &Data)
+        [](/*const Network::DHT::Node Peer,*/ const Core::Cryptography::Key &Key, const Core::Iterable::Span<char> &Data)
         {
             Test::Log("Set") << "{ " << Key << ", " << Data << " }" << std::endl;
         };
 
     Chord.OnGet =
-        [&Chord](/*const Network::DHT::Node Peer,*/ const Core::Network::DHT::Key &Key, Network::DHT::OnGetCallback CB)
+        [&Chord](/*const Network::DHT::Node Peer,*/ const Core::Cryptography::Key &Key, Network::DHT::OnGetCallback CB)
         {
             Test::Log("Get") << "{ " << Key << " }" << std::endl;
 
@@ -98,7 +98,7 @@ int main(int argc, char const *argv[])
         {
             Chord.Query(
                 Target,
-                Network::DHT::Key::Generate(4),
+                Cryptography::Key::Generate(4),
                 [](Iterable::List<Network::DHT::Node> Result, Network::DHT::EndCallback End)
                 {
                     Test::Log("Query") << Result[0].EndPoint << std::endl;
@@ -112,7 +112,7 @@ int main(int argc, char const *argv[])
         else if (Command == "route")
         {
             Chord.Route(
-                Network::DHT::Key::Generate(4),
+                Cryptography::Key::Generate(4),
                 [](Iterable::List<Network::DHT::Node> Result, Network::DHT::EndCallback End)
                 {
                     Test::Log("Route") << Result[0].EndPoint << std::endl;
@@ -136,7 +136,7 @@ int main(int argc, char const *argv[])
         {
             Chord.Keys(
                 Target,
-                [](const Iterable::List<Network::DHT::Key> &keys, Network::DHT::EndCallback End)
+                [](const Iterable::List<Cryptography::Key> &keys, Network::DHT::EndCallback End)
                 {
                     Test::Log("Keys") << "{ " << keys << " }" << std::endl;
                     End({Network::DHT::Report::Codes::Normal});
@@ -150,7 +150,7 @@ int main(int argc, char const *argv[])
         {
             std::string Data = "Hello there";
             Chord.Set(
-                Network::DHT::Key::Generate(4),
+                Cryptography::Key::Generate(4),
                 {Data.c_str(), Data.length()},
                 [](const Network::DHT::Report& Report)
                 {
@@ -160,7 +160,7 @@ int main(int argc, char const *argv[])
         else if (Command == "get")
         {
             Chord.Get(
-                Network::DHT::Key::Generate(4),
+                Cryptography::Key::Generate(4),
                 [](Iterable::Span<char> &Data, Network::DHT::EndCallback End)
                 {
                     Test::Log("Get") << "{ " << Data << " }" << std::endl;

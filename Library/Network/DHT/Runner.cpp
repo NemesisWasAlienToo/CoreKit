@@ -197,7 +197,7 @@ namespace Core
                     }
                     case Operations::Query:
                     {
-                        Key key(Identity.Id.Size);
+                        Cryptography::Key key(Identity.Id.Size);
 
                         ReqSerializer >> key;
 
@@ -215,7 +215,7 @@ namespace Core
                     case Operations::Keys:
                     {
                         OnKeys(
-                            [this, &node, &ReqSerializer](const Iterable::List<Key> &keys)
+                            [this, &node, &ReqSerializer](const Iterable::List<Cryptography::Key> &keys)
                             {
                                 Fire(
                                     node.EndPoint,
@@ -231,7 +231,7 @@ namespace Core
                     {
                         // Set - Key - Data
 
-                        Key key(Identity.Id.Size);
+                        Cryptography::Key key(Identity.Id.Size);
                         ReqSerializer >> key;
 
                         Iterable::Span<char> Data = ReqSerializer.Dump();
@@ -244,7 +244,7 @@ namespace Core
                     {
                         // Get - Key
 
-                        Key key(Identity.Id.Size);
+                        Cryptography::Key key(Identity.Id.Size);
                         ReqSerializer >> key;
 
                         OnGet(
@@ -301,8 +301,8 @@ namespace Core
                 // Request Handlers
 
                 std::function<void(OnKeysCallback)> OnKeys = {};
-                std::function<void(const Key &, OnGetCallback)> OnGet = {};
-                std::function<void(const Key &, const Iterable::Span<char> &)> OnSet = {};
+                std::function<void(const Cryptography::Key &, OnGetCallback)> OnGet = {};
+                std::function<void(const Cryptography::Key &, const Iterable::Span<char> &)> OnSet = {};
                 std::function<void(const Node &, Iterable::Span<char> &)> OnData = {};
 
                 // ### Constructors
@@ -444,7 +444,7 @@ namespace Core
                         std::move(End));
                 }
 
-                void Query(const Network::EndPoint &Peer, const Key &Id, QueryCallback Callback, EndCallback End)
+                void Query(const Network::EndPoint &Peer, const Cryptography::Key &Id, QueryCallback Callback, EndCallback End)
                 {
                     Build(
                         Peer,
@@ -485,7 +485,7 @@ namespace Core
                         std::move(End));
                 }
 
-                void Route(const Network::EndPoint &Peer, const Key &Id, RouteCallback Callback, EndCallback End)
+                void Route(const Network::EndPoint &Peer, const Cryptography::Key &Id, RouteCallback Callback, EndCallback End)
                 {
                     if (Id == Identity.Id)
                     {
@@ -516,7 +516,7 @@ namespace Core
                         std::move(End));
                 }
 
-                void Route(const Key &Id, RouteCallback Callback, EndCallback End)
+                void Route(const Cryptography::Key &Id, RouteCallback Callback, EndCallback End)
                 {
                     const auto &Peer = Cache.Resolve(Id);
 
@@ -592,10 +592,10 @@ namespace Core
 
                             Keys(
                                 Target.EndPoint,
-                                [this, Peer = Response.First().EndPoint](const Iterable::List<Key> &Keys, EndCallback End)
+                                [this, Peer = Response.First().EndPoint](const Iterable::List<Cryptography::Key> &Keys, EndCallback End)
                                 {
                                     Keys.ForEach(
-                                        [this, Peer, &End](const Key &key)
+                                        [this, Peer, &End](const Cryptography::Key &key)
                                         {
                                             if (key >= Identity.Id)
                                                 Get(
@@ -639,7 +639,7 @@ namespace Core
 
                             Serializer >> Header;
 
-                            Iterable::List<Key> Keys;
+                            Iterable::List<Cryptography::Key> Keys;
 
                             Serializer >> Keys;
 
@@ -648,7 +648,7 @@ namespace Core
                         std::move(End));
                 }
 
-                void GetFrom(const Network::EndPoint &Peer, const Key &key, GetCallback Callback, EndCallback End)
+                void GetFrom(const Network::EndPoint &Peer, const Cryptography::Key &key, GetCallback Callback, EndCallback End)
                 {
                     Build(
                         Peer,
@@ -675,7 +675,7 @@ namespace Core
                         std::move(End));
                 }
 
-                void Get(const Key &key, GetCallback Callback, EndCallback End)
+                void Get(const Cryptography::Key &key, GetCallback Callback, EndCallback End)
                 {
                     Route(
                         key,
@@ -700,7 +700,7 @@ namespace Core
 
                 // @todo Maybe add send with call back too?
 
-                void SetTo(const Network::EndPoint &Peer, const Key &key, const Iterable::Span<char> &Data)
+                void SetTo(const Network::EndPoint &Peer, const Cryptography::Key &key, const Iterable::Span<char> &Data)
                 {
                     Fire(
                         Peer,
@@ -710,7 +710,7 @@ namespace Core
                         });
                 }
 
-                void Set(const Key &key, const Iterable::Span<char> &Data, EndCallback End)
+                void Set(const Cryptography::Key &key, const Iterable::Span<char> &Data, EndCallback End)
                 {
                     Route(
                         key,

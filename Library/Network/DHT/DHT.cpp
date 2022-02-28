@@ -67,7 +67,7 @@ namespace Core
                     "Provided argument is invalid",
             };
 
-            typedef std::function<void(const Iterable::List<Key> &)> OnKeysCallback;
+            typedef std::function<void(const Iterable::List<Cryptography::Key> &)> OnKeysCallback;
             typedef std::function<void(Iterable::Span<char> &)> OnGetCallback;
 
             typedef std::function<void(const Report &)> EndCallback;
@@ -79,7 +79,7 @@ namespace Core
             typedef SuccessCallback<Duration> PingCallback;
             typedef SuccessCallback<Iterable::List<Node>> QueryCallback;
             typedef SuccessCallback<Iterable::List<Node>> RouteCallback;
-            typedef SuccessCallback<Iterable::List<Key> &> KeysCallback;
+            typedef SuccessCallback<Iterable::List<Cryptography::Key> &> KeysCallback;
             typedef SuccessCallback<Iterable::Span<char> &> GetCallback;
             typedef SuccessCallback<Iterable::Span<char> &> SendToCallback;
 

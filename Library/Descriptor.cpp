@@ -138,7 +138,8 @@ namespace Core
 
         Descriptor &operator=(Descriptor &&Other)
         {
-            std::swap(_INode, Other._INode);
+            _INode = Other._INode;
+            Other._INode = -1;
             return *this;
         }
 

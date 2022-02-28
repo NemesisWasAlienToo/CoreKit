@@ -724,13 +724,6 @@ namespace Core
 
             Socket &operator=(const Socket &Other) = delete;
 
-            Socket &operator=(Socket &&Other)
-            {
-                _INode = Other._INode;
-
-                return *this;
-            }
-
             // Friend operators
 
             friend std::ostream &operator<<(std::ostream &os, const Socket &socket)

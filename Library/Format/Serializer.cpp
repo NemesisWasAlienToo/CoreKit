@@ -211,7 +211,7 @@ namespace Core
                 return *this;
             }
 
-            Serializer &operator<<(const Network::DHT::Key &Value)
+            Serializer &operator<<(const Cryptography::Key &Value)
             {
                 *this << Value.Size;
 
@@ -373,14 +373,14 @@ namespace Core
                 return *this;
             }
 
-            Serializer &operator>>(Network::DHT::Key &Value) // @todo key size is not obvious to the user
+            Serializer &operator>>(Cryptography::Key &Value) // @todo key size is not obvious to the user
             {
                 size_t Size;
 
                 *this >> Size;
 
                 if (Value.Size != Size)
-                    Value = Network::DHT::Key(Size);
+                    Value = Cryptography::Key(Size);
 
                 Queue.Take((char *)Value.Data, Value.Size);
 

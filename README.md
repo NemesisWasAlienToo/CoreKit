@@ -47,6 +47,9 @@ Checked items are implemented completly at the moment and unchecked items are to
     - [x] Hex : Hexadecimal String Encoding
     - [x] Serializer : Data serializer and deserializer for network data packing
 
+- [ ] Storage:
+    - [ ] Sqlite3 : Sqlite3 wrapper class
+
 - [ ] Iterable:
     - [x] Span : Generic array wrapper
     - [x] List : Generic list
@@ -92,7 +95,7 @@ Checked items are implemented completly at the moment and unchecked items are to
 - Cryptography:
     - Add SHA3
     - Add AES
-    - Move States to heap to protect user against leaks after buffer overflow
+    - Move States to heap to protect user against leaks
 
 - Http:
     - Optimize Http request, response
@@ -103,10 +106,8 @@ Checked items are implemented completly at the moment and unchecked items are to
 
 - DHT:
     - Task queue between Runner and Server-Handler
-    - Server Send and Receive time out
-    - Redefine fundamental operation data structures
+    - Server connections limit
     - Multiple values for a key
-    - SendTo needs a version waiting for a response too
 
 ## Doing
 
