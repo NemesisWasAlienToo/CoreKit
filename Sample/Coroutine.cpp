@@ -20,7 +20,7 @@ public:
         std::cout << "Stuff 2" << std::endl;
     }
 
-    int operator()(int& a)
+    void operator()(int& a)
     {
         a += 100;
 
