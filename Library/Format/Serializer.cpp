@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <string>
-#include <arpa/inet.h>
+#include <type_traits>
 
 #include "Iterable/Span.cpp"
 #include "Iterable/List.cpp"
@@ -27,8 +27,7 @@ namespace Core
 #if BYTE_ORDER == NETWORK_BYTE_ORDER
 
             template <typename T>
-            static std::void_t<std::enable_if<std::is_integral<T>::value>>
-            static void Order(const T &Source, T &Destination)
+            static std::void_t<std::enable_if<std::is_integral<T>::value>> static void Order(const T &Source, T &Destination)
             {
                 Destination = Source;
             }
@@ -66,7 +65,7 @@ namespace Core
 
             Serializer(Iterable::Queue<char> &queue) : Queue(queue) {}
 
-            Serializer(const Serializer&) = delete;
+            Serializer(const Serializer &) = delete;
 
             ~Serializer() = default;
 
@@ -82,6 +81,21 @@ namespace Core
                 Queue.Add(Data, Size);
 
                 return *this;
+            }
+
+            template <class T>
+            inline Serializer &Add(const T &Object)
+            {
+                *this << Object;
+                return *this;
+            }
+
+            template <class T>
+            inline T Take()
+            {
+                T t;
+                *this >> t;
+                return t;
             }
 
             template <typename T>
@@ -188,10 +202,23 @@ namespace Core
                 return *this;
             }
 
-            //
+            template <typename TValue>
+            Serializer &operator<<(const Iterable::Iterable<TValue> &Value)
+            {
+                *this << Value.Length();
+
+                for (size_t i = 0; i < Value._Length; i++)
+                {
+                    *this << Value[i];
+                }
+
+                return *this;
+            }
 
             Serializer &operator<<(const Iterable::Span<char> &Value)
             {
+                *this << Value.Length();
+
                 Queue.Add(Value.Content(), Value.Length());
 
                 return *this;
@@ -339,17 +366,41 @@ namespace Core
                 return *this;
             }
 
+            template <typename TValue>
+            Serializer &operator>>(Iterable::Iterable<TValue> &Value)
+            {
+                Value = Iterable::Iterable<TValue>(this->Take<size_t>());
+
+                Value._Length = Value._Capacity;
+
+                // @todo Optimize when serializer and deserializer are seperated
+                // Cuz we know there is no data inserted when taking data and 
+                // thus the queue hasn't wrapped around
+
+                // if constexpr (std::is_integral_v<TValue>)
+
+                for (size_t i = 0; i < Value._Length; i++)
+                {
+                    Value[i] = this->Take<TValue>();
+                }
+
+                return *this;
+            }
+
             Serializer &operator>>(Iterable::Span<char> &Value)
             {
-                // Apply byte order
-                size_t Size = std::min(Value.Length(), Queue.Length());
+                // @todo Optimize when serializer and deserializer are seperated
+                // Cuz we know there is no data inserted when taking data and 
+                // thus the queue hasn't wrapped around
 
-                for (size_t i = 0; i < Size; i++)
+                Value = Iterable::Span<char>(this->Take<size_t>());
+
+                for (size_t i = 0; i < Value.Length(); i++)
                 {
                     Value[i] = Queue[i];
                 }
 
-                Queue.Free(Size);
+                Queue.Free(Value.Length());
 
                 return *this;
             }
@@ -443,7 +494,7 @@ namespace Core
                 return os;
             }
 
-            Serializer& operator=(const Serializer&) = delete;
+            Serializer &operator=(const Serializer &) = delete;
         };
     }
 }

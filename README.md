@@ -111,6 +111,13 @@ Checked items are implemented completly at the moment and unchecked items are to
 
 ## Doing
 
+- Format
+    - Seperate serializer and deserializer
+    - Optmize bit-copy-able objects Add and Take
+
+- Iterable
+    - Poll Put CPoll inside Poll and seperate Poll from Iterable
+
 - DHT:
     - End Callbakc Status
     - Node should perform prev node look up to notify others

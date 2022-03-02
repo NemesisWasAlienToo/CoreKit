@@ -6,73 +6,54 @@
 
 using namespace Core;
 
-#define async(Function)
-
-class Co1 : public Coroutine<void(int)>
+class Co : public Coroutine<int(int&)>
 {
 public:
-    Co1(size_t stackSize = DefaultStackSize) : Coroutine(stackSize) {}
+    Co(size_t stackSize = DefaultStackSize) : Coroutine(stackSize) {}
 
-    void operator()(int a)
+    void PrintStuff()
     {
-        std::cout << "1 phase \n";
+        std::cout << "Stuff" << std::endl;
 
-        sleep(1);
+        Yield(4);
 
-        Yield();
-
-        std::cout << "2 phase \n";
-
-        sleep(1);
-
-        std::cout << "A is " << a << '\n';
-
-        Yield();
+        std::cout << "Stuff 2" << std::endl;
     }
-};
 
-class Co2 : public Coroutine<int(int)>
-{
-public:
-    Co2(size_t stackSize = DefaultStackSize) : Coroutine(stackSize) {}
-
-    int operator()(int a)
+    int operator()(int& a)
     {
-        Co1 coro(1024 * 4 * 4);
-
-        coro.Start(1100);
-
-        std::cout << "Between phases\n";
-
-        coro.Continue();
-
-        std::cout << "First stage finished\n";
+        a += 100;
 
         std::cout << "1 phase \n";
 
-        sleep(1);
-
-        Yield(1);
-
-        std::cout << "2 phase \n";
-
-        sleep(1);
-
-        std::cout << "A is " << a << '\n';
+        PrintStuff();
 
         Yield(2);
+
+        a += 100;
+
+        std::cout << "2 phase \n";
+
+        Terminate(3);
     }
 };
 
 int main(int argc, char const *argv[])
 {
-    Co2 coro(1024 * 4 * 4);
+    Co coro(1024 * 4 * 4);
 
-    auto r = coro.Start(1100);
+    int a = 100;
 
-    std::cout << "Between phases \n";
+    auto r = coro.Start(a);
 
-    r = coro.Continue();
+    while (!coro.IsFinished())
+    {
+        sleep(1);
+        
+        r = coro.Continue();
+    }
 
     std::cout << "Ended\n";
+
+    std::cout << "A is " << a << '\n';
 }
