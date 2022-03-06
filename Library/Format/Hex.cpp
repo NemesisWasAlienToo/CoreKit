@@ -5,6 +5,8 @@
 #include <sstream>
 #include <iomanip>
 
+#include <Iterable/Span.cpp>
+
 namespace Core
 {
     namespace Format

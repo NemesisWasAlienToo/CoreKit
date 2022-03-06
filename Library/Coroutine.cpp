@@ -1,91 +1,154 @@
 #pragma once
 
-#include <strings.h>
+#include <iostream>
+
+#define SaveRegs asm volatile("" :: \
+                                  : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15")
+
+#define StackPointer(RES) asm("movq %%rsp, %0" \
+                              : "=r"(RES))
 
 namespace Core
 {
-    namespace
+    class __Coroutine_Helper
     {
-        class __Coroutine_Helper
+    public:
+        static constexpr size_t DefaultStackSize = 1024 * 4 * 4; // 4 pages of memory
+
+        struct State
         {
-        public:
-            static constexpr size_t DefaultStackSize = 1024 * 4 * 4; // 4 pages of memory
+            void *Stack;
+            void *Base;
+            void *Instruction;
 
-            struct State
+            State() = default;
+
+            State(State &&Other) : Stack(Other.Stack), Base(Other.Base), Instruction(Other.Instruction)
             {
-                void *Stack;
-                void *Base;
-                void *Instruction;
-
-                bool __attribute__((noinline)) Save()
-                {
-                    bool Result;
-
-                    asm volatile(
-                        "movq %%rsp, %0\n\t"
-                        "movq %%rbp, %1\n\t"
-                        "movq $1f, %2\n\t"
-                        "movb $0, %3\n\t"
-                        "jmp 2f\n\t"
-                        "1:"
-                        "movb $1, %3\n\t"
-                        "2:"
-                        : "=m"(Stack), "=m"(Base), "=m"(Instruction), "=r"(Result)
-                        :
-                        : "memory");
-
-                    return Result;
-                }
-
-                [[noreturn]] inline __attribute__((always_inline)) void Restore()
-                {
-                    asm volatile(
-                        "movq %0, %%rsp\n\t"
-                        "movq %1, %%rbp\n\t"
-                        "jmp *%2"
-                        :
-                        : "m"(Stack), "r"(Base), "r"(Instruction));
-                }
-            };
-
-        protected:
-            State My;
-            State Parent;
-
-            size_t StackSize = 0;
-            char *Stack;
-
-            bool Finished = false;
-            bool Started = false;
-
-        public:
-            __Coroutine_Helper() = default;
-
-            __Coroutine_Helper(size_t stackSize) : StackSize(stackSize), Stack(new char[StackSize]) {}
-
-            __Coroutine_Helper(const __Coroutine_Helper &) = delete;
-
-            ~__Coroutine_Helper()
-            {
-                delete[] Stack;
+                Other.Stack = nullptr;
+                Other.Base = nullptr;
+                Other.Instruction = nullptr;
             }
 
-            // Peroperties
+            State(const State &) = delete;
 
-            inline bool IsFinished()
+            State &operator=(State &&Other)
             {
-                return Finished;
+                Stack = Other.Stack;
+                Base = Other.Base;
+                Instruction = Other.Instruction;
+
+                Other.Stack = nullptr;
+                Other.Base = nullptr;
+                Other.Instruction = nullptr;
+
+                return *this;
             }
 
-            inline bool IsStarted()
+            State &operator=(const State &) = delete;
+
+            bool __attribute__((noinline)) Save()
             {
-                return Started;
+                bool Result;
+
+                asm volatile(
+                    "movq %%rsp, %0\n\t"
+                    "movq %%rbp, %1\n\t"
+                    "movq $1f, %2\n\t"
+                    "movb $0, %3\n\t"
+                    "jmp 2f\n\t"
+                    "1:"
+                    "movb $1, %3\n\t"
+                    "2:"
+                    : "=m"(Stack), "=m"(Base), "=m"(Instruction), "=r"(Result)
+                    :
+                    : "memory");
+
+                return Result;
+            }
+
+            [[noreturn]] inline __attribute__((always_inline)) void Restore()
+            {
+                asm volatile(
+                    "movq %0, %%rsp\n\t"
+                    "movq %1, %%rbp\n\t"
+                    "jmp *%2"
+                    :
+                    : "m"(Stack), "r"(Base), "r"(Instruction));
             }
         };
-    }
+
+    protected:
+        State My;
+        State Parent;
+
+        size_t StackSize = 0;
+        char *Stack;
+
+        bool Finished = false;
+        bool Started = false;
+
+    public:
+        __Coroutine_Helper() = default;
+
+        __Coroutine_Helper(size_t stackSize) : StackSize(stackSize), Stack(new char[StackSize]) {}
+
+        __Coroutine_Helper(const __Coroutine_Helper &) = delete;
+
+        __Coroutine_Helper(__Coroutine_Helper &&Other) : My(std::move(Other.My)), Parent(std::move(Other.Parent)),
+                                                         StackSize(Other.StackSize), Stack(Other.Stack), Finished(Other.Finished), Started(Other.Started)
+        {
+            Other.StackSize = 0;
+            Other.Stack = nullptr;
+
+            Other.Finished = false;
+            Other.Started = false;
+        }
+
+        __Coroutine_Helper &operator=(const __Coroutine_Helper &) = delete;
+
+        __Coroutine_Helper &operator=(__Coroutine_Helper &&Other)
+        {
+            My = std::move(Other.My);
+            Parent = std::move(Other.Parent);
+
+            StackSize = Other.StackSize;
+            Stack = Other.Stack;
+
+            Finished = Other.Finished;
+            Started = Other.Started;
+
+            Other.StackSize = 0;
+            Other.Stack = nullptr;
+
+            Other.Finished = false;
+            Other.Started = false;
+
+            return *this;
+        }
+
+        ~__Coroutine_Helper()
+        {
+            delete[] Stack;
+        }
+
+        // Peroperties
+
+        inline bool IsFinished()
+        {
+            return Finished;
+        }
+
+        inline bool IsStarted()
+        {
+            return Started;
+        }
+    };
 
     template <typename... TArgs>
-    class Coroutine {};
+    class Coroutine
+    {
+    };
 
     template <typename... TArgs>
     class Coroutine<void(TArgs...)> : public __Coroutine_Helper
@@ -93,31 +156,32 @@ namespace Core
     public:
         Coroutine() = default;
 
-        Coroutine(size_t stackSize = __Coroutine_Helper::DefaultStackSize) : __Coroutine_Helper(stackSize) {}
+        Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize) {}
 
         // Funtionalities
 
         void Start(TArgs... Args)
         {
-            asm volatile("" ::
-                             : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+            SaveRegs;
 
             if (!this->Parent.Save())
             {
                 // Normal
 
+                Started = true;
+
                 // Change stack
 
                 asm volatile(
-                    "movq %0, %%rsp\n\t"
+                    "movq %0, %%rsp"
                     :
-                    : "r"((void *)((size_t)Stack + StackSize)));
+                    : "r"((void *)&Stack[StackSize]));
 
                 // Call Invoker
 
                 this->operator()(std::forward<TArgs...>(Args...));
 
-                throw "Invalid scope"; // <- If user called normal return an exeption is thrown
+                throw "Invalid continue"; // <- If user called normal return an exeption is thrown
             }
 
             // Returned
@@ -125,8 +189,7 @@ namespace Core
 
         void Continue()
         {
-            asm volatile("" ::
-                             : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+            SaveRegs;
 
             if (!Parent.Save())
             {
@@ -140,8 +203,7 @@ namespace Core
 
         void Yield()
         {
-            asm volatile("" ::
-                             : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+            SaveRegs;
 
             if (!My.Save())
             {
@@ -168,18 +230,19 @@ namespace Core
     public:
         Coroutine() = default;
 
-        Coroutine(size_t stackSize = __Coroutine_Helper::DefaultStackSize) : __Coroutine_Helper(stackSize) {}
+        Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize) {}
 
         // Funtionalities
 
         TReturn Start(TArgs... Args)
         {
-            asm volatile("" ::
-                             : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+            SaveRegs;
 
             if (!this->Parent.Save())
             {
                 // Normal
+
+                Started = true;
 
                 // Change stack
 
@@ -190,7 +253,7 @@ namespace Core
 
                 // Call Invoker
 
-                this->operator()(std::forward<TArgs...>(Args...));
+                this->operator()(std::forward<TArgs>(Args)...);
 
                 throw "Invalid scope"; // <- If user called normal return an exeption is thrown
             }
@@ -204,8 +267,7 @@ namespace Core
 
         TReturn Continue()
         {
-            asm volatile("" ::
-                             : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+            SaveRegs;
 
             if (!this->Parent.Save())
             {
@@ -225,8 +287,7 @@ namespace Core
         {
             this->Return = Value;
 
-            asm volatile("" ::
-                             : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+            SaveRegs;
 
             if (!this->My.Save())
             {

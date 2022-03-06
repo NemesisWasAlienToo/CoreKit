@@ -86,7 +86,14 @@ Checked items are implemented completly at the moment and unchecked items are to
 
 ## To do
 
+- Coroutine Prohibit moving af an already started coroutine
+
+- Format
+    - Seperate serializer and deserializer
+    - Optmize bit-copy-able objects Add and Take
+
 - Iterable:
+    - Poll Put CPoll inside Poll and seperate Poll from Iterable
     - Chande ForEach std::function to Template for optimzing access to lambda
     - Add Linked-List
     - Add Map
@@ -108,17 +115,3 @@ Checked items are implemented completly at the moment and unchecked items are to
     - Task queue between Runner and Server-Handler
     - Server connections limit
     - Multiple values for a key
-
-## Doing
-
-- Format
-    - Seperate serializer and deserializer
-    - Optmize bit-copy-able objects Add and Take
-
-- Iterable
-    - Poll Put CPoll inside Poll and seperate Poll from Iterable
-
-- DHT:
-    - End Callbakc Status
-    - Node should perform prev node look up to notify others
-    - Node should update its key values after join

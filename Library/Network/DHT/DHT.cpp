@@ -5,6 +5,7 @@
 #include "Network/DHT/Node.cpp"
 #include "Iterable/List.cpp"
 #include "Iterable/Span.cpp"
+#include "Iterable/Queue.cpp"
 #include "Duration.cpp"
 
 namespace Core
@@ -82,6 +83,8 @@ namespace Core
             typedef SuccessCallback<Iterable::List<Cryptography::Key> &> KeysCallback;
             typedef SuccessCallback<Iterable::Span<char> &> GetCallback;
             typedef SuccessCallback<Iterable::Span<char> &> SendToCallback;
+
+            // @todo Eventually remove this
 
             struct Request
             {
