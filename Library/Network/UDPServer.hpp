@@ -38,31 +38,22 @@ namespace Core
         {
         public:
             using CleanCallback = std::function<void(const EndPoint &)>;
-
-            using EndCallback = std::function<void()>;
-            using OutgoingCallback = std::function<bool(const Network::Socket &)>;
-
             using ProductCallback = std::function<void()>;
 
-            using IncommingCallback = std::function<std::tuple<bool, ProductCallback>(const Network::Socket &, EndCallback &)>;
+            using EndCallback = std::function<void()>;
+            using HandlerCallback = std::function<std::tuple<bool, ProductCallback>(const Network::Socket &, EndCallback &)>;
 
-            struct OutEntry
-            {
-                EndCallback End;
-                OutgoingCallback Handler;
-            };
-
-            struct InEntry
+            struct Entry
             {
                 DateTime Expire;
                 EndCallback End;
-                IncommingCallback Handler;
+                HandlerCallback Handler;
             };
 
-            using Map = std::map<Network::EndPoint, InEntry>;
-            using Queue = Iterable::Queue<OutEntry>;
+            using Map = std::map<Network::EndPoint, Entry>;
+            using Queue = Iterable::Queue<Entry>;
 
-            using BuilderCallback = std::function<void(Map::iterator &)>;
+            using BuilderCallback = std::function<Entry(const EndPoint&)>;
 
         private:
             std::mutex Lock;
@@ -104,49 +95,37 @@ namespace Core
 
             // @todo Make this callback based like ReceiveFrom
 
-            void SendTo(OutgoingCallback Handler, EndCallback End)
+            void SendTo(Entry entry)
             {
                 OLock.lock();
 
-                Outgoing.Add({std::move(End), std::move(Handler)});
+                Outgoing.Add(std::move(entry));
 
                 OLock.unlock();
 
                 Interrupt.Emit(1);
             }
 
-            template<class TCallback>
-            void SendTo(const TCallback& Callback)
-            {
-                OLock.lock();
-
-                Outgoing.Add({nullptr, nullptr});
-
-                // @todo Fix : Due to reallocation, Address might change
-
-                Callback(Outgoing.Length() - 1);
-
-                OLock.unlock();
-
-                Interrupt.Emit(1);
-            }
-
-            template<class TCallback>
-            bool ReceiveFrom(const EndPoint& Peer, const TCallback& Callback)
+            bool ReceiveFrom(const EndPoint &Peer, Entry entry)
             {
                 ILock.lock();
 
-                // @todo Fix : Due to reallocation, Address might change
+                auto [Iterator, Inserted] = Incomming.try_emplace(Peer, Entry());
 
-                auto [Iterator, Inserted] = Incomming.try_emplace(Peer, InEntry());
+                if (!Inserted)
+                {
+                    return false;
+                }
 
-                Callback(Iterator, Inserted);
+                Iterator->second = std::move(entry);
+
+                // Optimize winding
 
                 Wind();
 
                 ILock.unlock();
 
-                return Inserted;
+                return true;
             }
 
             void OnSend()
@@ -163,24 +142,19 @@ namespace Core
 
                 auto &Last = Outgoing.Last();
 
-                if (Last.Handler(Socket))
+                auto [Finished, Product] = Last.Handler(Socket, Last.End);
+
+                Lock.unlock();
+
+                if (Finished)
                 {
-                    Lock.unlock();
-
-                    OutEntry entry = std::move(Last);
-
                     Outgoing.Take();
-
-                    // if(Outgoing.IsEmpty())
-                    // {
-                    //     Empty.Emit(1);
-                    // }
 
                     OLock.unlock();
 
-                    if (entry.End)
+                    if (Product)
                     {
-                        entry.End();
+                        Product();
                     }
                 }
             }
@@ -192,25 +166,22 @@ namespace Core
 
                 ILock.lock();
 
-                auto [Entry, Inserted] = Incomming.try_emplace(Peer, InEntry());
+                auto [Iterator, Inserted] = Incomming.try_emplace(Peer, Entry());
 
                 if (Inserted)
                 {
                     // @todo if Data contains multiple packets, Builder must add multiple handelrs
 
-                    Builder(Entry);
+                    Iterator->second = Builder(Peer);
                 }
 
-                auto [Ended, Product] = Entry->second.Handler(Socket, Entry->second.End);
+                auto [Ended, Product] = Iterator->second.Handler(Socket, Iterator->second.End);
 
                 Lock.unlock();
-                ILock.unlock();
 
                 if (Ended)
                 {
-                    Incomming.erase(Entry);
-
-                    ILock.lock();
+                    Incomming.erase(Iterator);
 
                     Wind();
 
@@ -221,6 +192,8 @@ namespace Core
                         Product();
                     }
                 }
+
+                ILock.unlock();
             }
 
             auto Soonest()

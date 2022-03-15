@@ -61,8 +61,6 @@ namespace Core
 
             // Constructors
 
-            Serializer() = default;
-
             Serializer(Iterable::Queue<char> &queue) : Queue(queue) {}
 
             Serializer(const Serializer &) = delete;

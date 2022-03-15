@@ -32,15 +32,15 @@
 #include <string>
 #include <thread>
 
-#include "Network/DHT/Node.cpp"
-#include "Network/DHT/Server.cpp"
-#include "Network/DHT/Handler.cpp"
-#include "Iterable/List.cpp"
-#include "Iterable/Span.cpp"
-#include "Iterable/Poll.cpp"
-#include "Format/Serializer.cpp"
-#include "Duration.cpp"
-#include "Test.cpp"
+#include "Network/DHT/Node.hpp"
+#include "Network/DHT/Server.hpp"
+#include "Network/DHT/Handler.hpp"
+#include "Iterable/List.hpp"
+#include "Iterable/Span.hpp"
+#include "Iterable/Poll.hpp"
+#include "Format/Serializer.hpp"
+#include "Duration.hpp"
+#include "Test.hpp"
 
 namespace Core
 {

@@ -2,14 +2,14 @@
 #include <string>
 #include <functional>
 
-#include <Test.cpp>
-#include <File.cpp>
-#include <DateTime.cpp>
-#include <Iterable/List.cpp>
-#include <Iterable/Span.cpp>
-#include <Network/DNS.cpp>
-#include <Network/DHT/Chord.cpp>
-#include <Network/DHT/Runner.cpp>
+#include <Test.hpp>
+#include <File.hpp>
+#include <DateTime.hpp>
+#include <Iterable/List.hpp>
+#include <Iterable/Span.hpp>
+#include <Network/DNS.hpp>
+#include <Network/DHT/Chord.hpp>
+#include <Network/DHT/Runner.hpp>
 
 using namespace Core;
 

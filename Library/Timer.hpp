@@ -31,6 +31,8 @@ namespace Core
 
         // ### Constructors
 
+        Timer() = default;
+
         Timer(int Handler) : Descriptor(Handler) {}
         
         Timer(TimerTypes Type, int Flags)
@@ -66,7 +68,7 @@ namespace Core
 
         void Set(Duration duration)
         {
-            struct itimerspec _Duration = {0, 0};
+            struct itimerspec _Duration = {{0, 0}, {0, 0}};
 
             duration.Fill(_Duration.it_value);
 
@@ -78,7 +80,7 @@ namespace Core
 
         void Stop()
         {
-            struct itimerspec _Duration = {0, 0};
+            struct itimerspec _Duration = {{0, 0}, {0, 0}};
 
             if (timerfd_settime(_INode, 0, &_Duration, NULL) < 0)
             {
@@ -88,7 +90,7 @@ namespace Core
 
         Duration Period()
         {
-            struct itimerspec _Duration = {0, 0};
+            struct itimerspec _Duration = {{0, 0}, {0, 0}};
 
             if (timerfd_gettime(_INode, &_Duration) < 0)
             {
@@ -100,7 +102,7 @@ namespace Core
 
         Duration Left()
         {
-            struct itimerspec _Duration = {0, 0};
+            struct itimerspec _Duration = {{0, 0}, {0, 0}};
 
             if (timerfd_gettime(_INode, &_Duration) < 0)
             {

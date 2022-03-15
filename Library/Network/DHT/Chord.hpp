@@ -18,11 +18,11 @@
 #include <string>
 #include <mutex>
 
-#include <Network/EndPoint.cpp>
-#include <Network/DHT/DHT.cpp>
-#include <Network/DHT/Node.cpp>
-#include <Iterable/Span.cpp>
-#include <Iterable/List.cpp>
+#include <Network/EndPoint.hpp>
+#include <Network/DHT/DHT.hpp>
+#include <Network/DHT/Node.hpp>
+#include <Iterable/Span.hpp>
+#include <Iterable/List.hpp>
 
 namespace Core
 {
@@ -269,7 +269,7 @@ namespace Core
                 void ForEach(const std::function<void(const Node &)> &Callback)
                 {
                     Entries.ForEach(
-                        [this, &Callback](const Iterable::List<Node> &entry)
+                        [&Callback](const Iterable::List<Node> &entry)
                         {
                             if (entry.Length() > 0)
                             {

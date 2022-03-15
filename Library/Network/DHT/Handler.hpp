@@ -6,14 +6,14 @@
 #include <functional>
 #include <map>
 
-#include "Test.cpp"
-#include "Timer.cpp"
-#include "DateTime.cpp"
-#include "Format/Serializer.cpp"
-#include "Network/EndPoint.cpp"
-#include "Iterable/List.cpp"
-#include "Network/DHT/DHT.cpp"
-#include "Network/DHT/Node.cpp"
+#include "Test.hpp"
+#include "Timer.hpp"
+#include "DateTime.hpp"
+#include "Format/Serializer.hpp"
+#include "Network/EndPoint.hpp"
+#include "Iterable/List.hpp"
+#include "Network/DHT/DHT.hpp"
+#include "Network/DHT/Node.hpp"
 
 namespace Core
 {

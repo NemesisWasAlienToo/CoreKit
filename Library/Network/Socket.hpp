@@ -345,7 +345,7 @@ namespace Core
 
             ssize_t SendTo(const char *Data, size_t Length, const EndPoint &Target, int Flags = 0) const
             {
-                struct sockaddr_storage Client = {0, 0};
+                struct sockaddr_storage Client = {0};
                 socklen_t len = Target.sockaddr((struct sockaddr *)&Client);
 
                 Network::EndPoint a((struct sockaddr *)&Client);
@@ -369,7 +369,7 @@ namespace Core
 
             ssize_t SendTo(const Iterable::Span<char> &Data, const EndPoint &Target, int Flags = 0) const
             {
-                struct sockaddr_storage Client = {0, 0};
+                struct sockaddr_storage Client = {0};
                 socklen_t len = Target.sockaddr((struct sockaddr *)&Client);
 
                 Network::EndPoint a((struct sockaddr *)&Client);

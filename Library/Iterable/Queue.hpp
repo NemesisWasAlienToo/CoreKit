@@ -61,7 +61,7 @@ namespace Core
 
             std::tuple<const T*, size_t> Chunk()
             {
-                return std::tuple(&_ElementAt(0), std::min((this->_Capacity - this->_Length), this->_Length));
+                return std::tuple(&_ElementAt(0), std::min((this->_Capacity - this->_First), this->_Length));
             }
 
             // ### Public Functions
