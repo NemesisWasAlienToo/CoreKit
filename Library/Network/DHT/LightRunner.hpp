@@ -74,20 +74,15 @@ namespace Core
                 {
                     Cache.Add(Node);
 
-                    char Type;
+                    Network::DHT::Operations Type = static_cast<Network::DHT::Operations>(Serializer.Take<char>());
 
-                    Serializer >> Type;
-
-                    switch (static_cast<Network::DHT::Operations>(Type))
+                    switch (Type)
                     {
                     case Network::DHT::Operations::Ping:
                     {
                         SendTo(
                             Node.EndPoint,
-                            [](Format::Serializer &Ser)
-                            {
-                                Ser << '\0';
-                            },
+                            [](Format::Serializer &Ser) {},
                             {});
 
                         break;
@@ -138,17 +133,15 @@ namespace Core
                 {
                     while (State == States::Running)
                     {
-                        Server.Loop();
-
-                        //     try
-                        //     {
-                        //         Server.Loop();
-                        //     }
-                        //     catch (const std::exception &e)
-                        //     {
-                        //         std::cout << e.what() << '\n';
-                        //         break;
-                        //     }
+                        try
+                        {
+                            Server.Loop();
+                        }
+                        catch (const std::exception &e)
+                        {
+                            std::cout << e.what() << '\n';
+                            break;
+                        }
                     }
 
                     std::cout << "Thread exited" << std::endl;

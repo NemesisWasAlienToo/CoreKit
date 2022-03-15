@@ -372,7 +372,7 @@ namespace Core
                 Value._Length = Value._Capacity;
 
                 // @todo Optimize when serializer and deserializer are seperated
-                // Cuz we know there is no data inserted when taking data and 
+                // Cuz we know there is no data inserted when taking data and
                 // thus the queue hasn't wrapped around
 
                 // if constexpr (std::is_integral_v<TValue>)
@@ -388,7 +388,7 @@ namespace Core
             Serializer &operator>>(Iterable::Span<char> &Value)
             {
                 // @todo Optimize when serializer and deserializer are seperated
-                // Cuz we know there is no data inserted when taking data and 
+                // Cuz we know there is no data inserted when taking data and
                 // thus the queue hasn't wrapped around
 
                 Value = Iterable::Span<char>(this->Take<size_t>());
@@ -424,9 +424,7 @@ namespace Core
 
             Serializer &operator>>(Cryptography::Key &Value) // @todo key size is not obvious to the user
             {
-                size_t Size;
-
-                *this >> Size;
+                size_t Size = this->Take<size_t>();
 
                 if (Value.Size != Size)
                     Value = Cryptography::Key(Size);
@@ -435,6 +433,8 @@ namespace Core
 
                 return *this;
             }
+
+            // Optimize this
 
             Serializer &operator>>(std::string &Value)
             {

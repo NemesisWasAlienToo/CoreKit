@@ -53,7 +53,7 @@ namespace Core
             using Map = std::map<Network::EndPoint, Entry>;
             using Queue = Iterable::Queue<Entry>;
 
-            using BuilderCallback = std::function<Entry(const EndPoint&)>;
+            using BuilderCallback = std::function<Entry(const EndPoint &)>;
 
         private:
             std::mutex Lock;
@@ -121,7 +121,12 @@ namespace Core
 
                 // Optimize winding
 
-                Wind();
+                if (Incomming.size() == 1 || Iterator->second.Expire < Tracking->second.Expire)
+                {
+                    Tracking = Iterator;
+                }
+
+                SetClock();
 
                 ILock.unlock();
 
@@ -229,16 +234,31 @@ namespace Core
                     }
                     else
                     {
-                        Left = Duration(0, 1);
+                        Left = Duration(0, 0);
                     }
 
                     Expire.Set(Left);
                 }
                 else
                 {
-                    // Tracking->second.Expire = DateTime::Now();
                     Expire.Stop();
                 }
+            }
+
+            void SetClock()
+            {
+                Duration Left;
+
+                if (Tracking->second.Expire > DateTime::Now())
+                {
+                    Left = Tracking->second.Expire.Left();
+                }
+                else
+                {
+                    Left = Duration(0, 0);
+                }
+
+                Expire.Set(Left);
             }
 
             bool Clean() // @todo Add OnClean as callback template
@@ -289,7 +309,7 @@ namespace Core
                 Lock.lock();
 
             calc:
-                Await(); // <- Locks the poll
+                Await();
 
                 if (Poll[0].HasEvent())
                 {

@@ -19,12 +19,12 @@ namespace Core
 
             _FORCE_INLINE inline bool HasEvent()
             {
-                return Events != 0;
+                return bool(Events);
             }
 
             _FORCE_INLINE inline bool Happened(short int Masks)
             {
-                return (Events & Masks) != 0;
+                return bool(Events & Masks);
             }
 
             _FORCE_INLINE inline void Set(short int Masks)
