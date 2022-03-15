@@ -4,8 +4,8 @@
 #include <string>
 #include <thread>
 
-#include "Network/EndPoint.cpp"
-#include "Cryptography/Key.cpp"
+#include "Network/EndPoint.hpp"
+#include "Cryptography/Key.hpp"
 
 using namespace Core;
 

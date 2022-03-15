@@ -2,11 +2,11 @@
 
 #include "string"
 
-#include "Network/DHT/Node.cpp"
-#include "Iterable/List.cpp"
-#include "Iterable/Span.cpp"
-#include "Iterable/Queue.cpp"
-#include "Duration.cpp"
+#include "Network/DHT/Node.hpp"
+#include "Iterable/List.hpp"
+#include "Iterable/Span.hpp"
+#include "Iterable/Queue.hpp"
+#include "Duration.hpp"
 
 namespace Core
 {

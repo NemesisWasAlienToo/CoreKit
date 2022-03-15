@@ -2,11 +2,11 @@
 #include <string>
 #include <cstring>
 
-#include "Iterable/List.cpp"
+#include "Iterable/List.hpp"
 
-#include "Network/DNS.cpp"
-#include "Network/Socket.cpp"
-#include "Iterable/Poll.cpp"
+#include "Network/DNS.hpp"
+#include "Network/Socket.hpp"
+#include "Iterable/Poll.hpp"
 
 using namespace Core;
 

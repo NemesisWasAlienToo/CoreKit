@@ -2,10 +2,10 @@
 #include <string>
 #include <cstring>
 #include <streambuf>
-#include "Iterable/List.cpp"
-#include "Network/DNS.cpp"
-#include "Network/Socket.cpp"
-#include "Network/HTTP/HTTP.cpp"
+#include "Iterable/List.hpp"
+#include "Network/DNS.hpp"
+#include "Network/Socket.hpp"
+#include "Network/HTTP/HTTP.hpp"
 
 using namespace Core;
 using namespace std;

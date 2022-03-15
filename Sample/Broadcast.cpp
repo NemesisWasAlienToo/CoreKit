@@ -4,13 +4,13 @@
 #include <streambuf>
 #include <thread>
 
-#include "Test.cpp"
-#include "Iterable/List.cpp"
-#include "Iterable/Queue.cpp"
-#include "Iterable/Iterable.cpp"
-#include "Iterable/Poll.cpp"
-#include "Network/Socket.cpp"
-#include "Network/DNS.cpp"
+#include "Test.hpp"
+#include "Iterable/List.hpp"
+#include "Iterable/Queue.hpp"
+#include "Iterable/Iterable.hpp"
+#include "Iterable/Poll.hpp"
+#include "Network/Socket.hpp"
+#include "Network/DNS.hpp"
 
 using namespace Core;
 using namespace std;

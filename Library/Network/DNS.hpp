@@ -6,10 +6,10 @@
 #include <unistd.h>
 #include <system_error>
 
-#include "Network/EndPoint.cpp"
-#include "Network/Socket.cpp"
-#include "Network/Address.cpp"
-#include "Iterable/List.cpp"
+#include "Network/EndPoint.hpp"
+#include "Network/Socket.hpp"
+#include "Network/Address.hpp"
+#include "Iterable/List.hpp"
 namespace Core
 {
     namespace Network

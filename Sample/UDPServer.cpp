@@ -2,10 +2,10 @@
 #include <string>
 #include <thread>
 
-#include "Iterable/List.cpp"
-#include "Network/DNS.cpp"
-#include "Network/Address.cpp"
-#include "Network/Socket.cpp"
+#include "Iterable/List.hpp"
+#include "Network/DNS.hpp"
+#include "Network/Address.hpp"
+#include "Network/Socket.hpp"
 
 using namespace Core;
 

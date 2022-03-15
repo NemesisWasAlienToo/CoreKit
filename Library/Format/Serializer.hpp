@@ -4,12 +4,12 @@
 #include <string>
 #include <type_traits>
 
-#include "Iterable/Span.cpp"
-#include "Iterable/List.cpp"
-#include "Iterable/Queue.cpp"
-#include "Network/EndPoint.cpp"
-#include "Cryptography/Key.cpp"
-#include "Network/DHT/Node.cpp"
+#include "Iterable/Span.hpp"
+#include "Iterable/List.hpp"
+#include "Iterable/Queue.hpp"
+#include "Network/EndPoint.hpp"
+#include "Cryptography/Key.hpp"
+#include "Network/DHT/Node.hpp"
 
 #ifndef NETWORK_BYTE_ORDER
 #define NETWORK_BYTE_ORDER BIG_ENDIAN

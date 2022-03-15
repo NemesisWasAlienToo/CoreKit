@@ -6,8 +6,8 @@
 #include <sys/timerfd.h>
 #include <system_error>
 
-#include "Descriptor.cpp"
-#include "Duration.cpp"
+#include "Descriptor.hpp"
+#include "Duration.hpp"
 
 namespace Core
 {

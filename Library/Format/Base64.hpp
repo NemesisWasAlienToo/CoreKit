@@ -11,7 +11,7 @@
 #include <openssl/evp.h>
 #include <openssl/engine.h>
 
-#include <Iterable/Span.cpp>
+#include <Iterable/Span.hpp>
 
 namespace Core
 {

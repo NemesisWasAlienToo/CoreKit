@@ -7,7 +7,7 @@
 #include <sys/ioctl.h>
 #include <system_error>
 
-#include "Descriptor.cpp"
+#include "Descriptor.hpp"
 
 namespace Core
 {

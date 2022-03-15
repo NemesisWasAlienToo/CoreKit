@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <bitset>
 
-#include <Iterable/Span.cpp>
+#include <Iterable/Span.hpp>
 
 namespace Core
 {

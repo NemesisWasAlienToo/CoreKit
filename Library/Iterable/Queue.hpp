@@ -10,7 +10,7 @@
 #include <string>
 #include <cstring>
 
-#include "Iterable/Span.cpp"
+#include "Iterable/Span.hpp"
 
 namespace Core
 {

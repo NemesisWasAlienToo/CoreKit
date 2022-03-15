@@ -3,8 +3,8 @@
 #include <iostream>
 #include <string>
 
-#include <Format/Hex.cpp>
-#include <Cryptography/Random.cpp>
+#include <Format/Hex.hpp>
+#include <Cryptography/Random.hpp>
 
 using namespace Core;
 

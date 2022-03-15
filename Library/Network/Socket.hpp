@@ -11,9 +11,9 @@
 #include <system_error>
 #include <tuple>
 
-#include "Descriptor.cpp"
-#include "Network/EndPoint.cpp"
-#include "Iterable/Queue.cpp"
+#include "Descriptor.hpp"
+#include "Network/EndPoint.hpp"
+#include "Iterable/Queue.hpp"
 
 // To do :
 //      - Error handling

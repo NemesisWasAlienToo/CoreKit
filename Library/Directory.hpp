@@ -13,8 +13,8 @@
 #include <unistd.h>
 #include <system_error>
 
-#include "Descriptor.cpp"
-#include "Iterable/List.cpp"
+#include "Descriptor.hpp"
+#include "Iterable/List.hpp"
 
 namespace Core
 {

@@ -2,7 +2,7 @@
 
 #include <sys/socket.h>
 
-#include "Network/Address.cpp"
+#include "Network/Address.hpp"
 
 namespace Core
 {

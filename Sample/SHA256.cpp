@@ -3,8 +3,8 @@
 #include <string>
 #include <thread>
 
-#include "Iterable/List.cpp"
-#include "Cryptography/Digest.cpp"
+#include "Iterable/List.hpp"
+#include "Cryptography/Digest.hpp"
 
 using namespace Core;
 

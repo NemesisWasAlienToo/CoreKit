@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iomanip>
 
-#include <Iterable/Span.cpp>
+#include <Iterable/Span.hpp>
 
 namespace Core
 {

@@ -2,7 +2,7 @@
 #include <string>
 #include <unistd.h>
 
-#include <Coroutine.cpp>
+#include <Coroutine.hpp>
 
 using namespace Core;
 

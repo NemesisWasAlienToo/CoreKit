@@ -2,9 +2,9 @@
 
 #include <sys/epoll.h>
 
-#include "Iterable/Iterable.cpp"
-#include "Network/Socket.cpp"
-#include "Descriptor.cpp"
+#include "Iterable/Iterable.hpp"
+#include "Network/Socket.hpp"
+#include "Descriptor.hpp"
 
 namespace Core
 {
