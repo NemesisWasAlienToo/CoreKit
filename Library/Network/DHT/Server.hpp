@@ -132,7 +132,7 @@ namespace Core
 
                     Builder(Serializer);
 
-                    Serializer.Modify<uint32_t>(4) = Format::Serializer::Order((uint32_t)request.Buffer.Length());
+                    Serializer.Modify<uint32_t>(4) = Format::Serializer::Order(static_cast<uint32_t>(request.Buffer.Length()));
 
                     {
                         std::lock_guard<std::mutex> lock(_OutgoingLock);

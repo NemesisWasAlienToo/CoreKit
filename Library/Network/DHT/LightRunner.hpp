@@ -188,11 +188,13 @@ namespace Core
 
                     Format::Serializer Serializer(Buffer);
 
-                    Serializer.Add((char *)"CHRD", 4) << (uint32_t)0;
+                    Serializer.Add(reinterpret_cast<const char *>("CHRD"), 4) << static_cast<uint32_t>(0u);
 
                     Builder(Serializer);
 
-                    Serializer.Modify<uint32_t>(4) = Format::Serializer::Order((uint32_t)Buffer.Length());
+                    // Check size for being too big
+
+                    Serializer.Modify<uint32_t>(4) = Format::Serializer::Order(static_cast<uint32_t>(Buffer.Length()));
 
                     return UDPServer::Entry{
                         DateTime::FromNow(TimeOut),
@@ -253,7 +255,9 @@ namespace Core
 
                                 // Get Size
 
-                                size_t Size = ntohl(*(uint32_t *)(&Data[4]));
+                                // size_t Size = ntohl(*reinterpret_cast<uint32_t *>(&Data[4]));
+
+                                size_t Size = Format::Serializer::Order(*reinterpret_cast<uint32_t *>(&Data[4]));
 
                                 if (Size < Padding)
                                 {
@@ -319,7 +323,6 @@ namespace Core
                 {
                     if (!ReceiveFrom(Peer, std::move(Callback), std::move(End)))
                     {
-                        std::cout << "EndPoint is occupied\n";
                         return false;
                     }
 

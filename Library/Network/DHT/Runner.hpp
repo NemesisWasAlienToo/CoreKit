@@ -498,7 +498,7 @@ namespace Core
                         Id,
                         [this, Peer, Id, CB = std::move(Callback)](Iterable::List<Node> Response, const EndCallback &End)
                         {
-                            [[unlikely]] if (Response[0].Id == Identity.Id)
+                            if (Response[0].Id == Identity.Id)
                             {
                                 CB(Response, std::move(End));
                                 return;
@@ -520,7 +520,7 @@ namespace Core
                 {
                     const auto &Peer = Cache.Resolve(Id);
 
-                    [[unlikely]] if (Peer[0].Id == Identity.Id)
+                    if (Peer[0].Id == Identity.Id)
                     {
                         Callback(Cache.Terminate(), std::move(End));
                         return;

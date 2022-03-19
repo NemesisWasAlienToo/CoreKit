@@ -366,7 +366,7 @@ namespace Core
 
                 auto item = std::move(_ElementAt(Index));
 
-                [[likely]] if (this->_Length != Index)
+                if (this->_Length != Index)
                 {
                     _ElementAt(Index) = std::move(_ElementAt(this->_Length));
                 }
@@ -488,22 +488,6 @@ namespace Core
             }
 
             template<class TCallback>
-            size_t CountWhere(TCallback Condition) const
-            {
-                size_t result;
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    const T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                        result++;
-                }
-
-                return result;
-            }
-
-            template<class TCallback>
             bool ContainsWhere(TCallback Condition) const
             {
                 for (size_t i = 0; i < _Length; i++)
@@ -520,7 +504,7 @@ namespace Core
             }
 
             template<class TCallback>
-            bool ContainsWhere(TCallback Condition, size_t &First) const
+            bool ContainsWhere(TCallback Condition, size_t First) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
