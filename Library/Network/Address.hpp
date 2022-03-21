@@ -38,11 +38,15 @@ namespace Core
             unsigned char _Content[16] = {0};
 
         public:
-            // Variables :
-
             // Constructors :
 
             Address() = default;
+
+            Address(AddressFamily family, const char content[]) noexcept
+            {
+                _Family = family;
+                std::memcpy(_Content, &content, sizeof _Content);
+            }
 
             Address(const uint32_t &Other) noexcept
             {
@@ -102,17 +106,16 @@ namespace Core
 
             // Functions :
 
+            void Family(AddressFamily Family)
+            {
+                _Family = Family;
+            }
+
             void Set(AddressFamily Family, std::string IPAddress)
             {
                 _Family = Family;
                 inet_pton(_Family, IPAddress.c_str(), _Content);
             }
-
-            void Set(AddressFamily Family)
-            {
-                _Family = Family;
-            }
-
             void Set(std::string IPAddress)
             {
                 inet_pton(_Family, IPAddress.c_str(), _Content);
@@ -133,6 +136,10 @@ namespace Core
             // Properties :
 
             inline AddressFamily Family() const { return _Family; }
+            inline const unsigned char* Content() const { return _Content; }
+
+            inline AddressFamily& Family() { return _Family; }
+            inline unsigned char* Content() { return _Content; }
 
             std::string IP() const
             {

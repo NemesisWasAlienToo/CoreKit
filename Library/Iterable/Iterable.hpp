@@ -52,6 +52,7 @@ namespace Core
             _FORCE_INLINE inline virtual T &_ElementAt(size_t Index) { return _Content[Index]; }
             _FORCE_INLINE inline virtual const T &_ElementAt(size_t Index) const { return _Content[Index]; }
 
+        public:
             // ### Constructors
 
             Iterable() = default;
@@ -82,7 +83,6 @@ namespace Core
                 Other._Growable = false;
             }
 
-        public:
             // ### Destructor
 
             ~Iterable()
@@ -393,7 +393,7 @@ namespace Core
             //     std::sort(First(), Last());
             // }
 
-            template<class TCallback>
+            template <class TCallback>
             void ForEach(TCallback Action)
             {
                 for (size_t i = 0; i < _Length; i++)
@@ -402,7 +402,7 @@ namespace Core
                 }
             }
 
-            template<class TCallback>
+            template <class TCallback>
             Iterable<T> Where(TCallback Condition)
             {
                 Iterable<T> result(_Capacity);
@@ -418,7 +418,7 @@ namespace Core
                 return result;
             }
 
-            template<class TCallback>
+            template <class TCallback>
             bool ContainsWhere(TCallback Condition)
             {
                 for (size_t i = 0; i < _Length; i++)
@@ -432,7 +432,7 @@ namespace Core
                 return false;
             }
 
-            template<class TCallback>
+            template <class TCallback>
             bool ContainsWhere(size_t &First, TCallback Condition)
             {
                 for (size_t i = 0; i < _Length; i++)
@@ -462,7 +462,7 @@ namespace Core
                 return result;
             }
 
-            template<class TCallback>
+            template <class TCallback>
             void ForEach(TCallback Action) const
             {
                 for (size_t i = 0; i < _Length; i++)
@@ -471,7 +471,7 @@ namespace Core
                 }
             }
 
-            template<class TCallback>
+            template <class TCallback>
             Iterable<T> Where(TCallback Condition) const
             {
                 Iterable<T> result(_Capacity);
@@ -487,7 +487,7 @@ namespace Core
                 return result;
             }
 
-            template<class TCallback>
+            template <class TCallback>
             bool ContainsWhere(TCallback Condition) const
             {
                 for (size_t i = 0; i < _Length; i++)
@@ -503,7 +503,7 @@ namespace Core
                 return false;
             }
 
-            template<class TCallback>
+            template <class TCallback>
             bool ContainsWhere(TCallback Condition, size_t First) const
             {
                 for (size_t i = 0; i < _Length; i++)

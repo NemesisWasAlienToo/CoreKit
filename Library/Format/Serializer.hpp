@@ -97,7 +97,7 @@ namespace Core
             }
 
             template <typename T>
-            T &Modify(size_t Index) // @todo automatically do htonl
+            T &Modify(size_t Index)
             {
                 char *Pointer = &Queue[Index];
 
@@ -205,10 +205,11 @@ namespace Core
             {
                 *this << Value.Length();
 
-                for (size_t i = 0; i < Value._Length; i++)
-                {
-                    *this << Value[i];
-                }
+                Value.ForEach(
+                    [this](const TValue &Item)
+                    {
+                        *this << Item;
+                    });
 
                 return *this;
             }
@@ -222,16 +223,9 @@ namespace Core
                 return *this;
             }
 
-            template <typename T>
-            Serializer &operator<<(const Iterable::List<T> &Value)
+            Serializer &operator<<(const std::string &Value)
             {
-                *this << Value.Length();
-
-                Value.ForEach(
-                    [this](const T &Item)
-                    {
-                        *this << Item;
-                    });
+                Queue.Add(Value.c_str(), Value.length() + 1);
 
                 return *this;
             }
@@ -245,25 +239,21 @@ namespace Core
                 return *this;
             }
 
-            Serializer &operator<<(const std::string &Value)
+            Serializer &operator<<(const Network::Address &Value)
             {
-                Queue.Add(Value.c_str(), Value.length() + 1);
+                Network::Address::AddressFamily _Family;
+                Order(Value.Family(), _Family);
+
+                Queue.Add((char *)&_Family, sizeof(_Family));
+
+                Queue.Add((char *)Value.Content(), 16);
 
                 return *this;
             }
 
-            Serializer &operator<<(const Network::Address &Value)
-            {
-                auto str = Value.ToString();
-
-                return *this << str;
-            }
-
             Serializer &operator<<(const Network::EndPoint &Value)
             {
-                auto str = Value.ToString();
-
-                return *this << str;
+                return *this << Value.address() << Order(Value.port()) << Order(Value.flow()) << Order(Value.scope());
             }
 
             Serializer &operator<<(const Network::DHT::Node &Value)
@@ -367,9 +357,9 @@ namespace Core
             template <typename TValue>
             Serializer &operator>>(Iterable::Iterable<TValue> &Value)
             {
-                Value = Iterable::Iterable<TValue>(this->Take<size_t>());
+                size_t Size = this->Take<size_t>();
 
-                Value._Length = Value._Capacity;
+                Value = Iterable::Iterable<TValue>(Size);
 
                 // @todo Optimize when serializer and deserializer are seperated
                 // Cuz we know there is no data inserted when taking data and
@@ -377,9 +367,9 @@ namespace Core
 
                 // if constexpr (std::is_integral_v<TValue>)
 
-                for (size_t i = 0; i < Value._Length; i++)
+                for (size_t i = 0; i < Size; i++)
                 {
-                    Value[i] = this->Take<TValue>();
+                    Value.Add(this->Take<TValue>());
                 }
 
                 return *this;
@@ -403,26 +393,21 @@ namespace Core
                 return *this;
             }
 
-            template <typename T>
-            Serializer &operator>>(Iterable::List<T> &Value)
+            // @todo Optimize this
+
+            Serializer &operator>>(std::string &Value)
             {
-                size_t Size;
-
-                *this >> Size;
-
-                Value.Resize(Size);
-
-                for (size_t i = 0; i < Size; i++)
+                while (Queue.Last() != '0')
                 {
-                    T Taken;
-                    *this >> Taken;
-                    Value.Add(std::move(Taken));
+                    Value += Queue.Take();
                 }
+
+                Queue.Take();
 
                 return *this;
             }
 
-            Serializer &operator>>(Cryptography::Key &Value) // @todo key size is not obvious to the user
+            Serializer &operator>>(Cryptography::Key &Value)
             {
                 size_t Size = this->Take<size_t>();
 
@@ -434,45 +419,27 @@ namespace Core
                 return *this;
             }
 
-            // Optimize this
-
-            Serializer &operator>>(std::string &Value)
-            {
-                size_t Index = 0;
-
-                Queue.ContainsWhere(Index, [](char &item) -> bool
-                                    { return item == 0; });
-
-                Value.resize(Index++);
-
-                for (size_t i = 0; i < Index; i++)
-                {
-                    Value[i] = Queue[i];
-                }
-
-                Queue.Free(Index);
-
-                return *this;
-            }
-
             Serializer &operator>>(Network::Address &Value)
             {
-                std::string str;
+                Network::Address::AddressFamily _Family;
 
-                *this >> str;
+                Queue.Take((char *)&_Family, sizeof(_Family));
 
-                Value = Network::Address(str);
+                Order(Value.Family(), _Family);
+
+                Value.Family(_Family);
+
+                Queue.Take((char *)Value.Content(), 16);
 
                 return *this;
             }
 
             Serializer &operator>>(Network::EndPoint &Value)
             {
-                std::string str;
-
-                *this >> str;
-
-                Value = Network::EndPoint(str);
+                Value.address() = this->Take<Network::Address>();
+                Value.port(Order(this->Take<unsigned short>()));
+                Value.flow(Order(this->Take<int>()));
+                Value.scope(Order(this->Take<int>()));
 
                 return *this;
             }

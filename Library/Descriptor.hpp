@@ -32,11 +32,7 @@ namespace Core
 
         Descriptor() = default;
 
-        Descriptor(int Handler) : _INode(Handler)
-        {
-            if (!IsValid())
-                throw std::invalid_argument("File descriptor is not valid");
-        }
+        Descriptor(int Handler) : _INode(Handler) {}
 
         Descriptor(const Descriptor &Other) : _INode(Other._INode) {}
 

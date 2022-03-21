@@ -154,10 +154,10 @@ namespace Core
             //  Setters
 
             Address &address() { return _Address; }
-            const Address &address() const { return _Address; }
+            Address address() const { return _Address; }
 
-            unsigned short port() { return _Port; }
-            const unsigned short port(unsigned short Port)
+            unsigned short port() const { return _Port; }
+            unsigned short port(unsigned short Port)
             {
                 _Port = Port;
                 return _Port;
