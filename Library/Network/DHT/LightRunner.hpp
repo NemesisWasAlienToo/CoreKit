@@ -10,7 +10,6 @@
 #include "Network/DHT/DHT.hpp"
 #include "Iterable/List.hpp"
 #include "Iterable/Span.hpp"
-#include "Iterable/Poll.hpp"
 
 namespace Core
 {
@@ -178,6 +177,8 @@ namespace Core
 
                 // Fundation
 
+                // @todo Uniform by adding a callback(EndCallback&)
+
                 template <class TBuilder>
                 UDPServer::Entry BuildOEntry(
                     const Core::Network::EndPoint &Peer,
@@ -196,51 +197,44 @@ namespace Core
 
                     Serializer.Modify<uint32_t>(4) = Format::Serializer::Order(static_cast<uint32_t>(Buffer.Length()));
 
-                    return UDPServer::Entry{
+                    return {
                         DateTime::FromNow(TimeOut),
                         std::move(End),
-                        [Peer, QU = std::move(Buffer)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable -> std::tuple<bool, UDPServer::ProductCallback>
+                        [Peer, QU = std::move(Buffer)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable
                         {
-                            QU.Free(Socket.SendTo(&QU.First(), QU.Length(), Peer));
-
-                            if (QU.IsEmpty())
+                            if (!QU.IsEmpty())
                             {
-                                return std::make_tuple(true, std::move(End));
-                            }
+                                QU.Free(Socket.SendTo(&QU.First(), QU.Length(), Peer));
 
-                            return std::make_tuple(false, nullptr);
+                                if (QU.IsEmpty())
+                                {
+                                    return true;
+                                }
+
+                                return false;
+                            }
+                            else
+                            {
+                                if (End)
+                                {
+                                    End();
+                                }
+
+                                return true;
+                            }
                         }};
                 }
 
                 template <class TCallback>
-                inline UDPServer::ProductCallback IProduct(
-                    const Network::EndPoint &Peer,
-                    TCallback Callback,
-                    Iterable::Queue<char> &Queue,
-                    UDPServer::EndCallback &End)
-                {
-                    return [CB = std::move(Callback), Peer, Q = std::move(Queue), End = std::move(End)]() mutable
-                    {
-                        Format::Serializer Ser(Q);
-                        Network::DHT::Node Node;
-                        Node.EndPoint = Peer;
-                        Node.Id = Ser.Take<Cryptography::Key>();
-                        CB(Node, Ser, End);
-                    };
-                }
-
-                template <class TCallback>
-                inline auto BuildIEntry(
+                inline UDPServer::Entry BuildIEntry(
                     const Core::Network::EndPoint &Peer,
                     EndCallback End,
                     TCallback Callback)
                 {
-                    // @todo Change ProductCallback to lambda and template
-
-                    return UDPServer::Entry{
+                    return {
                         DateTime::FromNow(TimeOut),
                         std::move(End),
-                        [this, Queue = Iterable::Queue<char>(), Peer, _Callback = std::move(Callback)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable -> std::tuple<bool, UDPServer::ProductCallback>
+                        [this, Queue = Iterable::Queue<char>(), Peer, _Callback = std::move(Callback)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable
                         {
                             constexpr size_t Padding = 8;
 
@@ -250,7 +244,7 @@ namespace Core
 
                                 if (Data[0] != 'C' || Data[1] != 'H' || Data[2] != 'R' || Data[3] != 'D')
                                 {
-                                    return std::tuple(true, nullptr); // <- Maybe build error emitter
+                                    return true;
                                 }
 
                                 // Get Size
@@ -259,7 +253,7 @@ namespace Core
 
                                 if (Size < Padding)
                                 {
-                                    return std::tuple(false, nullptr);
+                                    return false;
                                 }
 
                                 // Build Queue
@@ -270,25 +264,54 @@ namespace Core
 
                                 if (Queue.IsFull())
                                 {
-                                    return std::tuple(true, IProduct(Peer, _Callback, Queue, End));
+                                    return true;
                                 }
 
-                                return std::tuple(false, nullptr);
+                                return false;
                             }
                             else
                             {
-                                auto [Data, p] = Socket.ReceiveFrom();
-
-                                // Fill Queue
-
-                                Queue.Add(Data.Content(), Data.Length());
-
-                                if (Queue.IsFull())
+                                if (!Queue.IsFull())
                                 {
-                                    return std::tuple(true, IProduct(Peer, _Callback, Queue, End));
-                                }
+                                    auto [Data, p] = Socket.ReceiveFrom();
 
-                                return std::tuple(false, nullptr);
+                                    // Fill Queue
+
+                                    Queue.Add(Data.Content(), Data.Length());
+
+                                    if (Queue.IsFull())
+                                    {
+                                        return true;
+                                    }
+
+                                    return false;
+                                }
+                                else
+                                {
+                                    // Finished
+
+                                    if (Queue.Capacity() == 0)
+                                    {
+                                        // Packet failed
+
+                                        if (End)
+                                        {
+                                            End();
+                                        }
+
+                                        return false;
+                                    }
+                                    else
+                                    {
+                                        // Normal packet
+
+                                        Format::Serializer Ser(Queue);
+                                        Network::DHT::Node Node{Ser.Take<Cryptography::Key>(), Peer};
+                                        _Callback(Node, Ser, End);
+
+                                        return true;
+                                    }
+                                }
                             }
                         }};
                 }
@@ -368,7 +391,7 @@ namespace Core
 
                         // Process response
 
-                        [CB = std::move(Callback)](const Network::DHT::Node &Node, Format::Serializer &Serializer, EndCallback End)
+                        [CB = std::move(Callback)](const Network::DHT::Node &Node, Format::Serializer &Serializer, UDPServer::EndCallback End)
                         {
                             char Header;
 
@@ -376,9 +399,7 @@ namespace Core
 
                             try
                             {
-                                Iterable::List<DHT::Node> Nodes;
-                                Serializer >> Nodes;
-                                CB(std::move(Nodes), std::move(End));
+                                CB(Serializer.Take<Iterable::List<DHT::Node>>(), std::move(End));
                             }
                             catch (const std::exception &e)
                             {
@@ -401,11 +422,11 @@ namespace Core
                     Query( // @todo optimize functions in the argument
                         Peer,
                         Id,
-                        [this, Peer, Id, CB = std::move(Callback)](Iterable::List<Node> Response, EndCallback End)
+                        [this, Peer, Id, CB = std::move(Callback)](Iterable::List<Node> Response, const EndCallback &End)
                         {
                             if (Response[0].Id == Identity.Id)
                             {
-                                CB(Response, std::move(End));
+                                CB(std::move(Response), std::move(End));
                                 return;
                             }
 
@@ -420,7 +441,7 @@ namespace Core
                         },
                         std::move(End));
                 }
-                
+
                 template <class TCallback>
                 void Route(const Cryptography::Key &Id, TCallback Callback, EndCallback End)
                 {

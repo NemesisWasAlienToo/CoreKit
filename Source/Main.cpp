@@ -43,33 +43,33 @@ int main(int argc, char const *argv[])
 
     Chord.OnKeys =
         [](Network::DHT::OnKeysCallback CB)
-        {
-            Iterable::List<Cryptography::Key> Keys;
-            
-            CB(Keys);
-        };
+    {
+        Iterable::List<Cryptography::Key> Keys;
+
+        CB(Keys);
+    };
 
     Chord.OnSet =
         [](/*const Network::DHT::Node Peer,*/ const Core::Cryptography::Key &Key, const Core::Iterable::Span<char> &Data)
-        {
-            Test::Log("Set") << "{ " << Key << ", " << Data << " }" << std::endl;
-        };
+    {
+        Test::Log("Set") << "{ " << Key << ", " << Data << " }" << std::endl;
+    };
 
     Chord.OnGet =
         [&Chord](/*const Network::DHT::Node Peer,*/ const Core::Cryptography::Key &Key, Network::DHT::OnGetCallback CB)
-        {
-            Test::Log("Get") << "{ " << Key << " }" << std::endl;
+    {
+        Test::Log("Get") << "{ " << Key << " }" << std::endl;
 
-            Iterable::Span<char> Data("Get Received", 12);
+        Iterable::Span<char> Data("Get Received", 12);
 
-            CB(Data);
-        };
+        CB(Data);
+    };
 
     Chord.OnData =
         [](const Network::DHT::Node Peer, Iterable::Span<char> &Data)
-        {
-            Test::Log("Data") << Data << std::endl;
-        };
+    {
+        Test::Log("Data") << Data << std::endl;
+    };
 
     // Run the server
 
@@ -89,7 +89,7 @@ int main(int argc, char const *argv[])
                 {
                     Test::Log("Ping") << Result << "s" << std::endl;
                 },
-                [](const Network::DHT::Report& Report)
+                [](const Network::DHT::Report &Report)
                 {
                     Test::Log("Ping") << "Ended" << std::endl;
                 });
@@ -104,7 +104,7 @@ int main(int argc, char const *argv[])
                     Test::Log("Query") << Result[0].EndPoint << std::endl;
                     End({Network::DHT::Report::Codes::Normal});
                 },
-                [](const Network::DHT::Report& Report)
+                [](const Network::DHT::Report &Report)
                 {
                     Test::Log("Query") << "Ended" << std::endl;
                 });
@@ -118,7 +118,7 @@ int main(int argc, char const *argv[])
                     Test::Log("Route") << Result[0].EndPoint << std::endl;
                     End({Network::DHT::Report::Codes::Normal});
                 },
-                [](const Network::DHT::Report& Report)
+                [](const Network::DHT::Report &Report)
                 {
                     Test::Log("Route") << "Ended" << std::endl;
                 });
@@ -127,7 +127,7 @@ int main(int argc, char const *argv[])
         {
             Chord.Bootstrap(
                 Target,
-                [](const Network::DHT::Report& Report)
+                [](const Network::DHT::Report &Report)
                 {
                     std::cout << "Bootstrap ended" << std::endl;
                 });
@@ -141,7 +141,7 @@ int main(int argc, char const *argv[])
                     Test::Log("Keys") << "{ " << keys << " }" << std::endl;
                     End({Network::DHT::Report::Codes::Normal});
                 },
-                [](const Network::DHT::Report& Report)
+                [](const Network::DHT::Report &Report)
                 {
                     std::cout << "Keys ended" << std::endl;
                 });
@@ -152,7 +152,7 @@ int main(int argc, char const *argv[])
             Chord.Set(
                 Cryptography::Key::Generate(4),
                 {Data.c_str(), Data.length()},
-                [](const Network::DHT::Report& Report)
+                [](const Network::DHT::Report &Report)
                 {
                     std::cout << "Set ended" << std::endl;
                 });
@@ -166,7 +166,7 @@ int main(int argc, char const *argv[])
                     Test::Log("Get") << "{ " << Data << " }" << std::endl;
                     End({Network::DHT::Report::Codes::Normal});
                 },
-                [](const Network::DHT::Report& Report)
+                [](const Network::DHT::Report &Report)
                 {
                     std::cout << "Get ended" << std::endl;
                 });
@@ -177,9 +177,40 @@ int main(int argc, char const *argv[])
 
             std::cout << "Enter data : ";
 
-            std::cin >> Message; 
+            std::cin >> Message;
 
             Chord.SendTo(Target, {Message.c_str(), Message.length()});
+        }
+        else if (Command == "test")
+        {
+            int count = 100, i;
+            Duration total;
+
+            i = count;
+
+            while (i--)
+            {
+                Chord.Ping(
+                    Target,
+                    [&total](Duration Result, Network::DHT::EndCallback End)
+                    {
+                        Test::Log("Ping") << Result << "s" << std::endl;
+
+                        total.Seconds += Result.Seconds;
+                        total.Nanoseconds += Result.Nanoseconds;
+                    },
+                    [](const Network::DHT::Report &Report)
+                    {
+                        Test::Log("Ping") << "Ended" << std::endl;
+                    });
+
+                usleep(50000);
+            }
+
+            total.Seconds /= count;
+            total.Nanoseconds /= count;
+
+            std::cout << "Result : " << total << std::endl;
         }
         else
         {

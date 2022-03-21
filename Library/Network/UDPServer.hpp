@@ -41,7 +41,7 @@ namespace Core
             using ProductCallback = std::function<void()>;
 
             using EndCallback = std::function<void()>;
-            using HandlerCallback = std::function<std::tuple<bool, ProductCallback>(const Network::Socket &, EndCallback &)>;
+            using HandlerCallback = std::function<bool(const Network::Socket &, EndCallback &)>;
 
             struct Entry
             {
@@ -147,20 +147,17 @@ namespace Core
 
                 auto &Last = Outgoing.Last();
 
-                auto [Finished, Product] = Last.Handler(Socket, Last.End);
+                auto IsReady = Last.Handler(Socket, Last.End);
 
                 Lock.unlock();
 
-                if (Finished)
+                if (IsReady)
                 {
-                    Outgoing.Take();
+                    auto Ent = Outgoing.Take();
 
                     OLock.unlock();
 
-                    if (Product)
-                    {
-                        Product();
-                    }
+                    Ent.Handler({-1}, Ent.End);
                 }
             }
 
@@ -180,22 +177,21 @@ namespace Core
                     Iterator->second = Builder(Peer);
                 }
 
-                auto [Ended, Product] = Iterator->second.Handler(Socket, Iterator->second.End);
+                auto IsReady = Iterator->second.Handler(Socket, Iterator->second.End);
 
                 Lock.unlock();
 
-                if (Ended)
+                if (IsReady)
                 {
+                    auto Ent = std::move(Iterator->second);
+
                     Incomming.erase(Iterator);
 
                     Wind();
 
                     ILock.unlock();
 
-                    if (Product)
-                    {
-                        Product();
-                    }
+                    Ent.Handler({-1}, Ent.End);
                 }
 
                 ILock.unlock();
