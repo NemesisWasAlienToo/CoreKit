@@ -241,8 +241,7 @@ namespace Core
 
             Serializer &operator<<(const Network::Address &Value)
             {
-                Network::Address::AddressFamily _Family;
-                Order(Value.Family(), _Family);
+                Network::Address::AddressFamily _Family = Order(Value.Family());
 
                 Queue.Add((char *)&_Family, sizeof(_Family));
 
@@ -425,9 +424,7 @@ namespace Core
 
                 Queue.Take((char *)&_Family, sizeof(_Family));
 
-                Order(Value.Family(), _Family);
-
-                Value.Family(_Family);
+                Value.Family() = Order(_Family);
 
                 Queue.Take((char *)Value.Content(), 16);
 
@@ -436,7 +433,7 @@ namespace Core
 
             Serializer &operator>>(Network::EndPoint &Value)
             {
-                Value.address() = this->Take<Network::Address>();
+                *this >> Value.address();
                 Value.port(Order(this->Take<unsigned short>()));
                 Value.flow(Order(this->Take<int>()));
                 Value.scope(Order(this->Take<int>()));

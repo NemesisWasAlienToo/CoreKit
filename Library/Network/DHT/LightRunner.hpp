@@ -348,7 +348,7 @@ namespace Core
 
                             Serializer >> Header;
 
-                            CB(DateTime::Now() - Start, End);
+                            CB(DateTime::Now() - Start, std::move(End));
                         },
                         std::move(End));
                 }
@@ -378,16 +378,107 @@ namespace Core
                             {
                                 Iterable::List<DHT::Node> Nodes;
                                 Serializer >> Nodes;
-                                CB(Nodes, End);
+                                CB(std::move(Nodes), std::move(End));
                             }
                             catch (const std::exception &e)
                             {
                                 Test::Warn(e.what()) << Serializer << std::endl;
-                                // End({Report::Codes::InvalidArgument, e.what()});
                                 End();
                             }
                         },
                         std::move(End));
+                }
+
+                template <class TCallback>
+                void Route(const Network::EndPoint &Peer, const Cryptography::Key &Id, TCallback Callback, EndCallback End)
+                {
+                    if (Id == Identity.Id)
+                    {
+                        Callback(Cache.Terminate(), std::move(End));
+                        return;
+                    }
+
+                    Query( // @todo optimize functions in the argument
+                        Peer,
+                        Id,
+                        [this, Peer, Id, CB = std::move(Callback)](Iterable::List<Node> Response, EndCallback End)
+                        {
+                            if (Response[0].Id == Identity.Id)
+                            {
+                                CB(Response, std::move(End));
+                                return;
+                            }
+
+                            if (Response[0].EndPoint.address() == Network::Address("0.0.0.0")) // <-- @todo Optimize this
+                            {
+                                Response[0].EndPoint = Peer;
+                                CB(std::move(Response), std::move(End));
+                                return;
+                            }
+
+                            Route(Response[0].EndPoint, Id, std::move(CB), std::move(End));
+                        },
+                        std::move(End));
+                }
+                
+                template <class TCallback>
+                void Route(const Cryptography::Key &Id, TCallback Callback, EndCallback End)
+                {
+                    const auto &Peer = Cache.Resolve(Id);
+
+                    if (Peer[0].Id == Identity.Id)
+                    {
+                        Callback(Cache.Terminate(), std::move(End));
+                        return;
+                    }
+
+                    Route(Peer[0].EndPoint, Id, std::move(Callback), std::move(End));
+                }
+
+                void FillCache(const Network::EndPoint &Peer, size_t NthNeighbor, EndCallback End)
+                {
+                    auto Neighbor = Identity.Id.Neighbor(NthNeighbor);
+
+                    Route(
+                        Peer,
+                        Neighbor,
+                        [this, NthNeighbor](Iterable::List<Node> Response, EndCallback End)
+                        {
+                            if (Response[0].Id == Identity.Id)
+                            {
+                                // All nodes reside before my key
+
+                                End();
+                                return;
+                            }
+
+                            // @todo also not all nodes exist and need to be routed
+
+                            size_t i = Cache.NeighborHood(Response[0].Id);
+
+                            if (i > NthNeighbor)
+                            {
+                                // Wrapped around and bootstrap is done
+
+                                End();
+                                return;
+                            }
+
+                            if (i > 0)
+                            {
+                                FillCache(Cache.Resolve(i)[0].EndPoint, i, std::move(End));
+                            }
+                            else
+                            {
+                                End();
+                            }
+                        },
+                        std::move(End));
+                }
+
+                inline void Bootstrap(const Network::EndPoint &Peer, EndCallback End)
+                {
+                    FillCache(Peer, Identity.Id.Size, std::move(End));
                 }
 
                 inline void Data(const EndPoint &Peer, const Iterable::Span<char> &Data)
