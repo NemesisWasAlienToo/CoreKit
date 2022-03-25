@@ -419,7 +419,7 @@ namespace Core
                         return;
                     }
 
-                    Query( // @todo optimize functions in the argument
+                    Query(
                         Peer,
                         Id,
                         [this, Peer, Id, CB = std::move(Callback)](Iterable::List<Node> Response, const EndCallback &End)

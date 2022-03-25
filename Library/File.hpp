@@ -90,7 +90,7 @@ namespace Core
             return (access(Name.c_str(), Tests) != -1);
         }
 
-        static void Create(const std::string &Path, uint32_t Permissions = DefaultPermission)
+        static File Create(const std::string &Path, uint32_t Permissions = DefaultPermission)
         {
             int Result = creat(Path.c_str(), Permissions);
 
@@ -99,7 +99,7 @@ namespace Core
                 throw std::system_error(errno, std::generic_category());
             }
 
-            close(Result);
+            return Result;
         }
 
         static File Open(const std::string &Path, int Flags = 0, uint32_t Permissions = DefaultPermission)

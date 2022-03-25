@@ -43,9 +43,9 @@ namespace Core
             return fcntl(_INode, F_GETFD) != -1 || errno != EBADF;
         }
 
-        auto Write(const void *Data, size_t Size)
+        ssize_t Write(const void *Data, size_t Size)
         {
-            int Result = write(_INode, Data, Size);
+            ssize_t Result = write(_INode, Data, Size);
 
             if (Result < 0)
             {
@@ -55,9 +55,9 @@ namespace Core
             return Result;
         }
 
-        auto Read(void *Data, size_t Size)
+        ssize_t Read(void *Data, size_t Size)
         {
-            int Result = read(_INode, Data, Size);
+            ssize_t Result = read(_INode, Data, Size);
 
             if (Result < 0)
             {

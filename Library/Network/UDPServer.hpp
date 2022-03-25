@@ -93,8 +93,6 @@ namespace Core
 
             // Functionalities
 
-            // @todo Make this callback based like ReceiveFrom
-
             void SendTo(Entry entry)
             {
                 OLock.lock();

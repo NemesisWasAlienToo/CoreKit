@@ -27,14 +27,6 @@ int main(int argc, char const *argv[])
 
     // Setup a target
 
-    // std::string TargetString;
-
-    // STDOUT << "Enter target ip : ";
-
-    // STDIN >> TargetString;
-
-    // const Network::EndPoint Target(TargetString);
-
     const Network::EndPoint Target("127.0.0.1:4444");
 
     // Setup the server
@@ -52,7 +44,15 @@ int main(int argc, char const *argv[])
     Chord.OnSet =
         [](/*const Network::DHT::Node Peer,*/ const Core::Cryptography::Key &Key, const Core::Iterable::Span<char> &Data)
     {
-        Test::Log("Set") << "{ " << Key << ", " << Data << " }" << std::endl;
+        Test::Log("Set") << "{ " << Key << ", ";
+
+        Data.ForEach(
+            [](char c)
+            {
+                std::cout << c;
+            });
+
+        std::cout << " }" << std::endl;
     };
 
     Chord.OnGet =
@@ -68,7 +68,15 @@ int main(int argc, char const *argv[])
     Chord.OnData =
         [](const Network::DHT::Node Peer, Iterable::Span<char> &Data)
     {
-        Test::Log("Data") << Data << std::endl;
+        Test::Log("Data") << Peer.Id;
+
+        Data.ForEach(
+            [](char c)
+            {
+                std::cout << c;
+            });
+
+        std::cout << std::endl;
     };
 
     // Run the server
@@ -163,7 +171,16 @@ int main(int argc, char const *argv[])
                 Cryptography::Key::Generate(4),
                 [](Iterable::Span<char> &Data, Network::DHT::EndCallback End)
                 {
-                    Test::Log("Get") << "{ " << Data << " }" << std::endl;
+                    Test::Log("Get") << "{ ";
+
+                    Data.ForEach(
+                        [](char c)
+                        {
+                            std::cout << c;
+                        });
+
+                    std::cout << " }" << std::endl;
+
                     End({Network::DHT::Report::Codes::Normal});
                 },
                 [](const Network::DHT::Report &Report)

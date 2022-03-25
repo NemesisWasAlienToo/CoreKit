@@ -88,6 +88,12 @@ Checked items are implemented completly at the moment and unchecked items are to
 
 - Coroutine Prohibit moving af an already started coroutine
 
+- Descriptor
+    - Define what a const Descriptor must be able to perform
+
+- File
+    - Standardize default permissions
+
 - Format
     - Seperate serializer and deserializer
     - Optmize bit-copy-able objects Add and Take
@@ -110,6 +116,7 @@ Checked items are implemented completly at the moment and unchecked items are to
 
 - Socket:
     - If non blocking sent and errno was EAGAIN return 0
+    - Define what a const Socket must be able to perform
 
 - DHT:
     - Task queue between Runner and Server-Handler

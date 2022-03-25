@@ -102,7 +102,8 @@ namespace Core
                 return false;
             }
 
-            void ForEach(std::function<void(T &)> Action)
+            template<typename TCallback>
+            void ForEach(TCallback Action)
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -110,27 +111,12 @@ namespace Core
                 }
             }
 
-            void ForEach(std::function<void(size_t, T &)> Action)
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    Action(i, _ElementAt(i));
-                }
-            }
-
-            void ForEach(std::function<void(const T &)> Action) const
+            template<typename TCallback>
+            void ForEach(TCallback Action) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
                     Action(_ElementAt(i));
-                }
-            }
-
-            void ForEach(std::function<void(size_t, const T &)> Action) const
-            {
-                for (int i = 0; i < _Length; i++)
-                {
-                    Action(i, _ElementAt(i));
                 }
             }
 
@@ -226,18 +212,6 @@ namespace Core
                 }
 
                 return true;
-            }
-
-            friend std::ostream &operator<<(std::ostream &os, const Span &List)
-            {
-                // Check for << opeartor
-
-                for (size_t i = 0; i < List._Length; i++)
-                {
-                    os << List._ElementAt(i);
-                }
-
-                return os;
             }
         };
     }

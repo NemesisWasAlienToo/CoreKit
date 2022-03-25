@@ -74,9 +74,8 @@ namespace Core
                 }
 
             public:
-                // volatile bool IsEmpty = true;
-
-                Handler() : ExpireEvent(Timer::Monotonic, 0) {} // @todo Add default timeout
+                Handler() = default;
+                Handler(Core::Timer::TimerTypes type) : ExpireEvent(type, 0) {} // @todo Add default timeout
                 ~Handler() = default;
 
                 // Functionalities

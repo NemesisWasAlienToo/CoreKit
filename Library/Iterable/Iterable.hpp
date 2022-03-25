@@ -44,7 +44,7 @@ namespace Core
                 if (!_Growable)
                     throw std::out_of_range("");
 
-                Resize(_CalculateNewSize(Minimum));
+                Resize(_CalculateNewSize(Minimum - (_Capacity - _Length)));
             }
 
             // ### Virtual Functions
@@ -93,7 +93,8 @@ namespace Core
 
             // ### Statics
 
-            static Iterable<T> Build(size_t Start, size_t End, std::function<T(size_t)> Builder)
+            template<typename TBuilder>
+            static Iterable<T> Build(size_t Start, size_t End, TBuilder Builder)
             {
                 Iterable<T> result((End - Start) + 1);
 
@@ -107,41 +108,51 @@ namespace Core
 
             // ### Properties
 
-            T *Content() const noexcept
+            inline T *Content() noexcept
             {
                 return _Content;
             }
 
-            size_t Length() const noexcept
+            inline T const *Content() const noexcept
+            {
+                return _Content;
+            }
+
+            inline size_t Length() const noexcept
             {
                 return _Length;
             }
 
-            size_t Capacity() const noexcept
+            inline void Length(size_t Lenght) noexcept
+            {
+                _Length = Lenght;
+            }
+
+            inline size_t Capacity() const noexcept
             {
                 return _Capacity;
             }
 
-            bool Growable() const noexcept
+            inline bool Growable() const noexcept
             {
                 return _Growable;
             }
 
-            void Growable(bool CanGrow) noexcept
+            inline void Growable(bool Growable) noexcept
             {
-                _Growable = CanGrow;
+                _Growable = Growable;
             }
 
-            _FORCE_INLINE inline bool IsEmpty() noexcept { return _Length == 0; }
+            inline bool IsEmpty() noexcept { return _Length == 0; }
 
-            _FORCE_INLINE inline bool IsFull() noexcept { return _Length == _Capacity; }
+            inline bool IsFull() noexcept { return _Length == _Capacity; }
 
-            _FORCE_INLINE inline size_t IsFree() noexcept { return _Capacity - _Length; }
+            inline size_t IsFree() noexcept { return _Capacity - _Length; }
 
             T &First()
             {
                 if (IsEmpty())
-                    throw std::out_of_range("");
+                    throw std::out_of_range("Instance is empty");
 
                 return _ElementAt(0);
             }
@@ -149,7 +160,7 @@ namespace Core
             const T &First() const
             {
                 if (IsEmpty())
-                    throw std::out_of_range("");
+                    throw std::out_of_range("Instance is empty");
 
                 return _ElementAt(0);
             }
@@ -157,15 +168,15 @@ namespace Core
             T &Last()
             {
                 if (IsEmpty())
-                    throw std::out_of_range("");
+                    throw std::out_of_range("Instance is empty");
 
                 return _ElementAt(_Length - 1);
             }
-
+        
             const T &Last() const
             {
                 if (IsEmpty())
-                    throw std::out_of_range("");
+                    throw std::out_of_range("Instance is empty");
 
                 return _ElementAt(_Length - 1);
             }
@@ -188,7 +199,9 @@ namespace Core
                 this->_Capacity = Size;
             }
 
-            void Reserve(size_t Count)
+            // @todo If NoWrap was true, the new size must be continues
+
+            void Reserve(size_t Count, bool NoWrap = false)
             {
                 this->_IncreaseCapacity(Count);
 
@@ -247,15 +260,15 @@ namespace Core
                 this->_Length += Count;
             }
 
-            void Add(Iterable<T> &Other)
+            void Add(const Iterable<T> &Other)
             {
-                while (!Other.IsEmpty())
+                for (size_t i = 0; i < Other._Length; i++)
                 {
-                    Add(Other.Take());
+                    Add(Other[i]);
                 }
             }
 
-            void Squeeze(T &&Item, size_t Index) // @todo Add perfect forwarding
+            void Squeeze(T &&Item, size_t Index)
             {
                 if (this->_Length <= Index)
                     throw std::out_of_range("");
@@ -381,10 +394,6 @@ namespace Core
 
                 std::swap(_ElementAt(First), _ElementAt(Second));
             }
-
-            // // ### To be implemented
-
-            // void Add(const Iterable<T> &Other) {}
 
             // ### Pre-defined functions
 
@@ -556,38 +565,6 @@ namespace Core
                 }
 
                 return false;
-            }
-
-            T &Biggest() const
-            {
-                if (this->_Length <= 0)
-                    throw std::out_of_range("Instance contains no element");
-
-                size_t result = 0;
-
-                for (size_t i = 1; i < _Length; i++)
-                {
-                    if (_ElementAt(i) > _ElementAt(result))
-                        result = i;
-                }
-
-                return _ElementAt(result);
-            }
-
-            T &Smallest() const
-            {
-                if (this->_Length <= 0)
-                    throw std::out_of_range("Instance contains no element");
-
-                size_t result = 0;
-
-                for (size_t i = 1; i < _Length; i++)
-                {
-                    if (_ElementAt(i) < _ElementAt(result))
-                        result = i;
-                }
-
-                return _ElementAt(result);
             }
 
             // ### Operators

@@ -15,9 +15,7 @@
 #include "Network/EndPoint.hpp"
 #include "Iterable/Queue.hpp"
 
-// To do :
-//      - Error handling
-//      - const functions
+// @todo Error handling for send, recv, sendto, recvfrom
 
 namespace Core
 {
@@ -53,23 +51,15 @@ namespace Core
                 WaitAll = MSG_WAITALL,
             };
 
-            Socket()
+            Socket() = default;
+
+            Socket(const int INode) : Descriptor(INode) {}
+
+            Socket(SocketFamily Family, int Type, int Protocol = 0)
             {
-                _INode = socket(IPv4, TCP, 0);
+                _INode = socket(Family, Type, Protocol);
 
-                if (_INode < 0)
-                {
-                    throw std::system_error(errno, std::generic_category());
-                }
-            }
-
-            Socket(const int Handler) : Descriptor(Handler) {}
-
-            Socket(SocketFamily Protocol, int Type = TCP)
-            {
-                _INode = socket(Protocol, Type, 0);
-
-                // Error handling here
+                // @todo Error handling here
 
                 if (_INode < 0)
                 {
@@ -102,7 +92,7 @@ namespace Core
 
                 Result = bind(_INode, SocketAddress, Size);
 
-                // Error handling here
+                // @todo Error handling here
 
                 if (Result < 0)
                 {
@@ -110,7 +100,7 @@ namespace Core
                 }
             }
 
-            void Bind(const Address &address, short Port) const
+            void Bind(const Address &address, unsigned short Port) const
             {
                 Bind(EndPoint(address, Port));
             }
@@ -145,19 +135,6 @@ namespace Core
             void Connect(const Address &address, short Port) const
             {
                 Connect(EndPoint(address, Port));
-            }
-
-            bool IsConnected() const
-            {
-                char Data;
-                int Result = Receive(&Data, 1, DontWait | Peek);
-
-                if ((Result == 0) || (Result < 0 && errno != EAGAIN))
-                {
-                    return false;
-                }
-
-                return true;
             }
 
             void Listen(int Count) const
@@ -213,26 +190,10 @@ namespace Core
 
                 Socket Ret(ClientDescriptor);
 
-                if (!IsBlocking()) Ret.Blocking(false);
+                if (!IsBlocking())
+                    Ret.Blocking(false);
 
                 return Ret;
-            }
-
-            bool Closable() const
-            {
-                if (_INode < 0)
-                    return false;
-
-                int error = 0;
-                socklen_t len = sizeof(error);
-                int retval = getsockopt(_INode, SOL_SOCKET, SO_ERROR, &error, &len);
-
-                if (retval != 0 || error != 0)
-                {
-                    throw std::system_error(errno, std::generic_category());
-                }
-
-                return true;
             }
 
             int Errors() const
@@ -247,6 +208,14 @@ namespace Core
                 }
 
                 return error;
+            }
+
+            bool IsValid() const
+            {
+                if (_INode < 0 || Errors() != 0)
+                    return false;
+
+                return true;
             }
 
             EndPoint Peer() const
@@ -325,22 +294,103 @@ namespace Core
 
             ssize_t Send(const char *Data, size_t Length, int Flags = 0) const
             {
-                return send(_INode, Data, Length, Flags);
+                // @todo Fix return type or return result of send
+
+                auto Result =  send(_INode, Data, Length, Flags);
+
+                if (Result < 0)
+                {
+                    if (errno == EAGAIN)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        throw std::system_error(errno, std::generic_category());
+                    }
+                }
+
+                return Result;
             }
 
             ssize_t Send(const Iterable::Span<char> &Data, int Flags = 0) const
             {
-                return send(_INode, Data.Content(), Data.Length(), Flags);
+                auto Result = send(_INode, Data.Content(), Data.Length(), Flags);
+
+                if (Result < 0)
+                {
+                    if (errno == EAGAIN)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        throw std::system_error(errno, std::generic_category());
+                    }
+                }
+
+                return Result;
             }
 
             ssize_t Receive(char *Data, size_t Length, int Flags = 0) const
             {
-                return recv(_INode, Data, Length, Flags);
+                // @todo Fix return type or return result of recv
+
+                auto Result = recv(_INode, Data, Length, Flags);
+
+                if (Result < 0)
+                {
+                    if (errno == EAGAIN)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        throw std::system_error(errno, std::generic_category());
+                    }
+                }
+
+                return Result;
             }
 
             ssize_t Receive(Iterable::Span<char> &Data, int Flags = 0) const
             {
-                return recv(_INode, Data.Content(), Data.Length(), Flags);
+                auto Result = recv(_INode, Data.Content(), Data.Length(), Flags);
+
+                if (Result < 0)
+                {
+                    if (errno == EAGAIN)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        throw std::system_error(errno, std::generic_category());
+                    }
+                }
+
+                return Result;
+            }
+
+            Iterable::Span<char> Receive(int Flags = 0) const
+            {
+                Iterable::Span<char> Data(Received());
+
+                auto Result = recv(_INode, Data.Content(), Data.Length(), Flags);
+
+                if (Result < 0)
+                {
+                    if (errno == EAGAIN)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        throw std::system_error(errno, std::generic_category());
+                    }
+                }
+
+                return Data;
             }
 
             ssize_t SendTo(const char *Data, size_t Length, const EndPoint &Target, int Flags = 0) const
@@ -360,6 +410,8 @@ namespace Core
                     }
                     else
                     {
+                        // @todo Add description from errno to exception
+
                         throw std::system_error(errno, std::generic_category());
                     }
                 }
@@ -492,246 +544,19 @@ namespace Core
                 return std::tuple(std::move(Data), Target);
             }
 
-            Socket &operator<<(const std::string &Message)
-            {
-                int Result = 0;
-                int Left = Message.length();
-                const char *str = Message.c_str();
-
-                while (Left > 0)
-                {
-                    Await(Out);
-                    Result = write(_INode, str, Left);
-                    Left -= Result;
-                }
-
-                // Error handling here
-
-                if (Result < 0)
-                {
-                    throw std::system_error(errno, std::generic_category());
-                }
-
-                return *this;
-            }
-
-            const Socket &operator<<(const std::string &Message) const
-            {
-                int Result = 0;
-                int Left = Message.length();
-                const char *str = Message.c_str();
-
-                while (Left > 0)
-                {
-                    Await(Out);
-                    Result = write(_INode, str, Left);
-                    Left -= Result;
-                }
-
-                // Error handling here
-
-                if (Result < 0)
-                {
-                    throw std::system_error(errno, std::generic_category());
-                }
-
-                return *this;
-            }
-
-            const Socket &operator<<(Iterable::Queue<char> &queue) const
-            {
-                // @todo Clarify on blocking and non-blocking
-
-                int Result;
-
-                for (;;)
-                {
-                    auto [Data, Size] = queue.Chunk();
-
-                    if (Size == 0)
-                    {
-                        break;
-                    }
-
-                    Result = write(_INode, Data, Size);
-
-                    if (Result > 0)
-                    {
-                        queue.Free(Result);
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                // Error handling here
-
-                if (Result < 0 && errno != EAGAIN)
-                {
-                    throw std::system_error(errno, std::generic_category());
-                }
-
-                return *this;
-            }
-
-            Socket &operator<<(Iterable::Queue<char> &queue)
-            {
-                // @todo Clarify on blocking and non-blocking
-
-                int Result;
-
-                for (;;)
-                {
-                    auto [Data, Size] = queue.Chunk();
-
-                    if (Size == 0)
-                    {
-                        break;
-                    }
-
-                    Result = write(_INode, Data, Size);
-
-                    if (Result > 0)
-                    {
-                        queue.Free(Result);
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                // Error handling here
-
-                if (Result < 0 && errno != EAGAIN)
-                {
-                    throw std::system_error(errno, std::generic_category());
-                }
-
-                return *this;
-            }
-
-            const Socket &operator>>(Iterable::Queue<char> &queue) const
-            {
-                size_t Size = Received();
-
-                if (Size <= 0)
-                    return *this;
-
-                char _Buffer[Size];
-
-                int Result = read(_INode, _Buffer, Size);
-
-                // Error handling here
-
-                if (Result < 0)
-                {
-                    throw std::system_error(errno, std::generic_category());
-                }
-
-                queue.Add(_Buffer, Size);
-
-                return *this;
-            }
-
-            Socket &operator>>(Iterable::Queue<char> &queue)
-            {
-                size_t Size = Received();
-
-                if (Size <= 0)
-                    return *this;
-
-                char _Buffer[Size];
-
-                int Result = read(_INode, _Buffer, Size);
-
-                // Error handling here
-
-                if (Result < 0)
-                {
-                    throw std::system_error(errno, std::generic_category());
-                }
-
-                queue.Add(_Buffer, Size);
-
-                return *this;
-            }
-
-            Socket &operator>>(std::string &Message)
-            {
-                size_t Size = Received() + 1;
-
-                if (Size <= 0)
-                    return *this;
-
-                char buffer[Size];
-
-                int Result = read(_INode, buffer, Size);
-
-                // Instead, can increase string size by
-                // avalable bytes in socket buffer
-                // and call read on c_str at the new memory index
-
-                if (Result < 0 && errno != EAGAIN)
-                {
-                    throw std::system_error(errno, std::generic_category());
-                }
-
-                buffer[Result] = 0;
-                Message.append(buffer);
-
-                return *this;
-            }
-
-            const Socket &operator>>(std::string &Message) const
-            {
-                size_t Size = Received() + 1;
-
-                if (Size <= 0)
-                    return *this;
-
-                char buffer[Size];
-
-                int Result = read(_INode, buffer, Size);
-
-                // Instead, can increase string size by
-                // avalable bytes in socket buffer
-                // and call read on c_str at the new memory index
-
-                if (Result < 0 && errno != EAGAIN)
-                {
-                    throw std::system_error(errno, std::generic_category());
-                }
-
-                buffer[Result] = 0;
-                Message.append(buffer);
-
-                return *this;
-            }
-
-            inline bool operator==(const Socket &Other)
+            inline bool operator==(const Socket &Other) const
             {
                 return Other._INode == _INode;
             }
 
-            inline bool operator!=(const Socket &Other)
+            inline bool operator!=(const Socket &Other) const
             {
                 return Other._INode != _INode;
             }
 
-            // Maybe add rvalue later?
+            // @todo Maybe add rvalue later?
 
             Socket &operator=(const Socket &Other) = delete;
-
-            // Friend operators
-
-            friend std::ostream &operator<<(std::ostream &os, const Socket &socket)
-            {
-                std::string str;
-                socket >> str; // fix this
-                return os << str;
-            }
         };
     }
 }

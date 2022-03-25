@@ -4,12 +4,14 @@
 #include <string>
 #include <type_traits>
 
+#include "Descriptor.hpp"
 #include "Iterable/Span.hpp"
 #include "Iterable/List.hpp"
 #include "Iterable/Queue.hpp"
 #include "Network/EndPoint.hpp"
 #include "Cryptography/Key.hpp"
 #include "Network/DHT/Node.hpp"
+#include "Network/Socket.hpp"
 
 #ifndef NETWORK_BYTE_ORDER
 #define NETWORK_BYTE_ORDER BIG_ENDIAN
@@ -72,6 +74,21 @@ namespace Core
             inline size_t Length()
             {
                 return Queue.Length();
+            }
+
+            void Realign()
+            {
+                Queue.Resize(Queue.Capacity());
+            }
+
+            void Clear()
+            {
+                Queue = Iterable::Queue<char>(Queue.Capacity());
+            }
+
+            void Clear(size_t NewSize)
+            {
+                Queue = Iterable::Queue<char>(NewSize);
             }
 
             inline Serializer &Add(const char *Data, size_t Size)
@@ -454,6 +471,41 @@ namespace Core
                 }
 
                 return os;
+            }
+
+            friend Descriptor &operator<<(Descriptor &descriptor, Serializer &Serializer)
+            {
+                Serializer.Queue.Free(descriptor.Write(&Serializer.Queue.First(), Serializer.Queue.Length()));
+                return descriptor;
+            }
+
+            friend Descriptor &operator>>(Descriptor &descriptor, Serializer &Serializer)
+            {
+                // @todo Optimize when NoWrap was implemented in iterable resize
+
+                if(Serializer.Queue.IsFree() == 0)
+                {
+                    Serializer.Queue.Reserve(1);
+                }
+
+                size_t size = Serializer.Queue.IsFree();
+                char data[size];
+
+                descriptor.Read(data, size);
+                Serializer.Queue.Add(data, size);
+                return descriptor;
+            }
+
+            friend Network::Socket &operator>>(Network::Socket &socket, Serializer &Serializer)
+            {
+                // @todo Optimize when NoWrap was implemented in iterable resize
+
+                size_t size = socket.Received();
+                char data[size];
+                socket.Receive(data, size);
+                Serializer.Queue.Add(data, size);
+
+                return socket;
             }
 
             Serializer &operator=(const Serializer &) = delete;
