@@ -2,13 +2,12 @@
 #include <string>
 #include <cstring>
 
-#include "Iterable/List.hpp"
-
-#include "Network/DNS.hpp"
-#include "Network/Socket.hpp"
-#include "Iterable/Queue.hpp"
-#include "Iterable/Poll.hpp"
-#include "Format/Serializer.hpp"
+#include <Iterable/List.hpp>
+#include <Network/DNS.hpp>
+#include <Network/Socket.hpp>
+#include <Iterable/Queue.hpp>
+#include <Iterable/Poll.hpp>
+#include <Format/Serializer.hpp>
 
 using namespace Core;
 

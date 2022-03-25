@@ -2,10 +2,9 @@
 #include <string>
 #include <cstring>
 
-#include "Iterable/List.hpp"
-
-#include "Descriptor.hpp"
-#include "File.hpp"
+#include <Iterable/List.hpp>
+#include <Descriptor.hpp>
+#include <File.hpp>
 
 using namespace Core;
 
@@ -13,7 +12,7 @@ int main(int argc, char const *argv[])
 {
     if (File::Exist("testfile.txt"))
     {
-        File f = File::Open("testfile.txt");
+        File f = File::Open("testfile.txt", File::ReadOnly);
 
         std::cout << f.ReadLine() << std::endl;
 
@@ -25,7 +24,11 @@ int main(int argc, char const *argv[])
     {
         File f = File::Create("testfile.txt");
 
-        f.WriteLine("hello there");
+        for (size_t i = 0; i < 10; i++)
+        {
+            f.WriteLine("ha");
+        }
+        
     }
 
     return 0;

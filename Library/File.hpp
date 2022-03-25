@@ -3,11 +3,9 @@
 #include <iostream>
 #include <sys/types.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <sys/ioctl.h>
 #include <system_error>
 
-#include "Descriptor.hpp"
+#include <Descriptor.hpp>
 
 namespace Core
 {
@@ -183,20 +181,6 @@ namespace Core
         }
 
         // ### Functions
-
-        int Received() const
-        {
-
-            int Count = 0;
-            int Result = ioctl(_INode, FIONREAD, &Count);
-
-            if (Result < 0)
-            {
-                throw std::system_error(errno, std::generic_category());
-            }
-
-            return Count;
-        }
 
         size_t Offset() const
         {

@@ -6,6 +6,8 @@
 #include <string.h>
 #include <poll.h>
 #include <sys/eventfd.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
 
 namespace Core
 {
@@ -41,6 +43,20 @@ namespace Core
         inline bool IsValid()
         {
             return fcntl(_INode, F_GETFD) != -1 || errno != EBADF;
+        }
+
+        int Received() const
+        {
+
+            int Count = 0;
+            int Result = ioctl(_INode, FIONREAD, &Count);
+
+            if (Result < 0)
+            {
+                throw std::system_error(errno, std::generic_category());
+            }
+
+            return Count;
         }
 
         ssize_t Write(const void *Data, size_t Size)

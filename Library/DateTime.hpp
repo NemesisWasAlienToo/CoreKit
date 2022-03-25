@@ -3,7 +3,7 @@
 #include <iostream>
 #include <time.h>
 
-#include "Duration.hpp"
+#include <Duration.hpp>
 
 namespace Core
 {

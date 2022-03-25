@@ -19,9 +19,9 @@ namespace Core
         constexpr char *White = (char *)"\033[37m";
         constexpr char *Reset = (char *)"\033[0m";
 
-        void Assert(const std::string &Message, bool Result)
+        void Assert(bool Condition, const std::string &Message)
         {
-            if (Result)
+            if (Condition)
                 std::cout << Green << "Passed" << Reset  << " : " << Message << std::endl;
             else
                 std::cout << Red << "Failed" << Reset  << " : " << Message << std::endl;
