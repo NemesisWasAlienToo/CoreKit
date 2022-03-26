@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <tuple>
+#include <type_traits>
 
 #define SaveRegs asm volatile("" :: \
                                   : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15")
@@ -160,7 +161,7 @@ namespace Core
     public:
         Coroutine() = default;
 
-        Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize), _Args(new ArgsContainer()) {}
+        Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize) {}
 
         ~Coroutine()
         {
@@ -182,48 +183,24 @@ namespace Core
 
         // Functionalities
 
-        void Start(TArgs &...Args)
+        void Start(const TArgs &...Args)
         {
             SaveRegs;
 
-            *_Args = ArgsContainer(Args...);
-
-            if (!this->Parent.Save())
+            if(_Args == nullptr)
             {
-                // Normal
-
-                Started = true;
-                Finished = false;
-
-                // Change stack
-
-                asm volatile(
-                    "movq %0, %%rsp\t\n"
-                    :
-                    : "r"((void *)&Stack[StackSize]));
-
-                // Call Invoker
-
-                this->operator()();
-
-                throw "Invalid continue"; // <- If user called normal return an exeption is thrown
+                _Args = new ArgsContainer(Args...);
+            }
+            else
+            {
+                *_Args = ArgsContainer(Args...);
             }
 
-            // Returned
-        }
-
-        void Start(TArgs &&...Args)
-        {
-            SaveRegs;
-
-            *_Args = ArgsContainer(std::move(Args)...);
-
             if (!this->Parent.Save())
             {
                 // Normal
 
                 Started = true;
-                Finished = false;
 
                 // Change stack
 
@@ -282,13 +259,14 @@ namespace Core
     protected:
         using ArgsContainer = std::tuple<TArgs...>;
 
-        ArgsContainer *_Args;
+        // ArgsContainer *_Args;
+        ArgsContainer *_Args = nullptr;
         TReturn Return;
 
     public:
         Coroutine() = default;
 
-        Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize), _Args(new ArgsContainer()) {}
+        Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize) {}
 
         ~Coroutine()
         {
@@ -312,45 +290,18 @@ namespace Core
 
         // @todo Take arguments by value
 
-        TReturn Start(TArgs &...Args)
+        TReturn Start(const TArgs &...Args)
         {
             SaveRegs;
 
-            *_Args = ArgsContainer(Args...);
-
-            if (!this->Parent.Save())
+            if(_Args == nullptr)
             {
-                // Normal
-
-                Started = true;
-                Finished = false;
-
-                // Change stack
-
-                asm volatile(
-                    "movq %0, %%rsp\t\n"
-                    :
-                    : "r"((void *)&Stack[StackSize]));
-
-                // Call Invoker
-
-                this->operator()();
-
-                throw "Invalid scope"; // <- If user called normal return an exeption is thrown
+                _Args = new ArgsContainer(Args...);
             }
             else
             {
-                // Returned
-
-                return this->Return;
+                *_Args = ArgsContainer(Args...);
             }
-        }
-
-        TReturn Start(TArgs &&...Args)
-        {
-            SaveRegs;
-
-            *_Args = ArgsContainer(std::move(Args)...);
 
             if (!this->Parent.Save())
             {
