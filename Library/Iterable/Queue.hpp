@@ -130,25 +130,6 @@ namespace Core
                 this->_Length -= Count;
             }
 
-            std::string ToString(size_t Size)
-            {
-                if (Size > this->_Length)
-                    throw std::out_of_range("");
-
-                // @todo Cahange to steam and display object
-
-                std::string str;
-
-                str.resize(Size * sizeof(T));
-
-                for (size_t i = 0; i < Size; i++)
-                {
-                    str[i] = _ElementAt(i);
-                }
-
-                return str;
-            }
-
             std::string ToString()
             {
                 return ToString(this->_Length);
@@ -174,16 +155,6 @@ namespace Core
                 Item = Take();
 
                 return *this;
-            }
-
-            friend std::ostream &operator<<(std::ostream &os, Queue &Queue)
-            {
-                while (!Queue.IsEmpty())
-                {
-                    os << Queue.Take();
-                }
-
-                return os;
             }
         };
     }

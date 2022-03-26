@@ -86,7 +86,8 @@ Checked items are implemented completly at the moment and unchecked items are to
 
 ## To do
 
-- Coroutine Prohibit moving af an already started coroutine
+- Coroutine
+    - Prohibit moving of an already started coroutine
 
 - Descriptor
     - Define what a const Descriptor must be able to perform
@@ -100,7 +101,6 @@ Checked items are implemented completly at the moment and unchecked items are to
 
 - Iterable:
     - Poll Put CPoll inside Poll and seperate Poll from Iterable
-    - Chande ForEach std::function to Template for optimzing access to lambda
     - Add Linked-List
     - Add Map
     - Add (red-black & AVL) binary search trees
@@ -115,10 +115,9 @@ Checked items are implemented completly at the moment and unchecked items are to
     - Add http Server server
 
 - Socket:
-    - If non blocking sent and errno was EAGAIN return 0
+    - Error string from errno
     - Define what a const Socket must be able to perform
 
 - DHT:
     - Task queue between Runner and Server-Handler
     - Server connections limit
-    - Multiple values for a key

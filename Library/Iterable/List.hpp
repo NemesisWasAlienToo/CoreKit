@@ -43,20 +43,6 @@ namespace Core
 
             ~List() = default;
 
-            // ### Functionalities
-
-            std::string ToString()
-            {
-                std::stringstream ss;
-
-                for (size_t i = 0; i < this->_Length; i++)
-                {
-                    ss << this->_Content[i] << '\n';
-                }
-
-                return ss.str();
-            }
-
             // ### Static Functions
 
             static List<T> Build(size_t Start, size_t End, std::function<T(size_t)> Builder)
@@ -80,18 +66,6 @@ namespace Core
             bool operator!=(const List &Other) noexcept
             {
                 return this->_Content != Other->_Content;
-            }
-
-            friend std::ostream &operator<<(std::ostream &os, const List &List)
-            {
-                // Check for << opeartor
-
-                for (size_t i = 0; i < List._Length; i++)
-                {
-                    os << "[" << i << "] : " << List._ElementAt(i) << '\n';
-                }
-
-                return os;
             }
         };
     }

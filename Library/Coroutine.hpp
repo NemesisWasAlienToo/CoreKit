@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <tuple>
 
 #define SaveRegs asm volatile("" :: \
                                   : "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15")
@@ -13,8 +14,6 @@ namespace Core
     class __Coroutine_Helper
     {
     public:
-        static constexpr size_t DefaultStackSize = 1024 * 4 * 4; // 4 pages of memory
-
         struct State
         {
             void *Stack;
@@ -105,6 +104,11 @@ namespace Core
             Other.Started = false;
         }
 
+        virtual ~__Coroutine_Helper()
+        {
+            delete[] Stack;
+        }
+
         __Coroutine_Helper &operator=(const __Coroutine_Helper &) = delete;
 
         __Coroutine_Helper &operator=(__Coroutine_Helper &&Other)
@@ -125,11 +129,6 @@ namespace Core
             Other.Started = false;
 
             return *this;
-        }
-
-        ~__Coroutine_Helper()
-        {
-            delete[] Stack;
         }
 
         // Peroperties
@@ -153,33 +152,89 @@ namespace Core
     template <typename... TArgs>
     class Coroutine<void(TArgs...)> : public __Coroutine_Helper
     {
+    protected:
+        using ArgsContainer = std::tuple<TArgs...>;
+
+        ArgsContainer *_Args;
+
     public:
         Coroutine() = default;
 
-        Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize) {}
+        Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize), _Args(new ArgsContainer()) {}
 
-        // Funtionalities
+        ~Coroutine()
+        {
+            delete _Args;
+        }
 
-        void Start(TArgs... Args)
+        // Peroperties
+
+        ArgsContainer &Arguments()
+        {
+            return *_Args;
+        }
+
+        template <size_t TNumber>
+        auto &Argument()
+        {
+            return std::get<TNumber>(*_Args);
+        }
+
+        // Functionalities
+
+        void Start(TArgs &...Args)
         {
             SaveRegs;
+
+            *_Args = ArgsContainer(Args...);
 
             if (!this->Parent.Save())
             {
                 // Normal
 
                 Started = true;
+                Finished = false;
 
                 // Change stack
 
                 asm volatile(
-                    "movq %0, %%rsp"
+                    "movq %0, %%rsp\t\n"
                     :
                     : "r"((void *)&Stack[StackSize]));
 
                 // Call Invoker
 
-                this->operator()(std::forward<TArgs...>(Args...));
+                this->operator()();
+
+                throw "Invalid continue"; // <- If user called normal return an exeption is thrown
+            }
+
+            // Returned
+        }
+
+        void Start(TArgs &&...Args)
+        {
+            SaveRegs;
+
+            *_Args = ArgsContainer(std::move(Args)...);
+
+            if (!this->Parent.Save())
+            {
+                // Normal
+
+                Started = true;
+                Finished = false;
+
+                // Change stack
+
+                asm volatile(
+                    "movq %0, %%rsp\t\n"
+                    :
+                    : "r"((void *)&Stack[StackSize]));
+
+                // Call Invoker
+
+                this->operator()();
 
                 throw "Invalid continue"; // <- If user called normal return an exeption is thrown
             }
@@ -218,42 +273,102 @@ namespace Core
             Parent.Restore();
         }
 
-        virtual void operator()(TArgs... Args) = 0;
+        virtual void operator()() = 0;
     };
 
     template <typename TReturn, typename... TArgs>
     class Coroutine<TReturn(TArgs...)> : public __Coroutine_Helper
     {
     protected:
+        using ArgsContainer = std::tuple<TArgs...>;
+
+        ArgsContainer *_Args;
         TReturn Return;
 
     public:
         Coroutine() = default;
 
-        Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize) {}
+        Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize), _Args(new ArgsContainer()) {}
 
-        // Funtionalities
+        ~Coroutine()
+        {
+            delete _Args;
+        }
 
-        TReturn Start(TArgs... Args)
+        // Peroperties
+
+        ArgsContainer &Arguments()
+        {
+            return *_Args;
+        }
+
+        template <size_t TNumber>
+        auto &Argument()
+        {
+            return std::get<TNumber>(*_Args);
+        }
+
+        // Functionalities
+
+        // @todo Take arguments by value
+
+        TReturn Start(TArgs &...Args)
         {
             SaveRegs;
+
+            *_Args = ArgsContainer(Args...);
 
             if (!this->Parent.Save())
             {
                 // Normal
 
                 Started = true;
+                Finished = false;
 
                 // Change stack
 
                 asm volatile(
-                    "movq %0, %%rsp\n\t"
+                    "movq %0, %%rsp\t\n"
                     :
-                    : "r"((void *)((size_t)this->Stack + this->StackSize)));
+                    : "r"((void *)&Stack[StackSize]));
 
                 // Call Invoker
 
-                this->operator()(std::forward<TArgs>(Args)...);
+                this->operator()();
+
+                throw "Invalid scope"; // <- If user called normal return an exeption is thrown
+            }
+            else
+            {
+                // Returned
+
+                return this->Return;
+            }
+        }
+
+        TReturn Start(TArgs &&...Args)
+        {
+            SaveRegs;
+
+            *_Args = ArgsContainer(std::move(Args)...);
+
+            if (!this->Parent.Save())
+            {
+                // Normal
+
+                Started = true;
+                Finished = false;
+
+                // Change stack
+
+                asm volatile(
+                    "movq %0, %%rsp\t\n"
+                    :
+                    : "r"((void *)&Stack[StackSize]));
+
+                // Call Invoker
+
+                this->operator()();
 
                 throw "Invalid scope"; // <- If user called normal return an exeption is thrown
             }
@@ -304,6 +419,6 @@ namespace Core
             this->Parent.Restore();
         }
 
-        virtual void operator()(TArgs... Args) = 0;
+        virtual void operator()() = 0;
     };
 }

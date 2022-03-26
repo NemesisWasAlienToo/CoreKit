@@ -26,10 +26,10 @@ namespace Core
         public:
             Span() = default;
             Span(size_t Size) : _Length(Size), _Content(new T[Size]) {}
-            Span(Span &&Other)
+            Span(Span &&Other) : _Length(Other._Length), _Content(Other._Content)
             {
-                std::swap(_Content, Other._Content);
-                std::swap(_Length, Other._Length);
+                Other._Content = nullptr;
+                Other._Length = 0;
             }
 
             Span(size_t Size, const T &Value) : _Length(Size), _Content(new T[Size])
@@ -168,20 +168,6 @@ namespace Core
                 }
 
                 return *this;
-            }
-
-            // Funtionalities
-
-            std::string ToString()
-            {
-                std::stringstream ss;
-
-                for (size_t i = 0; i < this->_Length; i++)
-                {
-                    ss << this->_Content[i] << '\n';
-                }
-
-                return ss.str();
             }
 
             // Operators
