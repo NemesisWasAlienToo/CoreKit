@@ -1,46 +1,15 @@
-/**
- * @file Runner.cpp
- * @author Nemesis (github.com/NemesisWasAlienToo)m
- * 
- * @brief DHT node runner
- *
- *      Supported operations: [ Response, Invalid, Ping, Query, Keys, Set, Get, Data ]
- *
- *      The packet format for each operation is as follows :
- *
- *      Response   : [ [ Header - Size ] - My id ] - Response Specifier - Data
- *      Invalid    : [ [ Header - Size ] - My id ] - Invalid Specifier - Cause of failure
- *      Ping       : [ [ Header - Size ] - My id ] - Ping Specifier - My ID
- *      Query      : [ [ Header - Size ] - My id ] - Query Specifier - Target ID
- *      Set        : [ [ Header - Size ] - My id ] - Set Specifier - Key - Data
- *      Get        : [ [ Header - Size ] - My id ] - Get Specifier - Key
- *      Data       : [ [ Header - Size ] - My id ] - Data Specifier - Data
- *
- * @todo Optimize adding and removing node by using binary tree or linked list
- * @todo Optimize changing std::function to template where possible
- * @todo Optimization
- * @version 0.1
- * @date 2022-01-03
- *
- * @copyright Copyright (c) 2022
- *
- */
-
 #pragma once
 
 #include <iostream>
 #include <string>
 #include <thread>
+#include <tuple>
 
-#include "Network/DHT/Node.hpp"
-#include "Network/DHT/Server.hpp"
-#include "Network/DHT/Handler.hpp"
+#include "Network/EndPoint.hpp"
+#include "Network/UDPServer.hpp"
+#include "Network/DHT/DHT.hpp"
 #include "Iterable/List.hpp"
 #include "Iterable/Span.hpp"
-#include "Iterable/Poll.hpp"
-#include "Format/Serializer.hpp"
-#include "Duration.hpp"
-#include "Test.hpp"
 
 namespace Core
 {
@@ -48,322 +17,151 @@ namespace Core
     {
         namespace DHT
         {
-            template <class CachePolicy>
+            template <class TCache>
             class Runner
             {
-            private:
-                // ### Variables
+            public:
+                using EndCallback = UDPServer::EndCallback;
 
+            private:
                 enum class States : char
                 {
                     Stopped = 0,
                     Running,
                 };
 
-                Node Identity;
-
-                Network::DHT::Server Server;
-
-                Network::DHT::Handler Handler;
-
-                Event Interrupt;
-
-                std::mutex Lock;
-
-                Iterable::Poll Poll;
-
-                Iterable::List<std::thread> Pool;
-
-                CachePolicy Cache;
-
+                Network::DHT::Node Identity;
+                Iterable::Span<std::thread> Pool;
+                Duration TimeOut;
+                Network::UDPServer Server;
                 volatile States State;
 
-                void Await()
+                TCache Cache;
+
+            public:
+                // Variables
+
+                std::function<void(const Node &, Format::Serializer &)> OnData = {};
+
+                // Constructors
+
+                Runner() = default;
+
+                Runner(const Network::DHT::Node identity, Duration Timeout) : Identity(identity), TimeOut(Timeout), Server(identity.EndPoint), State(States::Stopped), Cache(Identity.Id)
                 {
-                    Poll[0].Mask = Server.Events();
-
-                    Poll();
-                }
-
-                void EventLoop()
-                {
-                    while (State == States::Running)
+                    Server.Builder = [this](const EndPoint &Peer)
                     {
-                        // @todo Clean this
-
-                        Lock.lock();
-
-                    calc:
-                        Await();
-
-                        if (Poll[0].HasEvent())
-                        {
-                            if (Poll[0].Happened(Iterable::Poll::Out))
+                        return BuildIEntry(
+                            Peer,
+                            nullptr,
+                            [this](const Network::DHT::Node &Node, Format::Serializer &Serializer, UDPServer::EndCallback &End)
                             {
-                                Server.Send();
-                                Lock.unlock();
-                            }
-                            else if (Poll[0].Happened(Iterable::Poll::In))
-                            {
-                                if (!Server.Take(
-
-                                        // Take the completed request
-
-                                        [this](Request &request)
-                                        {
-                                            // After taing out the request free the lock
-
-                                            Lock.unlock();
-
-                                            // Take the handler for request
-
-                                            if (!Handler.Take(
-                                                    request.Peer,
-                                                    [this, &request](auto &CB, auto &End)
-                                                    {
-                                                        Format::Serializer Ser(request.Buffer);
-
-                                                        Node node(Identity.Id.Size);
-                                                        node.EndPoint = request.Peer;
-                                                        Ser >> node.Id;
-
-                                                        CB(node, Ser, End);
-
-                                                        // Cache Test
-
-                                                        // Cache.Add(node);
-
-                                                        Cache.Test(node);
-                                                    }))
-                                            {
-                                                Respond(request);
-                                            }
-                                        }))
-                                {
-                                    Lock.unlock();
-                                }
-                            }
-                        }
-                        else if (Poll[1].HasEvent())
-                        {
-                            Test::Log("Handler") << "Request timed out" << std::endl;
-                            Handler.Clean(
-                                [this](const EndPoint &Target)
-                                {
-                                    Cache.Remove(Target);
-                                    Server.Remove(Target);
-                                    Test::Log("cache") << "Timed out and removed" << std::endl;
-                                });
-
-                            Lock.unlock();
-                        }
-                        else if (Poll[2].HasEvent())
-                        {
-                            Interrupt.Listen();
-                            goto calc;
-                        }
-                    }
-                }
-
-                void Respond(Network::DHT::Request &Request)
-                {
-                    Format::Serializer ReqSerializer(Request.Buffer);
-                    Node node(Identity.Id.Size);
-                    char Type;
-
-                    node.EndPoint = Request.Peer;
-                    ReqSerializer >> node.Id;
-
-                    // Handle this new node
-
-                    Cache.Add(node);
-
-                    // Get request type
-
-                    ReqSerializer >> Type;
-
-                    switch (static_cast<Operations>(Type))
-                    {
-                    case Operations::Ping:
-                    {
-                        Fire(
-                            Request.Peer,
-                            [this](Format::Serializer &Response)
-                            {
-                                Response << (char)Operations::Response;
+                                Respond(Node, Serializer);
                             });
+                    };
+
+                    Server.OnClean = [this](const Network::EndPoint &EP)
+                    {
+                        Cache.Remove(EP);
+                    };
+                }
+
+                // Private functionalities
+
+            private:
+                void Respond(const Network::DHT::Node &Node, Format::Serializer &Serializer)
+                {
+                    Cache.Add(Node);
+
+                    Network::DHT::Operations Type = static_cast<Network::DHT::Operations>(Serializer.Take<char>());
+
+                    switch (Type)
+                    {
+                    case Network::DHT::Operations::Ping:
+                    {
+                        SendTo(
+                            Node.EndPoint,
+                            [](Format::Serializer &Ser)
+                            {
+                                Ser << static_cast<char>(Operations::Response);
+                            },
+                            {});
 
                         break;
                     }
                     case Operations::Query:
                     {
-                        Cryptography::Key key(Identity.Id.Size);
+                        Cryptography::Key key;
 
-                        ReqSerializer >> key;
+                        Serializer >> key;
 
-                        Fire(
-                            Request.Peer,
-                            [this, &key](Format::Serializer &Response)
+                        SendTo(
+                            Node.EndPoint,
+                            [this, &key](Format::Serializer &Serializer)
                             {
-                                Response << (char)Operations::Response;
-
-                                Response << Cache.Resolve(key);
-                            });
-
-                        break;
-                    }
-                    case Operations::Keys:
-                    {
-                        OnKeys(
-                            [this, &node, &ReqSerializer](const Iterable::List<Cryptography::Key> &keys)
-                            {
-                                Fire(
-                                    node.EndPoint,
-                                    [&keys](Format::Serializer &Serializer)
-                                    {
-                                        Serializer << (char)Operations::Response << keys;
-                                    });
-                            });
-
-                        break;
-                    }
-                    case Operations::Set:
-                    {
-                        // Set - Key - Data
-
-                        Cryptography::Key key(Identity.Id.Size);
-                        ReqSerializer >> key;
-
-                        Iterable::Span<char> Data = ReqSerializer.Dump();
-
-                        OnSet(key, Data);
-
-                        break;
-                    }
-                    case Operations::Get:
-                    {
-                        // Get - Key
-
-                        Cryptography::Key key(Identity.Id.Size);
-                        ReqSerializer >> key;
-
-                        OnGet(
-                            key,
-                            [this, &node](const Iterable::Span<char> &Data)
-                            {
-                                Fire(
-                                    node.EndPoint,
-                                    [&Data](Format::Serializer &Serializer)
-                                    {
-                                        Serializer << (char)Operations::Response << Data;
-                                    });
-                            });
+                                Serializer << (char)Operations::Response << Cache.Resolve(key);
+                            },
+                            {});
 
                         break;
                     }
                     case Operations::Data:
                     {
-                        Iterable::Span<char> Data = ReqSerializer.Dump();
-
-                        OnData(node, Data);
-
-                        break;
-                    }
-                    case Operations::Invalid:
-                    {
-                        std::string Cause;
-
-                        // OnFail();
-
-                        ReqSerializer >> Cause;
+                        OnData(Node, Serializer);
 
                         break;
                     }
                     default:
                     {
-                        Fire(
-                            Request.Peer,
-                            [this](Format::Serializer &Response)
+                        Test::Warn("Unknown command") << Node.Id << "@" << Node.EndPoint << std::endl;
+
+                        SendTo(
+                            Node.EndPoint,
+                            [](Format::Serializer &Response)
                             {
                                 Response << (char)Operations::Invalid << "Invalid command";
-                            });
+                            },
+                            nullptr);
 
                         break;
                     }
                     }
                 }
 
+                // Public functionalities
+
             public:
-                // ### Public Variables
-
-                Duration TimeOut;
-
-                // Request Handlers
-
-                std::function<void(OnKeysCallback)> OnKeys = {};
-                std::function<void(const Cryptography::Key &, OnGetCallback)> OnGet = {};
-                std::function<void(const Cryptography::Key &, const Iterable::Span<char> &)> OnSet = {};
-                std::function<void(const Node &, Iterable::Span<char> &)> OnData = {};
-
-                // ### Constructors
-
-                Runner() = default;
-
-                Runner(const Node &identity, Duration Timeout, size_t ThreadCount = 1) : Identity(identity), Server(identity.EndPoint), Handler(), Poll(3),
-                                                                                         Pool(ThreadCount, false), Cache(Identity.Id), State(States::Stopped), TimeOut(Timeout)
+                void GetInPool()
                 {
-                    Cache.OnTest = [this](Node Peer, auto OnFail)
+                    while (State == States::Running)
                     {
-                        Ping(
-                            Peer.EndPoint,
-                            [](Duration duration, EndCallback End)
-                            {
-                                // if it is successfull dont call end
-                            },
-                            [CB = std::move(OnFail)](const Network::DHT::Report &Report)
-                            {
-                                Test::Log("Cache") << "Replaced" << std::endl;
-                                CB();
-                            });
-                    };
+                        try
+                        {
+                            Server.Loop();
+                        }
+                        catch (const std::exception &e)
+                        {
+                            std::cout << e.what() << '\n';
+                            break;
+                        }
+                    }
 
-                    Poll.Add(Server.Listener(), Server.Events());
-                    Poll.Add(Handler.Listener(), Timer::In);
-                    Poll.Add(Interrupt.INode(), Event::In);
+                    std::cout << "Thread exited" << std::endl;
                 }
 
-                // ### Functionalities
-
-                // void Await()
-                // {
-                //     //
-                // }
-
-                std::function<void()> GetInPool = [this]()
+                inline void Run(size_t ThreadCount)
                 {
-                    try
-                    {
-                        EventLoop();
-                    }
-                    catch (const std::exception &e)
-                    {
-                        std::cerr << e.what() << '\n';
-                    }
-
-                    Test::Log("Pool") << "Exited" << std::endl;
-                };
-
-                void Run()
-                {
-                    // Setup thread pool task
+                    Pool = Iterable::Span<std::thread>(ThreadCount);
 
                     State = States::Running;
 
-                    Pool.Reserve(Pool.Capacity());
-
-                    for (size_t i = 0; i < Pool.Capacity(); i++)
+                    for (size_t i = 0; i < Pool.Length(); i++)
                     {
-                        Pool[i] = std::thread(GetInPool);
+                        Pool[i] = std::thread(
+                            [this]
+                            {
+                                GetInPool();
+                            });
                     }
                 }
 
@@ -380,71 +178,209 @@ namespace Core
                         });
                 }
 
-                // Builders for new precedure
+                // Fundation
 
-                inline void Fire(
+                // @todo Uniform by adding a callback(EndCallback&)
+
+                template <class TBuilder>
+                UDPServer::Entry BuildOEntry(
                     const Core::Network::EndPoint &Peer,
-                    const std::function<void(Core::Format::Serializer &)> &Builder /*, End*/)
+                    EndCallback End,
+                    TBuilder Builder)
                 {
-                    Server.Put(
-                        Peer,
-                        [this, &Builder](Format::Serializer &Ser)
+                    Iterable::Queue<char> Buffer;
+
+                    Format::Serializer Serializer(Buffer);
+
+                    Serializer.Add(reinterpret_cast<const char *>("CHRD"), 4) << static_cast<uint32_t>(0u);
+
+                    Builder(Serializer);
+
+                    // Check size for being too big
+
+                    Serializer.Modify<uint32_t>(4) = Format::Serializer::Order(static_cast<uint32_t>(Buffer.Length()));
+
+                    return {
+                        DateTime::FromNow(TimeOut),
+                        std::move(End),
+                        [Peer, QU = std::move(Buffer)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable
                         {
-                            // Fill in my id for me
+                            if (!QU.IsEmpty())
+                            {
+                                QU.Free(Socket.SendTo(&QU.First(), QU.Length(), Peer));
 
-                            Ser << Identity.Id;
+                                if (QU.IsEmpty())
+                                {
+                                    return true;
+                                }
 
-                            // Build
+                                return false;
+                            }
+                            else
+                            {
+                                if (End)
+                                {
+                                    End();
+                                }
 
-                            Builder(Ser);
-                        });
-
-                    Interrupt.Emit(1);
+                                return true;
+                            }
+                        }};
                 }
 
-                template<class TBuilder>
-                bool Build(
-                    const Network::EndPoint &Peer,
-                    const TBuilder &Builder,
-                    Network::DHT::Handler::Callback Callback,
-                    Network::DHT::EndCallback End)
+                template <class TCallback>
+                inline UDPServer::Entry BuildIEntry(
+                    const Core::Network::EndPoint &Peer,
+                    EndCallback End,
+                    TCallback Callback)
                 {
-                    if (!Handler.Put(Peer, DateTime::FromNow(TimeOut), std::move(Callback), std::move(End)))
+                    return {
+                        DateTime::FromNow(TimeOut),
+                        std::move(End),
+                        [this, Queue = Iterable::Queue<char>(), Peer, _Callback = std::move(Callback)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable
+                        {
+                            constexpr size_t Padding = 8;
+
+                            if (Queue.Capacity() == 0)
+                            {
+                                auto [Data, p] = Socket.ReceiveFrom();
+
+                                if (Data[0] != 'C' || Data[1] != 'H' || Data[2] != 'R' || Data[3] != 'D')
+                                {
+                                    return true;
+                                }
+
+                                // Get Size
+
+                                size_t Size = Format::Serializer::Order(*reinterpret_cast<uint32_t *>(&Data[4]));
+
+                                if (Size < Padding)
+                                {
+                                    return false;
+                                }
+
+                                // Build Queue
+
+                                Queue = Iterable::Queue<char>(Size - Padding, false);
+
+                                Queue.Add(Data.Content() + Padding, Data.Length() - Padding);
+
+                                if (Queue.IsFull())
+                                {
+                                    return true;
+                                }
+
+                                return false;
+                            }
+                            else
+                            {
+                                if (!Queue.IsFull())
+                                {
+                                    auto [Data, p] = Socket.ReceiveFrom();
+
+                                    // Fill Queue
+
+                                    Queue.Add(Data.Content(), Data.Length());
+
+                                    if (Queue.IsFull())
+                                    {
+                                        return true;
+                                    }
+
+                                    return false;
+                                }
+                                else
+                                {
+                                    // Finished
+
+                                    if (Queue.Capacity() == 0)
+                                    {
+                                        // Packet failed
+
+                                        if (End)
+                                        {
+                                            End();
+                                        }
+
+                                        return false;
+                                    }
+                                    else
+                                    {
+                                        // Normal packet
+
+                                        Format::Serializer Ser(Queue);
+                                        Network::DHT::Node Node{Ser.Take<Cryptography::Key>(), Peer};
+                                        _Callback(Node, Ser, End);
+
+                                        return true;
+                                    }
+                                }
+                            }
+                        }};
+                }
+
+                template <class TBuilder>
+                inline void SendTo(const EndPoint &Peer, TBuilder Builder, UDPServer::EndCallback End)
+                {
+                    Server.SendTo(
+                        BuildOEntry(
+                            Peer,
+                            std::move(End),
+                            [this, &Builder](Format::Serializer &Ser)
+                            {
+                                Ser << Identity.Id;
+                                Builder(Ser);
+                            }));
+                }
+
+                template <class TCallback>
+                inline bool ReceiveFrom(const EndPoint &Peer, TCallback Callback, UDPServer::EndCallback End)
+                {
+                    return Server.ReceiveFrom(Peer, BuildIEntry(Peer, std::move(End), std::move(Callback)));
+                }
+
+                template <class TBuilder, class TCallback>
+                inline bool Build(const EndPoint &Peer,
+                                  const TBuilder &Builder,
+                                  TCallback Callback,
+                                  EndCallback End)
+                {
+                    if (!ReceiveFrom(Peer, std::move(Callback), std::move(End)))
                     {
-                        End(Report::Codes::Occupied);
-                        Test::Error("Handler") << "Handler already exists" << std::endl;
                         return false;
                     }
 
-                    Fire(Peer, Builder);
+                    SendTo(Peer, Builder, nullptr);
 
                     return true;
                 }
 
-                void Ping(const Network::EndPoint &Peer, PingCallback Callback, EndCallback End)
+                // Actual funcionalities
+
+                // Callback => void(const Duration&);
+
+                template <class TCallback>
+                inline void Ping(const EndPoint &Peer, TCallback Callback, EndCallback End)
                 {
                     Build(
                         Peer,
-
-                        // Build buffer
-
-                        [this](Format::Serializer &Serializer)
+                        [](Format::Serializer &Serializer)
                         {
-                            Serializer << (char)Operations::Ping;
+                            Serializer << (char)Network::DHT::Operations::Ping;
                         },
-
-                        // Process response
-
-                        [this, SendTime = DateTime::Now(), CB = std::move(Callback)](Node &key, Format::Serializer &request, EndCallback End)
+                        [Start = DateTime::Now(), CB = std::move(Callback)](const Network::DHT::Node &Node, Format::Serializer &Serializer, UDPServer::EndCallback &End)
                         {
-                            // @todo check retuened id as well
+                            char Header;
 
-                            CB(DateTime::Now() - SendTime, End);
+                            Serializer >> Header;
+
+                            CB(DateTime::Now() - Start, std::move(End));
                         },
                         std::move(End));
                 }
 
-                void Query(const Network::EndPoint &Peer, const Cryptography::Key &Id, QueryCallback Callback, EndCallback End)
+                template <class TCallback>
+                void Query(const Network::EndPoint &Peer, const Cryptography::Key &Id, TCallback Callback, EndCallback End)
                 {
                     Build(
                         Peer,
@@ -458,34 +394,27 @@ namespace Core
 
                         // Process response
 
-                        [this, CB = std::move(Callback)](Node &Requester, Format::Serializer &Serializer, EndCallback End)
+                        [CB = std::move(Callback)](const Network::DHT::Node &Node, Format::Serializer &Serializer, UDPServer::EndCallback End)
                         {
-                            if (Requester.Id == Identity.Id)
-                            {
-                                End({Report::Codes::InvalidArgument, "Self refrence"});
-                                return;
-                            }
-
                             char Header;
 
                             Serializer >> Header;
 
                             try
                             {
-                                Iterable::List<Node> node;
-                                Serializer >> node;
-                                CB(std::move(node), std::move(End));
+                                CB(Serializer.Take<Iterable::List<DHT::Node>>(), std::move(End));
                             }
                             catch (const std::exception &e)
                             {
                                 Test::Warn(e.what()) << Serializer << std::endl;
-                                End({Report::Codes::InvalidArgument, "Invalid address"});
+                                End();
                             }
                         },
                         std::move(End));
                 }
 
-                void Route(const Network::EndPoint &Peer, const Cryptography::Key &Id, RouteCallback Callback, EndCallback End)
+                template <class TCallback>
+                void Route(const Network::EndPoint &Peer, const Cryptography::Key &Id, TCallback Callback, EndCallback End)
                 {
                     if (Id == Identity.Id)
                     {
@@ -493,14 +422,14 @@ namespace Core
                         return;
                     }
 
-                    Query( // @todo optimize functions in the argument
+                    Query(
                         Peer,
                         Id,
                         [this, Peer, Id, CB = std::move(Callback)](Iterable::List<Node> Response, const EndCallback &End)
                         {
                             if (Response[0].Id == Identity.Id)
                             {
-                                CB(Response, std::move(End));
+                                CB(std::move(Response), std::move(End));
                                 return;
                             }
 
@@ -516,7 +445,8 @@ namespace Core
                         std::move(End));
                 }
 
-                void Route(const Cryptography::Key &Id, RouteCallback Callback, EndCallback End)
+                template <class TCallback>
+                void Route(const Cryptography::Key &Id, TCallback Callback, EndCallback End)
                 {
                     const auto &Peer = Cache.Resolve(Id);
 
@@ -542,7 +472,7 @@ namespace Core
                             {
                                 // All nodes reside before my key
 
-                                End({Report::Codes::Normal});
+                                End();
                                 return;
                             }
 
@@ -554,7 +484,7 @@ namespace Core
                             {
                                 // Wrapped around and bootstrap is done
 
-                                End({Report::Codes::Normal});
+                                End();
                                 return;
                             }
 
@@ -564,217 +494,39 @@ namespace Core
                             }
                             else
                             {
-                                End({Report::Codes::InvalidArgument, "Invalid neighbor number"});
+                                End();
                             }
-                        },
-                        std::move(End));
-                }
-
-                void FillData(EndCallback End)
-                {
-                    Route(
-                        Identity.Id - 1,
-                        [this](Iterable::List<Node> Response, EndCallback End)
-                        {
-                            if (Response.IsEmpty())
-                            {
-                                End({Report::Codes::Normal});
-                                return;
-                            }
-
-                            auto &Target = Response.First();
-
-                            if (Target.Id == Identity.Id)
-                            {
-                                End({Report::Codes::Normal});
-                                return;
-                            }
-
-                            Keys(
-                                Target.EndPoint,
-                                [this, Peer = Response.First().EndPoint](const Iterable::List<Cryptography::Key> &Keys, EndCallback End)
-                                {
-                                    Keys.ForEach(
-                                        [this, Peer, &End](const Cryptography::Key &key)
-                                        {
-                                            if (key >= Identity.Id)
-                                                Get(
-                                                    key,
-                                                    [this, &key](Iterable::Span<char> &Data, EndCallback End)
-                                                    {
-                                                        OnSet(key, Data);
-                                                    },
-                                                    {});
-                                        });
-
-                                    End({Report::Codes::Normal});
-                                },
-                                std::move(End));
                         },
                         std::move(End));
                 }
 
                 inline void Bootstrap(const Network::EndPoint &Peer, EndCallback End)
                 {
-                    FillCache(
-                        Peer,
-                        Identity.Id.Size,
-                        [this, End = std::move(End)](const Network::DHT::Report &Report)
-                        {
-                            FillData(End);
-                        });
+                    FillCache(Peer, Identity.Id.Size, std::move(End));
                 }
 
-                void Keys(const Network::EndPoint &Peer, KeysCallback Callback, EndCallback End)
+                inline void Data(const EndPoint &Peer, const Iterable::Span<char> &Data)
                 {
-                    Build(
-                        Peer,
-                        [](Format::Serializer &Serializer)
-                        {
-                            Serializer << (char)Operations::Keys;
-                        },
-                        [this, CB = std::move(Callback)](Node &Requester, Format::Serializer &Serializer, EndCallback End)
-                        {
-                            char Header;
-
-                            Serializer >> Header;
-
-                            Iterable::List<Cryptography::Key> Keys;
-
-                            Serializer >> Keys;
-
-                            CB(Keys, End);
-                        },
-                        std::move(End));
-                }
-
-                void GetFrom(const Network::EndPoint &Peer, const Cryptography::Key &key, GetCallback Callback, EndCallback End)
-                {
-                    Build(
-                        Peer,
-
-                        // Build buffer
-                        // Get - Key
-
-                        [&key](Format::Serializer &Serializer)
-                        {
-                            Serializer << (char)Operations::Get << key;
-                        },
-                        [this, CB = std::move(Callback)](Node &Requester, Format::Serializer &Serializer, EndCallback End)
-                        {
-                            char Header;
-
-                            Serializer >> Header;
-
-                            Iterable::Span<char> Data(Serializer.Length());
-
-                            Serializer >> Data;
-
-                            CB(Data, End);
-                        },
-                        std::move(End));
-                }
-
-                void Get(const Cryptography::Key &key, GetCallback Callback, EndCallback End)
-                {
-                    Route(
-                        key,
-                        [this, key, CB = std::move(Callback)](Iterable::List<Node> Peers, EndCallback End)
-                        {
-                            if (Peers[0].Id == Identity.Id)
-                            {
-                                OnGet(
-                                    key,
-                                    [CB = std::move(CB), End = std::move(End)](Iterable::Span<char> &Data)
-                                    {
-                                        CB(Data, End);
-                                    });
-
-                                return;
-                            }
-
-                            GetFrom(Peers[0].EndPoint, key, CB, std::move(End));
-                        },
-                        std::move(End));
-                }
-
-                // @todo Maybe add send with call back too?
-
-                void SetTo(const Network::EndPoint &Peer, const Cryptography::Key &key, const Iterable::Span<char> &Data)
-                {
-                    Fire(
-                        Peer,
-                        [&key, &Data](Format::Serializer &Serializer)
-                        {
-                            Serializer << (char)Operations::Set << key << Data;
-                        });
-                }
-
-                void Set(const Cryptography::Key &key, const Iterable::Span<char> &Data, EndCallback End)
-                {
-                    Route(
-                        key,
-                        [this, key, Data](Iterable::List<Node> Peers, EndCallback End)
-                        {
-                            if (Peers[0].Id == Identity.Id) // @todo Check all nodes in response
-                            {
-                                OnSet(key, Data);
-                                End({Report::Codes::Normal}); // <-- Fix this
-                                return;
-                            }
-
-                            SetTo(Peers[0].EndPoint, key, Data);
-
-                            End({Report::Codes::Normal});
-                        },
-                        std::move(End));
-                }
-
-                void SendTo(const Network::EndPoint &Peer, const Iterable::Span<char> &Data)
-                {
-                    Fire(
+                    SendTo(
                         Peer,
                         [&Data](Format::Serializer &Serializer)
                         {
-                            Serializer << (char)Operations::Data << Data;
-                        });
+                            Serializer << (char)Network::DHT::Operations::Data << Data;
+                        },
+                        nullptr);
                 }
 
-                void SendTo(const Network::EndPoint &Peer, const Iterable::Span<char> &Data, SendToCallback Callback, EndCallback End)
+                inline void Data(const EndPoint &Peer, const std::string &Data)
                 {
-                    Build(
+                    SendTo(
                         Peer,
                         [&Data](Format::Serializer &Serializer)
                         {
-                            Serializer << (char)Operations::Data << Data;
+                            Serializer << (char)Network::DHT::Operations::Data << Data.length();
+
+                            Serializer.Add(Data.c_str(), Data.length());
                         },
-                        [this, CB = std::move(Callback)](Node &Requester, Format::Serializer &Serializer, EndCallback End)
-                        {
-                            char Header;
-
-                            Serializer >> Header;
-
-                            Iterable::Span<char> Data = Serializer.Dump();
-
-                            CB(Data, End);
-                        },
-                        std::move(End));
-                }
-
-                template<class TCondition>
-                void SendWhere(const Iterable::Span<char> &Data, const TCondition &Condition)
-                {
-                    Cache.ForEach(
-                        [this, &Data, &Condition](const Node &node)
-                        {
-                            if (Condition(node))
-                                Fire(
-                                    node.EndPoint,
-                                    [this, &Data](Format::Serializer &Serializer)
-                                    {
-                                        Serializer << (char)Operations::Data << Data;
-                                    });
-                        });
+                        nullptr);
                 }
             };
         }

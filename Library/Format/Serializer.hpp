@@ -119,9 +119,9 @@ namespace Core
                 char *Pointer = &Queue[Index];
 
                 if (Queue.Capacity() == 0 || (static_cast<size_t>((&Queue.Content()[Queue.Capacity() - 1] - Pointer)) < sizeof(T)))
-                    throw std::out_of_range("Size would access out of bound data");
+                    throw std::out_of_range("Size would access out of bound memory");
 
-                return *((T *)Pointer);
+                return *(reinterpret_cast<T *>(Pointer));
             }
 
             Iterable::Span<char> Dump()
@@ -135,84 +135,22 @@ namespace Core
 
             // Input operators
 
+            template<typename T>
+            std::enable_if_t<std::is_integral_v<T>, Serializer &>
+            operator<<(T Value)
+            {
+                T _Value;
+
+                Order(Value, _Value);
+
+                Queue.Add((char *)&_Value, sizeof(_Value));
+
+                return *this;
+            }
+            
             Serializer &operator<<(char Value)
             {
-                Queue << Value;
-
-                return *this;
-            }
-
-            Serializer &operator<<(short Value)
-            {
-                short _Value;
-
-                Order(Value, _Value);
-
-                Queue.Add((char *)&_Value, sizeof(_Value));
-
-                return *this;
-            }
-
-            Serializer &operator<<(int Value)
-            {
-                int _Value;
-
-                Order(Value, _Value);
-
-                Queue.Add((char *)&_Value, sizeof(_Value));
-
-                return *this;
-            }
-
-            Serializer &operator<<(long Value)
-            {
-                long _Value;
-
-                Order(Value, _Value);
-
-                Queue.Add((char *)&_Value, sizeof(_Value));
-
-                return *this;
-            }
-
-            //
-
-            Serializer &operator<<(unsigned char Value)
-            {
-                Queue << Value;
-
-                return *this;
-            }
-
-            Serializer &operator<<(unsigned short Value)
-            {
-                unsigned short _Value;
-
-                Order(Value, _Value);
-
-                Queue.Add((char *)&_Value, sizeof(_Value));
-
-                return *this;
-            }
-
-            Serializer &operator<<(unsigned int Value)
-            {
-                unsigned int _Value;
-
-                Order(Value, _Value);
-
-                Queue.Add((char *)&_Value, sizeof(_Value));
-
-                return *this;
-            }
-
-            Serializer &operator<<(unsigned long Value)
-            {
-                unsigned long _Value;
-
-                Order(Value, _Value);
-
-                Queue.Add((char *)&_Value, sizeof(_Value));
+                Queue.Add(Value);
 
                 return *this;
             }
@@ -286,86 +224,22 @@ namespace Core
 
             // Output operators
 
-            Serializer &operator>>(char &Value)
+            template<typename T>
+            std::enable_if_t<std::is_integral_v<T>, Serializer &>
+            operator>>(T& Value)
             {
-                Queue >> Value;
+                T _Value;
 
-                return *this;
-            }
-
-            Serializer &operator>>(short &Value)
-            {
-                short _Value;
-
-                Queue.Take((char *)&_Value, sizeof(_Value));
+                Queue.Take(reinterpret_cast<char *>(&_Value), sizeof(_Value));
 
                 Order(_Value, Value);
 
                 return *this;
             }
-
-            Serializer &operator>>(int &Value)
+            
+            Serializer &operator>>(char& Value)
             {
-                int _Value;
-
-                Queue.Take((char *)&_Value, sizeof(_Value));
-
-                Order(_Value, Value);
-
-                return *this;
-            }
-
-            Serializer &operator>>(long &Value)
-            {
-                long _Value;
-
-                Queue.Take((char *)&_Value, sizeof(_Value));
-
-                Order(_Value, Value);
-
-                return *this;
-            }
-
-            //
-
-            Serializer &operator>>(unsigned char &Value)
-            {
-                char *_value = (char *)&Value;
-
-                Queue >> *_value;
-
-                return *this;
-            }
-
-            Serializer &operator>>(unsigned short &Value)
-            {
-                unsigned short _Value;
-
-                Queue.Take((char *)&_Value, sizeof(_Value));
-
-                Order(_Value, Value);
-
-                return *this;
-            }
-
-            Serializer &operator>>(unsigned int &Value)
-            {
-                unsigned int _Value;
-
-                Queue.Take((char *)&_Value, sizeof(_Value));
-
-                Order(_Value, Value);
-
-                return *this;
-            }
-
-            Serializer &operator>>(unsigned long &Value)
-            {
-                unsigned long _Value;
-
-                Queue.Take((char *)&_Value, sizeof(_Value));
-
-                Order(_Value, Value);
+                Value = Queue.Take();
 
                 return *this;
             }
@@ -471,6 +345,17 @@ namespace Core
                 }
 
                 return os;
+            }
+
+            friend std::istream &operator>>(std::istream &is, Serializer &Serializer)
+            {
+                std::string Inpt;
+
+                is >> Inpt;
+
+                Serializer.Add(Inpt.c_str(), Inpt.length());
+
+                return is;
             }
 
             friend Descriptor &operator<<(Descriptor &descriptor, Serializer &Serializer)
