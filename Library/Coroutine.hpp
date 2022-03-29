@@ -166,6 +166,7 @@ namespace Core
         ~Coroutine()
         {
             delete _Args;
+            _Args = nullptr;
         }
 
         // Peroperties
@@ -183,24 +184,25 @@ namespace Core
 
         // Functionalities
 
-        void Start(const TArgs &...Args)
+        void Start(std::remove_reference_t<TArgs> &...Args)
         {
             SaveRegs;
 
-            if(_Args == nullptr)
+            // Must allocate new space cus if TReturn is const, it cannot be assigned without reallocating
+
+            if (_Args != nullptr)
             {
-                _Args = new ArgsContainer(Args...);
+                delete _Args;
             }
-            else
-            {
-                *_Args = ArgsContainer(Args...);
-            }
+
+            _Args = new ArgsContainer(std::forward<TArgs>(Args)...);
 
             if (!this->Parent.Save())
             {
                 // Normal
 
                 Started = true;
+                Finished = false;
 
                 // Change stack
 
@@ -213,10 +215,43 @@ namespace Core
 
                 this->operator()();
 
-                throw "Invalid continue"; // <- If user called normal return an exeption is thrown
+                throw "Invalid use of return in coroutine"; // <- If user called normal return an exeption is thrown
+            }
+        }
+
+        void Start(std::remove_reference_t<TArgs> &&...Args)
+        {
+            SaveRegs;
+
+            if (_Args == nullptr)
+            {
+                _Args = new ArgsContainer(std::forward<TArgs>(Args)...);
+            }
+            else
+            {
+                *_Args = ArgsContainer(std::forward<TArgs>(Args)...);
             }
 
-            // Returned
+            if (!this->Parent.Save())
+            {
+                // Normal
+
+                Started = true;
+                Finished = false;
+
+                // Change stack
+
+                asm volatile(
+                    "movq %0, %%rsp\t\n"
+                    :
+                    : "r"((void *)&Stack[StackSize]));
+
+                // Call Invoker
+
+                this->operator()();
+
+                throw "Invalid use of return in coroutine"; // <- If user called normal return an exeption is thrown
+            }
         }
 
         void Continue()
@@ -258,10 +293,10 @@ namespace Core
     {
     protected:
         using ArgsContainer = std::tuple<TArgs...>;
+        using RetContainer = std::tuple<TReturn>;
 
-        // ArgsContainer *_Args;
         ArgsContainer *_Args = nullptr;
-        TReturn Return;
+        RetContainer *_Return = nullptr;
 
     public:
         Coroutine() = default;
@@ -271,36 +306,81 @@ namespace Core
         ~Coroutine()
         {
             delete _Args;
+            _Args = nullptr;
+
+            delete _Return;
+            _Return = nullptr;
         }
 
         // Peroperties
 
-        ArgsContainer &Arguments()
-        {
-            return *_Args;
-        }
-
         template <size_t TNumber>
-        auto &Argument()
+        constexpr auto &Argument()
         {
             return std::get<TNumber>(*_Args);
+        }
+
+        constexpr TReturn &Return()
+        {
+            return std::get<0>(*_Return);
         }
 
         // Functionalities
 
         // @todo Take arguments by value
 
-        TReturn Start(const TArgs &...Args)
+        TReturn Start(std::remove_reference_t<TArgs> &...Args)
         {
             SaveRegs;
 
-            if(_Args == nullptr)
+            // Must allocate new space cus if TReturn is const, it cannot be assigned without reallocating
+
+            if (_Args != nullptr)
             {
-                _Args = new ArgsContainer(Args...);
+                delete _Args;
+            }
+
+            _Args = new ArgsContainer(std::forward<TArgs>(Args)...);
+
+            if (!this->Parent.Save())
+            {
+                // Normal
+
+                Started = true;
+                Finished = false;
+
+                // Change stack
+
+                asm volatile(
+                    "movq %0, %%rsp\t\n"
+                    :
+                    : "r"((void *)&Stack[StackSize]));
+
+                // Call Invoker
+
+                this->operator()();
+
+                throw "Invalid use of return in coroutine"; // <- If user called normal return an exeption is thrown
             }
             else
             {
-                *_Args = ArgsContainer(Args...);
+                // Returned
+
+                return std::forward<TReturn>(Return());
+            }
+        }
+
+        TReturn Start(std::remove_reference_t<TArgs> &&...Args)
+        {
+            SaveRegs;
+
+            if (_Args == nullptr)
+            {
+                _Args = new ArgsContainer(std::forward<TArgs>(Args)...);
+            }
+            else
+            {
+                *_Args = ArgsContainer(std::forward<TArgs>(Args)...);
             }
 
             if (!this->Parent.Save())
@@ -321,13 +401,13 @@ namespace Core
 
                 this->operator()();
 
-                throw "Invalid scope"; // <- If user called normal return an exeption is thrown
+                throw "Invalid use of return in coroutine"; // <- If user called normal return an exeption is thrown
             }
             else
             {
                 // Returned
 
-                return this->Return;
+                return std::forward<TReturn>(Return());
             }
         }
 
@@ -345,15 +425,22 @@ namespace Core
             }
             else
             {
-                return this->Return;
+                return std::forward<TReturn>(Return());
             }
         }
 
-        void Yield(TReturn Value)
+        void Yield(std::remove_reference_t<TReturn> &Value)
         {
-            this->Return = Value;
-
             SaveRegs;
+
+            if (_Return == nullptr)
+            {
+                _Return = new RetContainer(std::forward<TReturn>(Value));
+            }
+            else
+            {
+                *_Return = RetContainer(std::forward<TReturn>(Value));
+            }
 
             if (!this->My.Save())
             {
@@ -361,9 +448,51 @@ namespace Core
             }
         }
 
-        void Terminate(TReturn Value)
+        void Yield(std::remove_reference_t<TReturn> &&Value)
         {
-            this->Return = Value;
+            SaveRegs;
+
+            if (_Return == nullptr)
+            {
+                _Return = new RetContainer(std::forward<TReturn>(Value));
+            }
+            else
+            {
+                *_Return = RetContainer(std::forward<TReturn>(Value));
+            }
+
+            if (!this->My.Save())
+            {
+                this->Parent.Restore();
+            }
+        }
+
+        void Terminate(std::remove_reference_t<TReturn> &Value)
+        {
+            // Must allocate new space cus if TReturn is const, it cannot be assigned without reallocating
+
+            if (_Return != nullptr)
+            {
+                delete _Return;
+            }
+
+            _Return = new RetContainer(std::forward<TReturn>(Value));
+
+            this->Finished = true;
+
+            this->Parent.Restore();
+        }
+
+        void Terminate(std::remove_reference_t<TReturn> &&Value)
+        {
+            if (_Return == nullptr)
+            {
+                _Return = new RetContainer(std::forward<TReturn>(Value));
+            }
+            else
+            {
+                *_Return = RetContainer(std::forward<TReturn>(Value));
+            }
 
             this->Finished = true;
 
