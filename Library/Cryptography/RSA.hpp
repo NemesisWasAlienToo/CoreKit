@@ -405,7 +405,7 @@ namespace Core
             {
                 if (this != &Other)
                 {
-                    delete[] _Keys;
+                    RSA_free(_Keys);
                     
                     _Keys = Other._Keys;
                     _Padding = Other._Padding;

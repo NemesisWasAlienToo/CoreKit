@@ -47,7 +47,7 @@ namespace Core
 
                 Runner() = default;
 
-                Runner(const Network::DHT::Node identity, Duration Timeout) : Identity(identity), TimeOut(Timeout), Server(identity.EndPoint), State(States::Stopped), Cache(Identity.Id)
+                Runner(const Network::DHT::Node& identity, const Duration& Timeout) : Identity(identity), TimeOut(Timeout), Server(identity.EndPoint), State(States::Stopped), Cache(Identity.Id)
                 {
                     Server.Builder = [this](const EndPoint &Peer)
                     {
@@ -179,8 +179,6 @@ namespace Core
                 }
 
                 // Fundation
-
-                // @todo Uniform by adding a callback(EndCallback&)
 
                 template <class TBuilder>
                 UDPServer::Entry BuildOEntry(

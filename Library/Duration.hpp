@@ -117,22 +117,22 @@ namespace Core
 
         bool operator<(const Duration &Other)
         {
-            return Seconds != Other.Seconds ? Seconds < Other.Seconds : Nanoseconds < Other.Nanoseconds;
+            return Seconds < Other.Seconds ? true : Seconds == Other.Seconds && Nanoseconds < Other.Nanoseconds;
         }
 
         bool operator>(const Duration &Other)
         {
-            return Seconds != Other.Seconds ? Seconds > Other.Seconds : Nanoseconds > Other.Nanoseconds;
+            return Seconds > Other.Seconds ? true : Seconds == Other.Seconds && Nanoseconds > Other.Nanoseconds;
         }
 
         bool operator<=(const Duration &Other)
         {
-            return Seconds != Other.Seconds ? Seconds < Other.Seconds : Nanoseconds <= Other.Nanoseconds;
+            return Seconds > Other.Seconds ? false : Seconds != Other.Seconds || Nanoseconds <= Other.Nanoseconds;
         }
 
         bool operator>=(const Duration &Other)
         {
-            return Seconds != Other.Seconds ? Seconds > Other.Seconds : Nanoseconds >= Other.Nanoseconds;
+            return Seconds < Other.Seconds ? false : Seconds != Other.Seconds || Nanoseconds >= Other.Nanoseconds;
         }
 
         friend std::ostream &operator<<(std::ostream &os, const Duration &duration)

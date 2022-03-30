@@ -85,7 +85,7 @@ namespace Core
                                              reinterpret_cast<const unsigned char *>(Base64String.c_str()),
                                              Base64String.length());
 
-                if (Result != Data.Length())
+                if (static_cast<size_t>(Result) != Data.Length())
                 {
                     std::cout << "Base64 String" << std::endl;
                     exit(-1);

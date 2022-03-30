@@ -272,50 +272,22 @@ namespace Core
 
         bool operator>(const DateTime &Other) const
         {
-            if (Spec.tv_sec != Other.Spec.tv_sec)
-            {
-                return Spec.tv_sec > Other.Spec.tv_sec;
-            }
-            else
-            {
-                return Spec.tv_sec > Other.Spec.tv_sec;
-            }
+            return Spec.tv_sec > Other.Spec.tv_sec ? true : Spec.tv_sec == Other.Spec.tv_sec && Spec.tv_nsec > Other.Spec.tv_nsec;
         }
 
         bool operator<(const DateTime &Other) const
         {
-            if (Spec.tv_sec != Other.Spec.tv_sec)
-            {
-                return Spec.tv_sec < Other.Spec.tv_sec;
-            }
-            else
-            {
-                return Spec.tv_sec < Other.Spec.tv_sec;
-            }
+            return Spec.tv_sec < Other.Spec.tv_sec ? true : Spec.tv_sec == Other.Spec.tv_sec && Spec.tv_nsec < Other.Spec.tv_nsec;
         }
 
         bool operator>=(const DateTime &Other) const
         {
-            if (Spec.tv_sec != Other.Spec.tv_sec)
-            {
-                return Spec.tv_sec > Other.Spec.tv_sec;
-            }
-            else
-            {
-                return Spec.tv_sec >= Other.Spec.tv_sec;
-            }
+            return Spec.tv_sec < Other.Spec.tv_sec ? false : Spec.tv_sec != Other.Spec.tv_sec || Spec.tv_nsec >= Other.Spec.tv_nsec;
         }
 
         bool operator<=(const DateTime &Other) const
         {
-            if (Spec.tv_sec != Other.Spec.tv_sec)
-            {
-                return Spec.tv_sec < Other.Spec.tv_sec;
-            }
-            else
-            {
-                return Spec.tv_sec <= Other.Spec.tv_sec;
-            }
+            return Spec.tv_sec > Other.Spec.tv_sec ? false : Spec.tv_sec != Other.Spec.tv_sec || Spec.tv_nsec <= Other.Spec.tv_nsec;
         }
 
         // Operators

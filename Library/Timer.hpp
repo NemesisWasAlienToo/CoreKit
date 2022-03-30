@@ -112,7 +112,7 @@ namespace Core
             return _Duration.it_value;
         }
 
-        uint64_t Value() const
+        uint64_t Listen() const
         {
             unsigned long Value;
 
@@ -141,7 +141,7 @@ namespace Core
                 return 0;
             }
 
-            return Value();
+            return Listen();
         }
 
         // TryAwait

@@ -197,9 +197,6 @@ namespace Core
 
             auto Soonest()
             {
-                if (Incomming.size() <= 0)
-                    throw std::out_of_range("Instance contains no handler");
-
                 auto Result = Incomming.begin();
                 auto It = Incomming.begin()++;
 
@@ -260,12 +257,10 @@ namespace Core
                 bool Ret = false;
                 Network::EndPoint EP;
 
-                Expire.Value();
-
-                Lock.unlock();
+                Expire.Listen();
 
                 {
-                    ILock.lock();
+                    std::lock_guard lock(ILock);
 
                     if ((Ret = Tracking->second.Expire.IsExpired()))
                     {
@@ -279,8 +274,6 @@ namespace Core
                     }
 
                     Wind();
-
-                    ILock.unlock();
                 }
 
                 if (Ret && OnClean)
@@ -318,6 +311,7 @@ namespace Core
                 }
                 else if (Poll[1].HasEvent())
                 {
+                    Lock.unlock();
                     Clean();
                 }
                 else if (Poll[2].HasEvent())

@@ -611,7 +611,7 @@ namespace Core
                 return *this;
             }
 
-            T &operator[](const size_t &Index)
+            T &operator[](size_t Index)
             {
                 if (Index >= _Length)
                     throw std::out_of_range("");
@@ -619,7 +619,7 @@ namespace Core
                 return _ElementAt(Index);
             }
 
-            const T &operator[](const size_t &Index) const
+            const T &operator[](size_t Index) const
             {
                 if (Index >= _Length)
                     throw std::out_of_range("");
