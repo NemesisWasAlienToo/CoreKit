@@ -136,9 +136,7 @@ namespace Core
 
             Tracking = Soonest();
 
-            DateTime &Item = std::get<0>(Alarms[Tracking]);
-
-            Clock.Set(Item.Left());
+            Clock.Set(std::get<0>(Alarms[Tracking]).Left());
 
             // if (Item > DateTime::Now())
             // {

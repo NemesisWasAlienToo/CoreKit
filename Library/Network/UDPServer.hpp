@@ -55,7 +55,7 @@ namespace Core
 
             using BuilderCallback = std::function<Entry(const EndPoint &)>;
 
-        private:
+        protected:
             std::mutex Lock;
 
             Timer Expire;
@@ -95,18 +95,18 @@ namespace Core
 
             void SendTo(Entry entry)
             {
-                OLock.lock();
+                {
+                    std::lock_guard Lock(OLock);
 
-                Outgoing.Add(std::move(entry));
-
-                OLock.unlock();
+                    Outgoing.Add(std::move(entry));
+                }
 
                 Interrupt.Emit(1);
             }
 
             bool ReceiveFrom(const EndPoint &Peer, Entry entry)
             {
-                ILock.lock();
+                std::lock_guard Lock(ILock);
 
                 auto [Iterator, Inserted] = Incomming.try_emplace(Peer, Entry());
 
@@ -126,9 +126,119 @@ namespace Core
 
                 SetClock();
 
-                ILock.unlock();
-
                 return true;
+            }
+
+            void Loop()
+            {
+                Lock.lock();
+
+            calc:
+                Await();
+
+                if (Poll[0].HasEvent())
+                {
+                    if (Poll[0].Happened(Iterable::Poll::Out))
+                    {
+                        OnSend();
+                    }
+                    else if (Poll[0].Happened(Iterable::Poll::In))
+                    {
+                        OnReceive();
+                    }
+                }
+                else if (Poll[1].HasEvent())
+                {
+                    Clean();
+                }
+                else if (Poll[2].HasEvent())
+                {
+                    Interrupt.Listen();
+                    goto calc;
+                }
+            }
+
+        protected:
+            Core::Network::UDPServer::Map::iterator Soonest()
+            {
+                auto Result = Incomming.begin();
+                auto It = Incomming.begin()++;
+
+                for (size_t i = 1; i < Incomming.size(); i++, It++)
+                {
+                    if (It->second.Expire < Result->second.Expire)
+                    {
+                        Result = It;
+                    }
+                }
+
+                return Result;
+            }
+
+            void Wind()
+            {
+                if (Incomming.size() == 0)
+                {
+                    return;
+                }
+
+                Tracking = Soonest();
+
+                Expire.Set(Tracking->second.Expire.Left());
+
+                // if (Tracking->second.Expire > DateTime::Now())
+                // {
+                //     Expire.Set(Tracking->second.Expire.Left());
+                // }
+                // else
+                // {
+                //     Expire.Stop();
+                // }
+            }
+
+            void SetClock()
+            {
+                if (Tracking->second.Expire > DateTime::Now())
+                {
+                    Expire.Set(Tracking->second.Expire.Left());
+                }
+                else
+                {
+                    Expire.Stop();
+                }
+            }
+
+            bool Clean()
+            {
+                bool Ret = false;
+                Network::EndPoint EP;
+
+                Expire.Listen();
+                Lock.unlock();
+
+                {
+                    std::lock_guard lock(ILock);
+
+                    if ((Ret = Tracking->second.Expire.IsExpired()))
+                    {
+                        if (Tracking->second.End)
+                        {
+                            Tracking->second.End();
+                        }
+
+                        Incomming.erase(Tracking);
+                        EP = Tracking->first;
+                    }
+
+                    Wind();
+                }
+
+                if (Ret && OnClean)
+                {
+                    OnClean(EP);
+                }
+
+                return Ret;
             }
 
             void OnSend()
@@ -195,130 +305,11 @@ namespace Core
                 ILock.unlock();
             }
 
-            auto Soonest()
-            {
-                auto Result = Incomming.begin();
-                auto It = Incomming.begin()++;
-
-                for (size_t i = 1; i < Incomming.size(); i++, It++)
-                {
-                    if (It->second.Expire < Result->second.Expire)
-                    {
-                        Result = It;
-                    }
-                }
-
-                return Result;
-            }
-
-            void Wind()
-            {
-                if (Incomming.size() != 0)
-                {
-                    Tracking = Soonest();
-
-                    Duration Left;
-
-                    if (Tracking->second.Expire > DateTime::Now())
-                    {
-                        Left = Tracking->second.Expire.Left();
-                    }
-                    else
-                    {
-                        Left = Duration(0, 0);
-                    }
-
-                    Expire.Set(Left);
-                }
-                else
-                {
-                    Expire.Stop();
-                }
-            }
-
-            void SetClock()
-            {
-                Duration Left;
-
-                if (Tracking->second.Expire > DateTime::Now())
-                {
-                    Left = Tracking->second.Expire.Left();
-                }
-                else
-                {
-                    Left = Duration(0, 0);
-                }
-
-                Expire.Set(Left);
-            }
-
-            bool Clean() // @todo Add OnClean as callback template
-            {
-                bool Ret = false;
-                Network::EndPoint EP;
-
-                Expire.Listen();
-
-                {
-                    std::lock_guard lock(ILock);
-
-                    if ((Ret = Tracking->second.Expire.IsExpired()))
-                    {
-                        if (Tracking->second.End)
-                        {
-                            Tracking->second.End();
-                        }
-
-                        Incomming.erase(Tracking);
-                        EP = Tracking->first;
-                    }
-
-                    Wind();
-                }
-
-                if (Ret && OnClean)
-                {
-                    OnClean(EP);
-                }
-
-                return Ret;
-            }
-
             inline void Await()
             {
                 Poll[0].Mask = Outgoing.IsEmpty() ? (Iterable::Poll::In) : (Iterable::Poll::In | Iterable::Poll::Out);
 
                 Poll();
-            }
-
-            void Loop()
-            {
-                Lock.lock();
-
-            calc:
-                Await();
-
-                if (Poll[0].HasEvent())
-                {
-                    if (Poll[0].Happened(Iterable::Poll::Out))
-                    {
-                        OnSend();
-                    }
-                    else if (Poll[0].Happened(Iterable::Poll::In))
-                    {
-                        OnReceive();
-                    }
-                }
-                else if (Poll[1].HasEvent())
-                {
-                    Lock.unlock();
-                    Clean();
-                }
-                else if (Poll[2].HasEvent())
-                {
-                    Interrupt.Listen();
-                    goto calc;
-                }
             }
         };
     }
