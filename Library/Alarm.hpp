@@ -131,25 +131,25 @@ namespace Core
 
             if (Alarms.Length() == 0)
             {
+                Clock.Stop();
                 return;
             }
 
             Tracking = Soonest();
 
-            Clock.Set(std::get<0>(Alarms[Tracking]).Left());
+            if (std::get<0>(Alarms[Tracking]).IsExpired())
+            {
+                if (std::get<1>(Alarms[Tracking]))
+                {
+                    std::get<1>(Alarms[Tracking])();
+                }
 
-            // if (Item > DateTime::Now())
-            // {
-            //     Clock.Set(Item.Left());
-            // }
-            // else
-            // {
-            //     Clock.Stop();
-            //
-            //     std::get<1>(Alarms[Tracking])();
-            //     Alarms.Swap(Tracking);
-            //     Wind();
-            // }
+                Wind();
+
+                return;
+            }
+
+            Clock.Set(std::get<0>(Alarms[Tracking]).Left());
         }
 
         void Clean()

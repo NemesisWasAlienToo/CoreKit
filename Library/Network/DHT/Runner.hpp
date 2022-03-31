@@ -205,6 +205,11 @@ namespace Core
                         {
                             if (!QU.IsEmpty())
                             {
+                                if(Socket.INode() == -1)
+                                {
+                                    // How?!
+                                }
+
                                 QU.Free(Socket.SendTo(&QU.First(), QU.Length(), Peer));
 
                                 if (QU.IsEmpty())

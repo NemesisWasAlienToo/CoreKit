@@ -47,12 +47,12 @@ int main(int argc, char const *argv[])
                 Target,
                 [](Duration duration, auto End)
                 {
-                    std::cout << "Ping : " << duration << std::endl;
+                    Test::Log("Ping") << duration << std::endl;
                     End();
                 },
                 []
                 {
-                    std::cout << "Ping Ended\n";
+                    Test::Log("Ping") << "Ended\n";
                 });
         }
 
@@ -94,7 +94,7 @@ int main(int argc, char const *argv[])
                 Target,
                 []
                 {
-                    std::cout << "Bootstrap ended" << std::endl;
+                    Test::Log("Bootstrap") << "Ended" << std::endl;
                 });
         }
         else if (Command == "test")
@@ -123,7 +123,7 @@ int main(int argc, char const *argv[])
             total.Seconds /= count;
             total.Nanoseconds /= count;
 
-            std::cout << "Result : " << total << std::endl;
+            Test::Log("Test") << total << std::endl;
         }
         else if (Command == "exit")
         {

@@ -179,33 +179,30 @@ namespace Core
             {
                 if (Incomming.size() == 0)
                 {
+                    Expire.Stop();
                     return;
                 }
 
                 Tracking = Soonest();
 
-                Expire.Set(Tracking->second.Expire.Left());
-
-                // if (Tracking->second.Expire > DateTime::Now())
-                // {
-                //     Expire.Set(Tracking->second.Expire.Left());
-                // }
-                // else
-                // {
-                //     Expire.Stop();
-                // }
+                SetClock();
             }
 
             void SetClock()
             {
-                if (Tracking->second.Expire > DateTime::Now())
+                if (Tracking->second.Expire.IsExpired())
                 {
-                    Expire.Set(Tracking->second.Expire.Left());
+                    if(Tracking->second.End)
+                    {
+                        Tracking->second.End();
+                    }
+
+                    Wind();
+
+                    return;
                 }
-                else
-                {
-                    Expire.Stop();
-                }
+
+                Expire.Set(Tracking->second.Expire.Left());
             }
 
             bool Clean()
