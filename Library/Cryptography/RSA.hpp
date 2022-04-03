@@ -66,7 +66,8 @@ namespace Core
 
             RSA(const RSA &Other) = delete;
 
-            RSA(RSA &&Other) noexcept : _Keys(Other._Keys), _Padding(Other._Padding)
+            RSA(RSA &&Other)
+            noexcept : _Keys(Other._Keys), _Padding(Other._Padding)
             {
                 Other._Keys = nullptr;
                 Other._Padding = OAEP;
@@ -403,16 +404,18 @@ namespace Core
 
             RSA &operator=(RSA &&Other) noexcept
             {
-                if (this != &Other)
+                if (this == &Other)
                 {
-                    RSA_free(_Keys);
-                    
-                    _Keys = Other._Keys;
-                    _Padding = Other._Padding;
-                    
-                    Other._Keys = nullptr;
-                    Other._Padding = OAEP;
+                    return *this;
                 }
+
+                RSA_free(_Keys);
+
+                _Keys = Other._Keys;
+                _Padding = Other._Padding;
+
+                Other._Keys = nullptr;
+                Other._Padding = OAEP;
 
                 return *this;
             }

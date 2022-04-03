@@ -35,7 +35,7 @@ namespace Core
             }
 #else
             template <typename T>
-            static std::void_t<std::enable_if<std::is_integral<T>::value>>
+            static std::void_t<std::enable_if<std::is_integral_v<T>>>
             Order(const T &Source, T &Destination)
             {
                 const char *SourcePointer = (char *)&Source;
@@ -169,6 +169,22 @@ namespace Core
                 return *this;
             }
 
+            // @todo Remove this after unifiying iterable and span
+
+            template <typename TValue>
+            Serializer &operator<<(const Iterable::Span<TValue> &Value)
+            {
+                *this << Value.Length();
+
+                Value.ForEach(
+                    [this](const TValue &Item)
+                    {
+                        *this << Item;
+                    });
+
+                return *this;
+            }
+
             Serializer &operator<<(const Iterable::Span<char> &Value)
             {
                 *this << Value.Length();
@@ -260,6 +276,27 @@ namespace Core
                 for (size_t i = 0; i < Size; i++)
                 {
                     Value.Add(this->Take<TValue>());
+                }
+
+                return *this;
+            }
+
+            template <typename TValue>
+            Serializer &operator>>(Iterable::Span<TValue> &Value)
+            {
+                size_t Size = this->Take<size_t>();
+
+                Value = Iterable::Span<TValue>(Size);
+
+                // @todo Optimize when serializer and deserializer are seperated
+                // Cuz we know there is no data inserted when taking data and
+                // thus the queue hasn't wrapped around
+
+                // if constexpr (std::is_integral_v<TValue>)
+
+                for (size_t i = 0; i < Size; i++)
+                {
+                    Value[i] = this->Take<TValue>();
                 }
 
                 return *this;

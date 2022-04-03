@@ -17,18 +17,18 @@
 #include <functional>
 #include <map>
 
-#include "Test.hpp"
-#include "Event.hpp"
-#include "Timer.hpp"
+#include <Test.hpp>
+#include <Event.hpp>
+#include <Timer.hpp>
 
-#include "Network/EndPoint.hpp"
-#include "Network/Socket.hpp"
+#include <Network/EndPoint.hpp>
+#include <Network/Socket.hpp>
 
-#include "Iterable/List.hpp"
-#include "Iterable/Poll.hpp"
+#include <Iterable/List.hpp>
+#include <Iterable/Poll.hpp>
 
 #include <Format/Serializer.hpp>
-#include "Network/DHT/DHT.hpp"
+#include <Network/DHT/DHT.hpp>
 
 namespace Core
 {

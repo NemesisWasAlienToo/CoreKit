@@ -136,7 +136,7 @@ namespace Core
 
                     if (Neighbor.ContainsWhere(
                             Index,
-                            [&node](Node &Item)
+                            [&node](const Node &Item)
                             {
                                 return Item.EndPoint == node.EndPoint;
                             }))
@@ -148,7 +148,7 @@ namespace Core
                     return false;
                 }
 
-                bool Remove(const EndPoint &endPoint, size_t NeighborHood)
+                /*bool Remove(const EndPoint &endPoint, size_t NeighborHood)
                 {
                     auto &Neighbor = Entries[NeighborHood];
 
@@ -166,7 +166,7 @@ namespace Core
                     }
 
                     return false;
-                }
+                }*/
 
                 bool Remove(const EndPoint &endPoint)
                 {
@@ -207,7 +207,7 @@ namespace Core
                     return false;
                 }
 
-                bool Add(const Node &node, size_t NeighborHood)
+                /*bool Add(const Node &node, size_t NeighborHood)
                 {
                     auto &Neighbor = Entries[NeighborHood];
 
@@ -223,59 +223,15 @@ namespace Core
 
                         return false;
                     }
-                }
+                }*/
 
-                bool Test(const Node &node)
+                template <typename TCallback>
+                void ForEach(TCallback Callback)
                 {
-                    auto NeighborHood = (node.Id - Identity().Id).MSNB();
-
-                    // if(NeighborHood == 0) return;
-
-                    auto &Neighbor = Entries[NeighborHood];
-
-                    // if Exists already do nothing
-
-                    if (Neighbor.ContainsWhere(
-                            [&node](Node &Item)
-                            {
-                                return Item.EndPoint == node.EndPoint;
-                            }))
+                    for (size_t i = 1; i < Entries.Length(); i++)
                     {
-                        return false;
+                        Callback(Entries[i]);
                     }
-
-                    // if list is not full add it
-
-                    if (!Neighbor.IsFull())
-                    {
-                        Neighbor.Add(node);
-                        return false;
-                    }
-
-                    // if its full test
-
-                    // @todo fix dead lock
-
-                    OnTest(
-                        Neighbor.Last(),
-                        [this, node, NeighborHood]()
-                        {
-                            Add(node, NeighborHood);
-                        });
-
-                    return true;
-                }
-
-                void ForEach(const std::function<void(const Node &)> &Callback)
-                {
-                    Entries.ForEach(
-                        [&Callback](const Iterable::List<Node> &entry)
-                        {
-                            if (entry.Length() > 0)
-                            {
-                                Callback(entry[0]); // @todo Fix this
-                            }
-                        });
                 }
             };
         }

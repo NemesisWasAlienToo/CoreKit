@@ -93,6 +93,11 @@ namespace Core
 
             // Functionalities
 
+            inline void Notify(uint64_t Value = 1)
+            {
+                Interrupt.Emit(Value);
+            }
+
             void SendTo(Entry entry)
             {
                 {
@@ -129,32 +134,42 @@ namespace Core
                 return true;
             }
 
-            void Loop()
+            template <typename TCondition>
+            void Loop(TCondition Condition)
             {
-                Lock.lock();
+                while (Condition())
+                {
+                    Lock.lock();
 
-            calc:
-                Await();
+                calc:
+                    Await();
 
-                if (Poll[0].HasEvent())
-                {
-                    if (Poll[0].Happened(Iterable::Poll::Out))
+                    if (Poll[0].HasEvent())
                     {
-                        OnSend();
+                        if (Poll[0].Happened(Iterable::Poll::Out))
+                        {
+                            OnSend();
+                        }
+                        else if (Poll[0].Happened(Iterable::Poll::In))
+                        {
+                            OnReceive();
+                        }
                     }
-                    else if (Poll[0].Happened(Iterable::Poll::In))
+                    else if (Poll[1].HasEvent())
                     {
-                        OnReceive();
+                        Clean();
                     }
-                }
-                else if (Poll[1].HasEvent())
-                {
-                    Clean();
-                }
-                else if (Poll[2].HasEvent())
-                {
-                    Interrupt.Listen();
-                    goto calc;
+                    else if (Poll[2].HasEvent())
+                    {
+                        if (!Condition())
+                        {
+                            Lock.unlock();
+                            break;
+                        }
+
+                        Interrupt.Listen();
+                        goto calc;
+                    }
                 }
             }
 
@@ -192,7 +207,7 @@ namespace Core
             {
                 if (Tracking->second.Expire.IsExpired())
                 {
-                    if(Tracking->second.End)
+                    if (Tracking->second.End)
                     {
                         Tracking->second.End();
                     }

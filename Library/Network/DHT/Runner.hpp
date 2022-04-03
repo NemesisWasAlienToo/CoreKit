@@ -47,7 +47,7 @@ namespace Core
 
                 Runner() = default;
 
-                Runner(const Network::DHT::Node& identity, const Duration& Timeout) : Identity(identity), TimeOut(Timeout), Server(identity.EndPoint), State(States::Stopped), Cache(Identity.Id)
+                Runner(const Network::DHT::Node &identity, const Duration &Timeout) : Identity(identity), TimeOut(Timeout), Server(identity.EndPoint), State(States::Stopped), Cache(Identity.Id)
                 {
                     Server.Builder = [this](const EndPoint &Peer)
                     {
@@ -66,90 +66,31 @@ namespace Core
                     };
                 }
 
-                // Private functionalities
+                // Functionalities
 
-            private:
-                void Respond(const Network::DHT::Node &Node, Format::Serializer &Serializer)
-                {
-                    Cache.Add(Node);
-
-                    Network::DHT::Operations Type = static_cast<Network::DHT::Operations>(Serializer.Take<char>());
-
-                    switch (Type)
-                    {
-                    case Network::DHT::Operations::Ping:
-                    {
-                        SendTo(
-                            Node.EndPoint,
-                            [](Format::Serializer &Ser)
-                            {
-                                Ser << static_cast<char>(Operations::Response);
-                            },
-                            {});
-
-                        break;
-                    }
-                    case Operations::Query:
-                    {
-                        Cryptography::Key key;
-
-                        Serializer >> key;
-
-                        SendTo(
-                            Node.EndPoint,
-                            [this, &key](Format::Serializer &Serializer)
-                            {
-                                Serializer << (char)Operations::Response << Cache.Resolve(key);
-                            },
-                            {});
-
-                        break;
-                    }
-                    case Operations::Data:
-                    {
-                        OnData(Node, Serializer);
-
-                        break;
-                    }
-                    default:
-                    {
-                        Test::Warn("Unknown command") << Node.Id << "@" << Node.EndPoint << std::endl;
-
-                        SendTo(
-                            Node.EndPoint,
-                            [](Format::Serializer &Response)
-                            {
-                                Response << (char)Operations::Invalid << "Invalid command";
-                            },
-                            nullptr);
-
-                        break;
-                    }
-                    }
-                }
-
-                // Public functionalities
-
-            public:
                 void GetInPool()
                 {
-                    while (State == States::Running)
+                    try
                     {
-                        try
-                        {
-                            Server.Loop();
-                        }
-                        catch (const std::exception &e)
-                        {
-                            std::cout << e.what() << '\n';
-                            break;
-                        }
+                        Server.Loop(
+                            [this]
+                            {
+                                return State == States::Running;
+                            });
+                    }
+                    catch (const std::exception &e)
+                    {
+                        std::cout << e.what() << '\n';
+                    }
+                    catch (const std::error_code &e)
+                    {
+                        std::cout << e.message() << '\n';
                     }
 
                     std::cout << "Thread exited" << std::endl;
                 }
 
-                inline void Run(size_t ThreadCount)
+                inline void Run(size_t ThreadCount = std::thread::hardware_concurrency())
                 {
                     Pool = Iterable::Span<std::thread>(ThreadCount);
 
@@ -169,6 +110,8 @@ namespace Core
                 {
                     State = States::Stopped;
 
+                    Server.Notify();
+
                     // Join threads in pool
 
                     Pool.ForEach(
@@ -176,151 +119,11 @@ namespace Core
                         {
                             Thread.join();
                         });
+
+                    Interrupt.Listen();
                 }
 
                 // Fundation
-
-                template <class TBuilder>
-                UDPServer::Entry BuildOEntry(
-                    const Core::Network::EndPoint &Peer,
-                    EndCallback End,
-                    TBuilder Builder)
-                {
-                    Iterable::Queue<char> Buffer;
-
-                    Format::Serializer Serializer(Buffer);
-
-                    Serializer.Add(reinterpret_cast<const char *>("CHRD"), 4) << static_cast<uint32_t>(0u);
-
-                    Builder(Serializer);
-
-                    // Check size for being too big
-
-                    Serializer.Modify<uint32_t>(4) = Format::Serializer::Order(static_cast<uint32_t>(Buffer.Length()));
-
-                    return {
-                        DateTime::FromNow(TimeOut),
-                        std::move(End),
-                        [Peer, QU = std::move(Buffer)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable
-                        {
-                            if (!QU.IsEmpty())
-                            {
-                                if(Socket.INode() == -1)
-                                {
-                                    // How?!
-                                }
-
-                                QU.Free(Socket.SendTo(&QU.First(), QU.Length(), Peer));
-
-                                if (QU.IsEmpty())
-                                {
-                                    return true;
-                                }
-
-                                return false;
-                            }
-                            else
-                            {
-                                if (End)
-                                {
-                                    End();
-                                }
-
-                                return true;
-                            }
-                        }};
-                }
-
-                template <class TCallback>
-                inline UDPServer::Entry BuildIEntry(
-                    const Core::Network::EndPoint &Peer,
-                    EndCallback End,
-                    TCallback Callback)
-                {
-                    return {
-                        DateTime::FromNow(TimeOut),
-                        std::move(End),
-                        [this, Queue = Iterable::Queue<char>(), Peer, _Callback = std::move(Callback)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable
-                        {
-                            constexpr size_t Padding = 8;
-
-                            if (Queue.Capacity() == 0)
-                            {
-                                auto [Data, p] = Socket.ReceiveFrom();
-
-                                if (Data[0] != 'C' || Data[1] != 'H' || Data[2] != 'R' || Data[3] != 'D')
-                                {
-                                    return true;
-                                }
-
-                                // Get Size
-
-                                size_t Size = Format::Serializer::Order(*reinterpret_cast<uint32_t *>(&Data[4]));
-
-                                if (Size < Padding)
-                                {
-                                    return false;
-                                }
-
-                                // Build Queue
-
-                                Queue = Iterable::Queue<char>(Size - Padding, false);
-
-                                Queue.Add(Data.Content() + Padding, Data.Length() - Padding);
-
-                                if (Queue.IsFull())
-                                {
-                                    return true;
-                                }
-
-                                return false;
-                            }
-                            else
-                            {
-                                if (!Queue.IsFull())
-                                {
-                                    auto [Data, p] = Socket.ReceiveFrom();
-
-                                    // Fill Queue
-
-                                    Queue.Add(Data.Content(), Data.Length());
-
-                                    if (Queue.IsFull())
-                                    {
-                                        return true;
-                                    }
-
-                                    return false;
-                                }
-                                else
-                                {
-                                    // Finished
-
-                                    if (Queue.Capacity() == 0)
-                                    {
-                                        // Packet failed
-
-                                        if (End)
-                                        {
-                                            End();
-                                        }
-
-                                        return false;
-                                    }
-                                    else
-                                    {
-                                        // Normal packet
-
-                                        Format::Serializer Ser(Queue);
-                                        Network::DHT::Node Node{Ser.Take<Cryptography::Key>(), Peer};
-                                        _Callback(Node, Ser, End);
-
-                                        return true;
-                                    }
-                                }
-                            }
-                        }};
-                }
 
                 template <class TBuilder>
                 inline void SendTo(const EndPoint &Peer, TBuilder Builder, UDPServer::EndCallback End)
@@ -356,6 +159,17 @@ namespace Core
                     SendTo(Peer, Builder, nullptr);
 
                     return true;
+                }
+
+                template <class TCallback>
+                inline void ForEach(TCallback Callback)
+                {
+                    Cache.ForEach(
+                        [&Callback](const auto &Nodes)
+                        {
+                            if (Nodes.Length() > 0)
+                                Callback(Nodes);
+                        });
                 }
 
                 // Actual funcionalities
@@ -530,6 +344,208 @@ namespace Core
                             Serializer.Add(Data.c_str(), Data.length());
                         },
                         nullptr);
+                }
+
+            protected:
+                template <class TBuilder>
+                UDPServer::Entry BuildOEntry(
+                    const Core::Network::EndPoint &Peer,
+                    EndCallback End,
+                    TBuilder Builder)
+                {
+                    Iterable::Queue<char> Buffer;
+
+                    Format::Serializer Serializer(Buffer);
+
+                    Serializer.Add(reinterpret_cast<const char *>("CHRD"), 4) << static_cast<uint32_t>(0u);
+
+                    Builder(Serializer);
+
+                    // Check size for being too big
+
+                    Serializer.Modify<uint32_t>(4) = Format::Serializer::Order(static_cast<uint32_t>(Buffer.Length()));
+
+                    return {
+                        DateTime::FromNow(TimeOut),
+                        std::move(End),
+                        [Peer, QU = std::move(Buffer)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable
+                        {
+                            if (!QU.IsEmpty())
+                            {
+                                if (Socket.INode() == -1)
+                                {
+                                    // How?!
+                                }
+
+                                QU.Free(Socket.SendTo(&QU.First(), QU.Length(), Peer));
+
+                                if (QU.IsEmpty())
+                                {
+                                    return true;
+                                }
+
+                                return false;
+                            }
+                            else
+                            {
+                                if (End)
+                                {
+                                    End();
+                                }
+
+                                return true;
+                            }
+                        }};
+                }
+
+                template <class TCallback>
+                inline UDPServer::Entry BuildIEntry(
+                    const Core::Network::EndPoint &Peer,
+                    EndCallback End,
+                    TCallback Callback)
+                {
+                    return {
+                        DateTime::FromNow(TimeOut),
+                        std::move(End),
+                        [this, Queue = Iterable::Queue<char>(), Peer, _Callback = std::move(Callback)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable
+                        {
+                            constexpr size_t Padding = 8;
+
+                            if (Queue.Capacity() == 0)
+                            {
+                                auto [Data, p] = Socket.ReceiveFrom();
+
+                                if (Data[0] != 'C' || Data[1] != 'H' || Data[2] != 'R' || Data[3] != 'D')
+                                {
+                                    return true;
+                                }
+
+                                // Get Size
+
+                                size_t Size = Format::Serializer::Order(*reinterpret_cast<uint32_t *>(&Data[4]));
+
+                                if (Size < Padding)
+                                {
+                                    return false;
+                                }
+
+                                // Build Queue
+
+                                Queue = Iterable::Queue<char>(Size - Padding, false);
+
+                                Queue.Add(Data.Content() + Padding, Data.Length() - Padding);
+
+                                if (Queue.IsFull())
+                                {
+                                    return true;
+                                }
+
+                                return false;
+                            }
+                            else
+                            {
+                                if (!Queue.IsFull())
+                                {
+                                    auto [Data, p] = Socket.ReceiveFrom();
+
+                                    // Fill Queue
+
+                                    Queue.Add(Data.Content(), Data.Length());
+
+                                    if (Queue.IsFull())
+                                    {
+                                        return true;
+                                    }
+
+                                    return false;
+                                }
+                                else
+                                {
+                                    // Finished
+
+                                    if (Queue.Capacity() == 0)
+                                    {
+                                        // Packet failed
+
+                                        if (End)
+                                        {
+                                            End();
+                                        }
+
+                                        return false;
+                                    }
+                                    else
+                                    {
+                                        // Normal packet
+
+                                        Format::Serializer Ser(Queue);
+                                        Network::DHT::Node Node{Ser.Take<Cryptography::Key>(), Peer};
+                                        _Callback(Node, Ser, End);
+
+                                        return true;
+                                    }
+                                }
+                            }
+                        }};
+                }
+
+                void Respond(const Network::DHT::Node &Node, Format::Serializer &Serializer)
+                {
+                    Cache.Add(Node);
+
+                    Network::DHT::Operations Type = static_cast<Network::DHT::Operations>(Serializer.Take<char>());
+
+                    switch (Type)
+                    {
+                    case Network::DHT::Operations::Ping:
+                    {
+                        SendTo(
+                            Node.EndPoint,
+                            [](Format::Serializer &Ser)
+                            {
+                                Ser << static_cast<char>(Operations::Response);
+                            },
+                            {});
+
+                        break;
+                    }
+                    case Operations::Query:
+                    {
+                        Cryptography::Key key;
+
+                        Serializer >> key;
+
+                        SendTo(
+                            Node.EndPoint,
+                            [this, &key](Format::Serializer &Serializer)
+                            {
+                                Serializer << (char)Operations::Response << Cache.Resolve(key);
+                            },
+                            {});
+
+                        break;
+                    }
+                    case Operations::Data:
+                    {
+                        OnData(Node, Serializer);
+
+                        break;
+                    }
+                    default:
+                    {
+                        Test::Warn("Unknown command") << Node.Id << "@" << Node.EndPoint << std::endl;
+
+                        SendTo(
+                            Node.EndPoint,
+                            [](Format::Serializer &Response)
+                            {
+                                Response << (char)Operations::Invalid << "Invalid command";
+                            },
+                            nullptr);
+
+                        break;
+                    }
+                    }
                 }
             };
         }

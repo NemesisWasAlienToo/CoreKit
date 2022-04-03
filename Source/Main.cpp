@@ -131,9 +131,16 @@ int main(int argc, char const *argv[])
         }
         else
         {
-            Node.Data(Target, Command);
+            Node.ForEach(
+                [&](const auto& Nodes)
+                {
+                    Node.Data(Nodes[0].EndPoint, Command);
+                }
+            );
         }
     }
+
+    Node.Stop();
 
     return 0;
 }

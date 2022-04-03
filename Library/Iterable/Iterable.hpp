@@ -553,7 +553,7 @@ namespace Core
                 return false;
             }
 
-            bool Contains(const T &Item, int &Index) const
+            bool Contains(const T &Item, size_t &Index) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
