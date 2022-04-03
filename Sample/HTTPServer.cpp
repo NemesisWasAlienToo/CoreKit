@@ -13,6 +13,8 @@ int main(int argc, char const *argv[])
 
     Server.OnRequest = [](Network::HTTP::Request &Request, Network::HTTP::Response &Response)
     {
+        std::cout << Request.ToString() << std::endl;
+
         Response.Status = Network::HTTP::Status::OK;
 
         Response.Headers["Content-Type"] = "text/html; charset=UTF-8";
@@ -24,37 +26,7 @@ int main(int argc, char const *argv[])
 
     Server.Start(1);
 
-    while (true)
-    {
-        STDOUT.WriteLine("Waiting for commands");
-
-        std::string Command = STDIN.ReadLine();
-
-        if (Command == "exit")
-        {
-            break;
-        }
-    }
-
-    Server.Stop();
-
-    STDIN.ReadLine();
-
-    Server.Start(2);
-
-    while (true)
-    {
-        STDOUT.WriteLine("Waiting for commands");
-
-        std::string Command = STDIN.ReadLine();
-
-        if (Command == "exit")
-        {
-            break;
-        }
-    }
-
-    Server.Stop();
-
+    Server.GetInPool();
+    
     return 0;
 }
