@@ -120,7 +120,7 @@ namespace Core
                             Thread.join();
                         });
 
-                    Interrupt.Listen();
+                    Server.Listen();
                 }
 
                 // Fundation
@@ -250,7 +250,7 @@ namespace Core
                                 return;
                             }
 
-                            if (Response[0].EndPoint.address() == Network::Address("0.0.0.0")) // <-- @todo Optimize this
+                            if (Response[0].EndPoint.Address() == Network::Address("0.0.0.0")) // <-- @todo Optimize this
                             {
                                 Response[0].EndPoint = Peer;
                                 CB(std::move(Response), std::move(End));

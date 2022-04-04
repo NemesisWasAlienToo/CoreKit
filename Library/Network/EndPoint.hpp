@@ -13,7 +13,7 @@ namespace Core
         private:
             // Common
 
-            Address _Address;
+            Network::Address _Address;
             uint16_t _Port = 0;
 
             // IPv6 Specific
@@ -83,7 +83,7 @@ namespace Core
 
             EndPoint(const std::string& address, unsigned short Port)
             {
-                _Address = Address(address);
+                _Address = Network::Address(address);
                 _Port = htons(Port);
             }
 
@@ -94,7 +94,7 @@ namespace Core
                 std::string IP = Content.substr(0, Seprator);
                 std::string Port = Content.substr(Seprator + 1);
 
-                _Address = Address(IP);
+                _Address = Network::Address(IP);
                 _Port = htons(std::stoi(Port));
             }
 
@@ -153,8 +153,8 @@ namespace Core
 
             //  Setters
 
-            Address &address() { return _Address; }
-            Address address() const { return _Address; }
+            Network::Address &Address() { return _Address; }
+            Network::Address Address() const { return _Address; }
 
             unsigned short port() const { return _Port; }
             unsigned short port(unsigned short Port)
@@ -179,7 +179,7 @@ namespace Core
 
             //  Setters
 
-            void Set(Address address, int Port, int Scope, int Flow)
+            void Set(Network::Address address, int Port, int Scope, int Flow)
             {
                 _Address = address;
                 _Port = Port;

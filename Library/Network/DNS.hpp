@@ -14,16 +14,9 @@ namespace Core
 {
     namespace Network
     {
-        class DNS
+        namespace DNS
         {
-        private:
-            DNS() = default;
-            ~DNS() {}
-
-        public:
-            // Static
-
-            static Iterable::List<EndPoint> Resolve(const std::string &Domain, const std::string &Service, Address::AddressFamily Family = Address::IPv4, Socket::SocketType Type = Socket::TCP)
+            Iterable::List<EndPoint> Resolve(const std::string &Domain, const std::string &Service, Address::AddressFamily Family = Address::IPv4, Socket::SocketType Type = Socket::TCP)
             {
                 struct addrinfo hints, *res, *p;
                 int status;
@@ -50,7 +43,32 @@ namespace Core
                 return endPoints;
             }
 
-            static Iterable::List<Address> Resolve(const std::string &Domain, Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP)
+            EndPoint ResolveSingle(const std::string &Domain, const std::string &Service, Address::AddressFamily Family = Address::IPv4, Socket::SocketType Type = Socket::TCP)
+            {
+                struct addrinfo hints, *res;
+                int status;
+                EndPoint endPoint{Network::Address{0}, 0};
+
+                std::memset(&hints, 0, sizeof hints);
+                hints.ai_family = Family;
+                hints.ai_socktype = Type;
+                // hints.ai_flags = 0; Maybe add later
+
+                if ((status = getaddrinfo(Domain.c_str(), Service.c_str(), &hints, &res)) != 0)
+                    return endPoint;
+
+                if(res != NULL)
+                {
+
+                    endPoint = EndPoint(res->ai_addr);
+                }
+
+                freeaddrinfo(res);
+
+                return endPoint;
+            }
+
+            Iterable::List<Address> Resolve(const std::string &Domain, Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP)
             {
                 struct addrinfo hints, *res, *p;
                 int status;
@@ -68,11 +86,11 @@ namespace Core
                     Address address;
                     if (p->ai_family == Network::Address::IPv4)
                     {
-                        address = Address(((struct sockaddr_in *)p->ai_addr)->sin_addr);
+                        address = Address(((struct sockaddr_in *)res->ai_addr)->sin_addr);
                     }
                     else
                     {
-                        address = Address(((struct sockaddr_in6 *)p->ai_addr)->sin6_addr);
+                        address = Address(((struct sockaddr_in6 *)res->ai_addr)->sin6_addr);
                     }
 
                     addresses.Add(address);
@@ -83,7 +101,38 @@ namespace Core
                 return addresses;
             }
 
-            static std::string Name(Address Target)
+            Address ResolveSingle(const std::string &Domain, Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP)
+            {
+                struct addrinfo hints, *res;
+                int status;
+                Address address;
+
+                std::memset(&hints, 0, sizeof hints);
+                hints.ai_family = Family;
+                hints.ai_socktype = Type;
+
+                if ((status = getaddrinfo(Domain.c_str(), "", &hints, &res)) != 0)
+                    return address;
+
+                if(res != NULL)
+                {
+                    Address address;
+                    if (res->ai_family == Network::Address::IPv4)
+                    {
+                        address = Address(((struct sockaddr_in *)res->ai_addr)->sin_addr);
+                    }
+                    else
+                    {
+                        address = Address(((struct sockaddr_in6 *)res->ai_addr)->sin6_addr);
+                    }
+                }
+
+                freeaddrinfo(res);
+
+                return address;
+            }
+
+            std::string Name(Address Target)
             {
                 struct sockaddr_storage _Target;
                 socklen_t len = Network::EndPoint(Target, 0).sockaddr_storage(&_Target);
@@ -99,12 +148,12 @@ namespace Core
                 return host;
             }
 
-            static std::string Name(std::string Target)
+            std::string Name(std::string Target)
             {
                 return Name(Network::Address(Target));
             }
 
-            static std::string Service(EndPoint Target)
+            std::string Service(EndPoint Target)
             {
                 struct sockaddr_storage _Target;
                 socklen_t len = Target.sockaddr_storage(&_Target);
@@ -120,7 +169,7 @@ namespace Core
                 return serv;
             }
 
-            static Iterable::List<EndPoint> Host(const std::string &Service = "", Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP, bool Passive = false)
+            Iterable::List<EndPoint> Host(const std::string &Service = "", Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP, bool Passive = false)
             {
                 struct addrinfo hints, *res, *p;
                 int status;
@@ -146,7 +195,7 @@ namespace Core
                 return endPoints;
             }
 
-            static Iterable::List<Address> Host(Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP, bool Passive = false)
+            Iterable::List<Address> Host(Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP, bool Passive = false)
             {
                 struct addrinfo hints, *res, *p;
                 int status;
@@ -180,7 +229,7 @@ namespace Core
                 return addresses;
             }
 
-            static std::string HostName()
+            std::string HostName()
             {
                 char name[40];
                 gethostname(name, 40);

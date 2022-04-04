@@ -98,6 +98,11 @@ namespace Core
                 Interrupt.Emit(Value);
             }
 
+            inline uint64_t Listen()
+            {
+                return Interrupt.Listen();
+            }
+
             void SendTo(Entry entry)
             {
                 {

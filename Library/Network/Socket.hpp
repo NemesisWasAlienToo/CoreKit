@@ -77,7 +77,7 @@ namespace Core
                 struct sockaddr *SocketAddress;
                 int Size = 0, Result = 0, yes = 1;
 
-                if (Host.address().Family() == Address::IPv4)
+                if (Host.Address().Family() == Address::IPv4)
                 {
                     SocketAddress = (struct sockaddr *)new struct sockaddr_in;
                     Size = Host.sockaddr_in((struct sockaddr_in *)SocketAddress);
@@ -111,7 +111,7 @@ namespace Core
                 struct sockaddr *SocketAddress;
                 int Size = 0;
 
-                if (Target.address().Family() == Address::IPv4)
+                if (Target.Address().Family() == Address::IPv4)
                 {
                     SocketAddress = (struct sockaddr *)new struct sockaddr_in;
                     Size = Target.sockaddr_in((struct sockaddr_in *)SocketAddress);

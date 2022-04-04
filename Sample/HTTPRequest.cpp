@@ -10,11 +10,7 @@ using namespace Core;
 
 int main(int argc, char const *argv[])
 {
-    auto result = Network::DNS::Resolve("google.com");
-
-    Network::EndPoint Google(result[0], 80);
-
-    auto Response = Network::HTTP::Send(Google, Network::HTTP::Request::Get("/"));
+    Network::HTTP::Response Response = Network::HTTP::Send(Network::DNS::ResolveSingle("google.com", "http"), Network::HTTP::Request::Get("/"));
 
     std::cout << Response.Content << std::endl;
 

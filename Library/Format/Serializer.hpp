@@ -223,7 +223,7 @@ namespace Core
 
             Serializer &operator<<(const Network::EndPoint &Value)
             {
-                return *this << Value.address() << Order(Value.port()) << Order(Value.flow()) << Order(Value.scope());
+                return *this << Value.Address() << Order(Value.port()) << Order(Value.flow()) << Order(Value.scope());
             }
 
             Serializer &operator<<(const Network::DHT::Node &Value)
@@ -362,7 +362,7 @@ namespace Core
 
             Serializer &operator>>(Network::EndPoint &Value)
             {
-                *this >> Value.address();
+                *this >> Value.Address();
                 Value.port(Order(this->Take<unsigned short>()));
                 Value.flow(Order(this->Take<int>()));
                 Value.scope(Order(this->Take<int>()));
