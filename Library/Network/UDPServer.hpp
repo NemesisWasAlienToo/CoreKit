@@ -41,7 +41,7 @@ namespace Core
             using ProductCallback = std::function<void()>;
 
             using EndCallback = std::function<void()>;
-            using HandlerCallback = std::function<bool(const Network::Socket &, EndCallback &)>;
+            using HandlerCallback = std::function<bool(Network::Socket, EndCallback &)>;
 
             struct Entry
             {

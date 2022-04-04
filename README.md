@@ -111,8 +111,7 @@ Checked items are implemented completly at the moment and unchecked items are to
     - Move States to heap to protect user against leaks
 
 - Http:
-    - Optimize Http request, response
-    - Add http Server server
+    - Optimize HTTP Server event loop
 
 - Socket:
     - Error string from errno

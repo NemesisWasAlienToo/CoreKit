@@ -368,7 +368,7 @@ namespace Core
                     return {
                         DateTime::FromNow(TimeOut),
                         std::move(End),
-                        [Peer, QU = std::move(Buffer)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable
+                        [Peer, QU = std::move(Buffer)](Network::Socket Socket, UDPServer::EndCallback &End) mutable
                         {
                             if (!QU.IsEmpty())
                             {
@@ -407,7 +407,7 @@ namespace Core
                     return {
                         DateTime::FromNow(TimeOut),
                         std::move(End),
-                        [this, Queue = Iterable::Queue<char>(), Peer, _Callback = std::move(Callback)](const Network::Socket &Socket, UDPServer::EndCallback &End) mutable
+                        [this, Queue = Iterable::Queue<char>(), Peer, _Callback = std::move(Callback)](Network::Socket Socket, UDPServer::EndCallback &End) mutable
                         {
                             constexpr size_t Padding = 8;
 

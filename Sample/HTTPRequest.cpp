@@ -1,8 +1,6 @@
 #include <iostream>
 #include <string>
-#include <unistd.h>
 
-#include <File.hpp>
 #include <Network/DNS.hpp>
 #include <Network/HTTP/HTTP.hpp>
 
