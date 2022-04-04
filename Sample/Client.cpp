@@ -32,7 +32,7 @@ int main(int argc, char const *argv[])
 
     ser << "GET / HTTP/1.1 \r\n"
            "Host: ConfusionBox \r\n"
-           "Connecttion: closed\r\n\r\n";
+           "Connection: closed\r\n\r\n";
 
     while (!ser.Queue.IsEmpty())
     {

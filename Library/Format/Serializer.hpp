@@ -135,7 +135,7 @@ namespace Core
 
             // Input operators
 
-            template<typename T>
+            template <typename T>
             std::enable_if_t<std::is_integral_v<T>, Serializer &>
             operator<<(T Value)
             {
@@ -147,7 +147,7 @@ namespace Core
 
                 return *this;
             }
-            
+
             Serializer &operator<<(char Value)
             {
                 Queue.Add(Value);
@@ -240,9 +240,9 @@ namespace Core
 
             // Output operators
 
-            template<typename T>
+            template <typename T>
             std::enable_if_t<std::is_integral_v<T>, Serializer &>
-            operator>>(T& Value)
+            operator>>(T &Value)
             {
                 T _Value;
 
@@ -252,8 +252,8 @@ namespace Core
 
                 return *this;
             }
-            
-            Serializer &operator>>(char& Value)
+
+            Serializer &operator>>(char &Value)
             {
                 Value = Queue.Take();
 
@@ -320,16 +320,17 @@ namespace Core
                 return *this;
             }
 
-            // @todo Optimize this
+            // @todo Optimize and fix this this
 
             Serializer &operator>>(std::string &Value)
             {
-                while (Queue.Last() != '0')
+                while (!Queue.IsEmpty() && Queue.Last() != '0')
                 {
                     Value += Queue.Take();
                 }
 
-                Queue.Take();
+                if (!Queue.IsEmpty())
+                    Queue.Take();
 
                 return *this;
             }

@@ -78,9 +78,9 @@ namespace Core
 
                         if (ContetLength == 0 && bodyPos == 0)
                         {
-                            lenPos = Request.find("Content-Length: ", lenPos);
+                            lenPos = Request.find("Content-Length: ", lenPos - 15);
 
-                            if(lenPos == std::string::npos)
+                            if (lenPos == std::string::npos)
                             {
                                 lenPos = Request.length();
                             }
@@ -95,13 +95,13 @@ namespace Core
 
                         // Detect start of content
 
-                        if(bodyPos == 0)
+                        if (bodyPos == 0)
                         {
                             bodyPosTmp = Request.find("\r\n\r\n", bodyPosTmp);
 
-                            if(bodyPosTmp == std::string::npos)
+                            if (bodyPosTmp == std::string::npos)
                             {
-                                bodyPosTmp = Request.length() - 2;
+                                bodyPosTmp = Request.length() - 3;
                             }
                             else
                             {
@@ -124,9 +124,11 @@ namespace Core
                     Res.Version = "1.1";
                     Res.Headers["Host"] = Network::DNS::HostName();
 
-                    OnRequest(Req, Res);
+                    OnRequest(Info, Req, Res);
 
-                    Res.Headers["Content-Length"] = std::to_string(Res.Content.length());
+                    Res.Brief = StatusMessage.at(Res.Status);
+
+                    Res.Headers.insert_or_assign("Content-Length", std::to_string(Res.Content.length()));
 
                     // Serialize response
 
@@ -150,7 +152,7 @@ namespace Core
                 }
 
             public:
-                std::function<void(HTTP::Request &, HTTP::Response &)> OnRequest;
+                std::function<void(const Network::EndPoint &, const HTTP::Request &, HTTP::Response &)> OnRequest;
 
                 Server(const Network::EndPoint &Host, Duration Timout) : Socket(Network::Socket::IPv4, Network::Socket::TCP), Host(Host), TimeOut(Timout), State(States::Stopped)
                 {

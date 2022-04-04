@@ -11,9 +11,9 @@ int main(int argc, char const *argv[])
 {
     Network::HTTP::Server Server({"0.0.0.0:8888"}, {5, 0});
 
-    Server.OnRequest = [](Network::HTTP::Request &Request, Network::HTTP::Response &Response)
+    Server.OnRequest = [](const Network::EndPoint& Target, const Network::HTTP::Request &Request, Network::HTTP::Response &Response)
     {
-        std::cout << Request.ToString() << std::endl;
+        std::cout << Target << " : \n" << Request.ToString() << std::endl;
 
         Response.Status = Network::HTTP::Status::OK;
 
@@ -24,9 +24,9 @@ int main(int argc, char const *argv[])
 
     Server.Listen(20);
 
-    Server.Start(1);
+    Server.Start(0);
 
     Server.GetInPool();
-    
+
     return 0;
 }
