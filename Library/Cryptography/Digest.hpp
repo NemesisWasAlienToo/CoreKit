@@ -8,6 +8,8 @@
 #include <openssl/md5.h>
 #include <openssl/md4.h>
 
+#include <Iterable/Span.hpp>
+
 // ## Add SHA3
 
 namespace Core
@@ -45,18 +47,9 @@ namespace Core
                 return Scheme::Update(&_State, Data, Size);
             }
 
-            std::string Hex()
+            int Add(const Iterable::Span<char> Data)
             {
-                unsigned char _Content[Scheme::Lenght];
-                std::stringstream ss;
-
-                Scheme::Final(_Content, &_State);
-
-                for (int i = 0; i < Scheme::Lenght; i++)
-                {
-                    ss << std::hex << std::setw(2) << std::setfill('0') << (int)_Content[i];
-                }
-                return ss.str();
+                return Scheme::Update(&_State, Data.Content(), Data.Length());
             }
 
             void Bytes(unsigned char *Data)
@@ -64,16 +57,20 @@ namespace Core
                 Scheme::Final(Data, &_State);
             }
 
-            // Static funtions
-
-            static constexpr size_t Size()
+            Iterable::Span<char> Bytes()
             {
-                return Scheme::Lenght;
+                Iterable::Span<char> Res(Scheme::Lenght);
+
+                Scheme::Final(Res.Content(), &_State);
+
+                return Res;
             }
 
-            static void Bytes(const std::string &Data, unsigned char *Digest)
+            // Static funtions
+
+            inline static constexpr size_t Size()
             {
-                Scheme::Name((unsigned char *)Data.c_str(), Data.length(), Digest);
+                return Scheme::Lenght;
             }
 
             static void Bytes(const unsigned char *Data, size_t Size, unsigned char *Digest)
@@ -81,31 +78,27 @@ namespace Core
                 Scheme::Name(Data, Size, Digest);
             }
 
-            // ## Remove this
-            static std::string Hex(const std::string &Data)
+            static Iterable::Span<char> Bytes(const unsigned char *Data, size_t Size)
             {
-                unsigned char _Content[Scheme::Lenght];
+                Iterable::Span<char> Res(Scheme::Lenght);
 
-                Scheme::Name((unsigned char *)Data.c_str(), Data.length(), _Content);
+                Scheme::Name(Data, Size, reinterpret_cast<unsigned char *>(Res.Content()));
 
-                std::stringstream ss;
+                return Res;
+            }
 
-                for (size_t i = 0; i < Scheme::Lenght; i++)
-                {
-                    ss << std::hex << std::setw(2) << std::setfill('0') << (int)_Content[i];
-                }
+            static Iterable::Span<char> Bytes(const Iterable::Span<char> &Data)
+            {
+                Iterable::Span<char> Res(Scheme::Lenght);
 
-                return ss.str();
+                Scheme::Name(reinterpret_cast<const unsigned char *>(Data.Content()), Data.Length(), Res);
+
+                return Res;
             }
 
             // Operators
 
             Digest &operator=(const Digest &Other) = delete;
-
-            Digest &operator<<(const std::string &Data)
-            {
-                Scheme::Update(&_State, Data.c_str(), Data.size());
-            }
         };
 
         // SHA

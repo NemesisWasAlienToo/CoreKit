@@ -92,7 +92,7 @@ namespace Core
 
             void Resize(size_t NewSize)
             {
-                auto NewData = new unsigned char[Size];
+                auto NewData = new unsigned char[NewSize];
 
                 for (size_t i = 0; i < Size; i++)
                 {
@@ -146,7 +146,7 @@ namespace Core
 
             std::string ToString() const
             {
-                return Format::Hex::From((char *)Data, Size);
+                return Format::Hex::From((const unsigned char *)Data, Size);
             }
 
             inline size_t NeighborCount() const

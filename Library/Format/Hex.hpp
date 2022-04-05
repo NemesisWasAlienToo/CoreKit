@@ -33,7 +33,7 @@ namespace Core
                 return 2 * Size;
             }
 
-            std::string From(const char *Data, size_t Size)
+            std::string From(const unsigned char *Data, size_t Size)
             {
                 std::stringstream ss;
 

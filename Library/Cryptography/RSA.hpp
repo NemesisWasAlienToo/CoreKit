@@ -10,8 +10,9 @@
 #include <openssl/evp.h>
 #include <openssl/engine.h>
 
-#include "Format/Hex.hpp"
-#include "Format/Base64.hpp"
+#include <Format/Hex.hpp>
+#include <Format/Base64.hpp>
+#include <Iterable/Span.hpp>
 
 namespace Core
 {
@@ -49,15 +50,7 @@ namespace Core
 
             RSA() = default;
 
-            RSA(int Lenght)
-            {
-                // Check for RAND seed?
-
-                if (_Keys != NULL)
-                    RSA_free(_Keys);
-
-                _Keys = Generate(Lenght);
-            }
+            RSA(int BitLenght, RSAPadding Padding = OAEP) : _Keys(Generate(BitLenght)), _Padding(Padding) {}
 
             RSA(Key *Keys)
             {
@@ -82,14 +75,6 @@ namespace Core
 
             // ## Functions
 
-            void New(int Length)
-            {
-                if (_Keys != NULL)
-                    RSA_free(_Keys);
-
-                _Keys = Generate(Length);
-            }
-
             int PlainSize()
             {
                 int Extra = 0;
@@ -107,14 +92,14 @@ namespace Core
             }
 
             template <KeyType T>
-            void Encrypt(const unsigned char *Plain, int Size, unsigned char *Cypher)
+            int Encrypt(const unsigned char *Plain, int Size, unsigned char *Cypher)
             {
 
                 int Result = 0;
 
-                if (T == Public)
+                if constexpr (T == Public)
                     Result = RSA_public_encrypt(Size, Plain, Cypher, _Keys, _Padding);
-                else if (T == Private)
+                else if constexpr (T == Private)
                     Result = RSA_private_encrypt(Size, Plain, Cypher, _Keys, _Padding == None ? None : PKCS1);
 
                 if (Result < 1)
@@ -123,10 +108,44 @@ namespace Core
                     std::cout << "RSA : " << ERR_reason_error_string(Error) << std::endl;
                     exit(-1);
                 }
+
+                return Result;
             }
 
             template <KeyType T>
-            void Dencrypt(const unsigned char *Cypher, int Size, unsigned char *Plain)
+            Iterable::Span<char> Encrypt(const unsigned char *Plain, int Size)
+            {
+                int Result = 0;
+                Iterable::Span<char> Cypher(CypherSize());
+
+                if constexpr (T == Public)
+                    Result = RSA_public_encrypt(Size, Plain, reinterpret_cast<unsigned char *>(Cypher.Content()), _Keys, _Padding);
+                else if constexpr (T == Private)
+                    Result = RSA_private_encrypt(Size, Plain, reinterpret_cast<unsigned char *>(Cypher.Content()), _Keys, _Padding == None ? None : PKCS1);
+
+                if (Result < 1)
+                {
+                    unsigned long Error = ERR_get_error();
+                    std::cout << "RSA : " << ERR_reason_error_string(Error) << std::endl;
+                    exit(-1);
+                }
+
+                // @todo Optimize this later
+                
+                if(Result != CypherSize())
+                    Cypher.Resize(Result);
+
+                return Cypher;
+            }
+
+            template <KeyType T>
+            Iterable::Span<char> Encrypt(const Iterable::Span<char> &Plain)
+            {
+                return Encrypt<T>(reinterpret_cast<const unsigned char *>(Plain.Content()), Plain.Length());
+            }
+
+            template <KeyType T>
+            int Dencrypt(const unsigned char *Cypher, int Size, unsigned char *Plain)
             {
 
                 int Result = 0;
@@ -142,28 +161,76 @@ namespace Core
                     std::cout << "RSA : " << ERR_reason_error_string(Error) << std::endl;
                     exit(-1);
                 }
+
+                return Result;
+            }
+
+            template <KeyType T>
+            Iterable::Span<char> Dencrypt(const unsigned char *Cypher, int Size)
+            {
+                int Result = 0;
+                Iterable::Span<char> Plain(PlainSize());
+
+                if (T == Public)
+                    Result = RSA_public_decrypt(Size, Cypher, reinterpret_cast<unsigned char *>(Plain.Content()), _Keys, _Padding == None ? None : PKCS1);
+                else if (T == Private)
+                    Result = RSA_private_decrypt(Size, Cypher, reinterpret_cast<unsigned char *>(Plain.Content()), _Keys, _Padding);
+
+                if (Result < 1)
+                {
+                    unsigned long Error = ERR_get_error();
+                    std::cout << "RSA : " << ERR_reason_error_string(Error) << std::endl;
+                    exit(-1);
+                }
+
+                // @todo Optimize this later
+
+                if(Result != PlainSize())
+                    Plain.Resize(Result);
+
+                return Plain;
+            }
+
+            template <KeyType T>
+            Iterable::Span<char> Dencrypt(const Iterable::Span<char> &Cypher)
+            {
+                return Dencrypt<T>(reinterpret_cast<const unsigned char *>(Cypher.Content()), Cypher.Length());
             }
 
             template <typename T>
-            void Sign(const std::string &Data, unsigned char *Signature)
+            void Sign(const unsigned char *Data, size_t Size, unsigned char *Signature)
             {
                 unsigned char Digest[T::Size()];
 
-                T::Bytes(Data, Digest);
+                T::Bytes(Data, Size, Digest);
 
                 Encrypt<Private>(Digest, T::Size(), Signature);
             }
 
+            template <typename T>
+            Iterable::Span<char> Sign(const unsigned char *Data, size_t Size)
+            {
+                unsigned char Digest[T::Size()];
+
+                T::Bytes(Data, Size, Digest);
+
+                return Encrypt<Private>(Digest, T::Size());
+            }
+
+            template <typename T>
+            Iterable::Span<char> Sign(const Iterable::Span<char> &Data)
+            {
+                unsigned char Digest[T::Size()];
+
+                T::Bytes(Data.Content(), Data.Length(), Digest);
+
+                return Encrypt<Private>(Digest, T::Size());
+            }
+
+            // @todo Implenet
             // template <typename T>
             // void PKCSSign(const std::string &Data, unsigned char *Signature)
             // {
-            //     unsigned char Digest[T::Size()];
-
-            //     T::Bytes(Data, Digest);
-
-            //     ::RSA_sign(::SHA)
-
-            //     Encrypt<Private>(Digest, T::Size(), Signature);
             // }
 
             template <typename T>
@@ -184,22 +251,10 @@ namespace Core
                 return true;
             }
 
+            // @todo Implenet
             // template <typename T>
             // bool PKCSVerify(const std::string &Data, unsigned char *Signature)
             // {
-            //     size_t Size = T::Size();
-            //     unsigned char MDigest[Size];
-            //     unsigned char CDigest[Size];
-
-            //     T::Bytes(Data, MDigest);
-
-            //     Dencrypt<Public>(Signature, CypherSize(), CDigest);
-
-            //     for (size_t i = 0; i < Size; i++)
-            //         if (MDigest[i] != CDigest[i])
-            //             return false;
-
-            //     return true;
             // }
 
             bool IsValid()
@@ -208,6 +263,11 @@ namespace Core
             }
 
             // ## Properties
+
+            Key *Keys() const
+            {
+                return _Keys;
+            }
 
             template <KeyType T>
             std::string Keys()
@@ -246,47 +306,41 @@ namespace Core
                 return str;
             }
 
-            template <KeyType T>
-            void Keys(Key *Keys)
-            {
-                if (T == Public)
-                {
-                }
-                else
-                {
-                }
-            }
+            // @todo Implement
+
+            // template <KeyType T>
+            // void Keys(Key *Keys)
+            // {
+            //     if constexpr (T == Public)
+            //     {
+            //     }
+            //     else
+            //     {
+            //     }
+            // }
 
             template <KeyType T>
             void ToFile(const std::string &Name)
             {
+                BIO *KeyBuffer = BIO_new_file(Name.c_str(), "a+");
+                int Result = 0;
+
                 if (T == Public)
                 {
-                    BIO *PublicKeyBuffer = BIO_new_file(Name.c_str(), "a+");
-                    int Result = PEM_write_bio_RSAPublicKey(PublicKeyBuffer, _Keys);
-
-                    if (Result != 1)
-                    {
-                        unsigned long Error = ERR_get_error();
-                        std::cout << "Public Key : " << ERR_reason_error_string(Error) << std::endl;
-                    }
-
-                    BIO_free_all(PublicKeyBuffer);
+                    Result = PEM_write_bio_RSAPublicKey(KeyBuffer, _Keys);
                 }
                 else
                 {
-
-                    BIO *PrivateKeyBuffer = BIO_new_file(Name.c_str(), "a+");
-                    int Result = PEM_write_bio_RSAPrivateKey(PrivateKeyBuffer, _Keys, NULL, NULL, 0, NULL, NULL);
-
-                    if (Result != 1)
-                    {
-                        unsigned long Error = ERR_get_error();
-                        std::cout << "Private Key : " << ERR_reason_error_string(Error) << std::endl;
-                    }
-
-                    BIO_free_all(PrivateKeyBuffer);
+                    Result = PEM_write_bio_RSAPrivateKey(KeyBuffer, _Keys, NULL, NULL, 0, NULL, NULL);
                 }
+
+                if (Result != 1)
+                {
+                    unsigned long Error = ERR_get_error();
+                    std::cout << "Key : " << ERR_reason_error_string(Error) << std::endl;
+                }
+
+                BIO_free_all(KeyBuffer);
             }
 
             // ##  Static functiosn
@@ -378,13 +432,13 @@ namespace Core
                 return RSA_new();
             }
 
-            static Key *Generate(int Lenght)
+            static Key *Generate(int BitLenght)
             {
                 Key *Keys = RSA_new();
                 BIGNUM *bn = BN_new();
                 BN_set_word(bn, RSA_F4);
 
-                int Result = RSA_generate_key_ex(Keys, Lenght, bn, NULL);
+                int Result = RSA_generate_key_ex(Keys, BitLenght, bn, NULL);
 
                 BN_free(bn);
 

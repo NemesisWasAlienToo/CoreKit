@@ -77,6 +77,23 @@ namespace Core
                 return _Length;
             }
 
+            void Resize(size_t NewSize)
+            {
+                auto NewData = new T[NewSize];
+                auto Bound = std::min(NewSize, _Length);
+
+                for (size_t i = 0; i < Bound; i++)
+                {
+                    NewData[i] = _Content[i];
+                }
+
+                free(_Content);
+
+                _Length = NewSize;
+
+                _Content = NewData;
+            }
+
             bool Contains(const T &Item) const
             {
                 for (size_t i = 0; i < _Length; i++)

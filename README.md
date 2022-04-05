@@ -107,8 +107,8 @@ Checked items are implemented completly at the moment and unchecked items are to
 
 - Cryptography:
     - Add SHA3
-    - Add AES
     - Move States to heap to protect user against leaks
+    - RSA Error handling
 
 - Http:
     - Optimize HTTP Server event loop

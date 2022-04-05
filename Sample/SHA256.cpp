@@ -1,33 +1,21 @@
 #include <iostream>
-#include <fstream>
 #include <string>
-#include <thread>
 
-#include "Iterable/List.hpp"
-#include "Cryptography/Digest.hpp"
+#include <Cryptography/Digest.hpp>
+#include <Format/Hex.hpp>
 
 using namespace Core;
 
 int main(int argc, char const *argv[])
 {
-    if(argc < 2) {
-        std::cout << "Enter filename" << std::endl;
-        return 0;
-    }
-
-    std::string Line;
     std::string Content;
 
-    std::ifstream MyReadFile(argv[1]);
+    std::cout << "Enter your text" << std::endl;
+    std::cin >> Content;
 
-    while (std::getline(MyReadFile, Line))
-    {
-        Content += Line;
-    }
+    auto Hash = Cryptography::SHA256::Bytes(reinterpret_cast<const unsigned char*>(Content.c_str()), Content.length());
 
-    MyReadFile.close();
-
-    std::cout << Cryptography::SHA256::Hex(Content) << std::endl;
+    std::cout << Format::Hex::From(Hash) << std::endl;
 
     return 0;
 }
