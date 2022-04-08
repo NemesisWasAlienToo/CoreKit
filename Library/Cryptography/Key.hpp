@@ -77,6 +77,8 @@ namespace Core
 
             // Statics
 
+            // @todo Maybe change byte size to bit size?
+
             static Key Generate(size_t size)
             {
                 Key Result(size);

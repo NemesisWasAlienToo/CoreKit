@@ -66,8 +66,8 @@ Checked items are implemented completly at the moment and unchecked items are to
     - [x] EndPoint : End-Point consisting of address, port and some version specific fields 
     - [x] Socket
     - [ ] Http:
-        - [ ] : Request
-        - [ ] : Response
+        - [x] : Request
+        - [x] : Response
         - [ ] : Server
 
     - [ ] DHT : Distributed Hash Table runners and tools

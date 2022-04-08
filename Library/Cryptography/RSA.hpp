@@ -45,6 +45,12 @@ namespace Core
             Key *_Keys = NULL;
             RSAPadding _Padding = OAEP;
 
+            inline static void HandleErrors()
+            {
+                // ERR_error_string(Error, Err);
+                throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
+            }
+
         public:
             // ## Constructors
 
@@ -104,9 +110,7 @@ namespace Core
 
                 if (Result < 1)
                 {
-                    unsigned long Error = ERR_get_error();
-                    std::cout << "RSA : " << ERR_reason_error_string(Error) << std::endl;
-                    exit(-1);
+                    HandleErrors();
                 }
 
                 return Result;
@@ -131,8 +135,8 @@ namespace Core
                 }
 
                 // @todo Optimize this later
-                
-                if(Result != CypherSize())
+
+                if (Result != CypherSize())
                     Cypher.Resize(Result);
 
                 return Cypher;
@@ -157,9 +161,7 @@ namespace Core
 
                 if (Result < 1)
                 {
-                    unsigned long Error = ERR_get_error();
-                    std::cout << "RSA : " << ERR_reason_error_string(Error) << std::endl;
-                    exit(-1);
+                    HandleErrors();
                 }
 
                 return Result;
@@ -178,14 +180,12 @@ namespace Core
 
                 if (Result < 1)
                 {
-                    unsigned long Error = ERR_get_error();
-                    std::cout << "RSA : " << ERR_reason_error_string(Error) << std::endl;
-                    exit(-1);
+                    HandleErrors();
                 }
 
                 // @todo Optimize this later
 
-                if(Result != PlainSize())
+                if (Result != PlainSize())
                     Plain.Resize(Result);
 
                 return Plain;
@@ -334,13 +334,12 @@ namespace Core
                     Result = PEM_write_bio_RSAPrivateKey(KeyBuffer, _Keys, NULL, NULL, 0, NULL, NULL);
                 }
 
+                BIO_free_all(KeyBuffer);
+
                 if (Result != 1)
                 {
-                    unsigned long Error = ERR_get_error();
-                    std::cout << "Key : " << ERR_reason_error_string(Error) << std::endl;
+                    HandleErrors();
                 }
-
-                BIO_free_all(KeyBuffer);
             }
 
             // ##  Static functiosn
@@ -350,37 +349,27 @@ namespace Core
             {
                 Key *_New = RSA_new();
 
-                if (T == Public)
+                BIO *KeyBuffer = BIO_new(BIO_s_mem());
+                int Result;
+
+                if constexpr (T == Public)
                 {
-                    BIO *PublicKeyBuffer = BIO_new(BIO_s_mem());
-                    BIO_write(PublicKeyBuffer, Value.c_str(), Value.length());
-                    int Result = PEM_write_bio_RSAPublicKey(PublicKeyBuffer, _New);
 
-                    if (Result != 1)
-                    {
-                        unsigned long Error = ERR_get_error();
-                        char Err[200];
-                        std::cout << "Public Key : " << ERR_reason_error_string(Error) << std::endl;
-                        ERR_error_string(Error, Err);
-                        std::cout << "Public Key : " << Err << std::endl;
-                    }
-
-                    BIO_free_all(PublicKeyBuffer);
+                    BIO_write(KeyBuffer, Value.c_str(), Value.length());
+                    Result = PEM_write_bio_RSAPublicKey(KeyBuffer, _New);
                 }
                 else
                 {
 
-                    BIO *PrivateKeyBuffer = BIO_new(BIO_s_mem());
-                    BIO_write(PrivateKeyBuffer, Value.c_str(), Value.length());
-                    int Result = PEM_write_bio_RSAPrivateKey(PrivateKeyBuffer, _New, NULL, NULL, 0, NULL, NULL);
+                    BIO_write(KeyBuffer, Value.c_str(), Value.length());
+                    Result = PEM_write_bio_RSAPrivateKey(KeyBuffer, _New, NULL, NULL, 0, NULL, NULL);
+                }
 
-                    if (Result != 1)
-                    {
-                        unsigned long Error = ERR_get_error();
-                        std::cout << "Private Key : " << ERR_reason_error_string(Error) << std::endl;
-                    }
+                BIO_free_all(KeyBuffer);
 
-                    BIO_free_all(PrivateKeyBuffer);
+                if (Result != 1)
+                {
+                    HandleErrors();
                 }
 
                 return _New;
@@ -390,33 +379,24 @@ namespace Core
             static RSA FromFile(const std::string &Name)
             {
                 Key *_New = RSA_new();
+                BIO *KeyBuffer = BIO_new_file(Name.c_str(), "r+");
+                Key *Result;
 
-                if (T == Public)
+                if constexpr (T == Public)
                 {
-                    BIO *PublicKeyBuffer = BIO_new_file(Name.c_str(), "r+");
-                    Key *Result = PEM_read_bio_RSAPublicKey(PublicKeyBuffer, &_New, NULL, NULL);
-
-                    if (Result != _New)
-                    {
-                        unsigned long Error = ERR_get_error();
-                        std::cout << "Public From : " << ERR_reason_error_string(Error) << std::endl;
-                    }
-
-                    BIO_free_all(PublicKeyBuffer);
+                    Result = PEM_read_bio_RSAPublicKey(KeyBuffer, &_New, NULL, NULL);
                 }
                 else
                 {
 
-                    BIO *PrivateKeyBuffer = BIO_new_file(Name.c_str(), "r+");
-                    Key *Result = PEM_read_bio_RSAPrivateKey(PrivateKeyBuffer, &_New, NULL, NULL);
+                    Result = PEM_read_bio_RSAPrivateKey(KeyBuffer, &_New, NULL, NULL);
+                }
 
-                    if (Result != _New)
-                    {
-                        unsigned long Error = ERR_get_error();
-                        std::cout << "Private From : " << ERR_reason_error_string(Error) << std::endl;
-                    }
+                BIO_free_all(KeyBuffer);
 
-                    BIO_free_all(PrivateKeyBuffer);
+                if (Result != _New)
+                {
+                    HandleErrors();
                 }
 
                 return _New;
@@ -444,9 +424,7 @@ namespace Core
 
                 if (Result < 1)
                 {
-                    unsigned long Error = ERR_get_error();
-                    std::cout << "RSA : " << ERR_reason_error_string(Error) << std::endl;
-                    exit(-1);
+                    HandleErrors();
                 }
 
                 return Keys;

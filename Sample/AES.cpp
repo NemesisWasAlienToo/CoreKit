@@ -13,11 +13,11 @@ int main(int argc, char const *argv[])
 
     std::string Content = STDIN.ReadLine();
 
-    Cryptography::AES<Cryptography::AESModes::ECB, 128> AES(Cryptography::Key::Generate(128 / 8), Cryptography::Key::Generate(128 / 8));
+    Cryptography::AES<256> AES(Cryptography::Key::Generate(256 / 8), Cryptography::Key::Generate(128 / 8));
 
-    auto Cypher = AES.Encrypt(reinterpret_cast<const unsigned char *>(Content.c_str()), Content.length() + 1);
+    auto Cypher = AES.Encrypt<Cryptography::AESModes::CTR>(reinterpret_cast<const unsigned char *>(Content.c_str()), Content.length() + 1);
 
-    auto Plain = AES.Decrypt(Cypher);
+    auto Plain = AES.Decrypt<Cryptography::AESModes::CTR>(Cypher);
 
     std::cout << "Plain: " << Plain.Content() << std::endl;
 

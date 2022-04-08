@@ -17,84 +17,102 @@ namespace Core
     namespace Cryptography
     {
         enum class AESModes
-            {
-                ECB,
-                CBC,
-                CFB
-            };
+        {
+            ECB,
+            CBC,
+            CFB,
+            OFB,
+            CTR
+        };
 
-        template <AESModes TMode, size_t TLength>
+        template <size_t TLength>
         class AES
         {
-        public:
+        private:
             typedef const EVP_CIPHER *(*ModePointer)();
 
-        private:
             Cryptography::Key _Key;
             Cryptography::Key _IV;
 
             ModePointer _Mode;
 
-        public:
-            AES() = default;
-            AES(Cryptography::Key Key, Cryptography::Key IV) : _Key(Key), _IV(IV)
+            inline static void HandleErrors()
             {
-                // @todo : Check if key and IV are valid
-                // @todo : Optimize this :/
+                throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
+            }
 
-                if ((Key.Size * 8) != TLength)
-                {
-                    throw std::runtime_error("Key length must be " + std::to_string(TLength));
-                }
-                
-                // if ((IV.Size * 8) != TLength)
-                // {
-                //     throw std::runtime_error("IV length must be " + std::to_string(TLength));
-                // }
+            // @todo : Optimize this :/
 
+            template <AESModes Mode>
+            inline static constexpr ModePointer GetMode()
+            {
                 if constexpr (TLength == 128)
                 {
-                    if constexpr (TMode == AESModes::ECB)
+                    if constexpr (Mode == AESModes::ECB)
                     {
-                        _Mode = EVP_aes_128_ecb;
+                        return EVP_aes_128_ecb;
                     }
-                    else if constexpr (TMode == AESModes::CBC)
+                    else if constexpr (Mode == AESModes::CBC)
                     {
-                        _Mode = EVP_aes_128_cbc;
+                        return EVP_aes_128_cbc;
                     }
-                    else if constexpr (TMode == AESModes::CFB)
+                    else if constexpr (Mode == AESModes::CFB)
                     {
-                        _Mode = EVP_aes_128_cfb;
+                        return EVP_aes_128_cfb;
+                    }
+                    else if constexpr (Mode == AESModes::OFB)
+                    {
+                        return EVP_aes_128_ofb;
+                    }
+                    else if constexpr (Mode == AESModes::CTR)
+                    {
+                        return EVP_aes_128_ctr;
                     }
                 }
                 else if constexpr (TLength == 192)
                 {
-                    if constexpr (TMode == AESModes::ECB)
+                    if constexpr (Mode == AESModes::ECB)
                     {
-                        _Mode = EVP_aes_192_ecb;
+                        return EVP_aes_192_ecb;
                     }
-                    else if constexpr (TMode == AESModes::CBC)
+                    else if constexpr (Mode == AESModes::CBC)
                     {
-                        _Mode = EVP_aes_192_cbc;
+                        return EVP_aes_192_cbc;
                     }
-                    else if constexpr (TMode == AESModes::CFB)
+                    else if constexpr (Mode == AESModes::CFB)
                     {
-                        _Mode = EVP_aes_192_cfb;
+                        return EVP_aes_192_cfb;
+                    }
+                    else if constexpr (Mode == AESModes::OFB)
+                    {
+                        return EVP_aes_192_ofb;
+                    }
+                    else if constexpr (Mode == AESModes::CTR)
+                    {
+                        return EVP_aes_192_ctr;
                     }
                 }
                 else if constexpr (TLength == 256)
                 {
-                    if constexpr (TMode == AESModes::ECB)
+                    if constexpr (Mode == AESModes::ECB)
                     {
-                        _Mode = EVP_aes_256_ecb;
+                        return EVP_aes_256_ecb;
                     }
-                    else if constexpr (TMode == AESModes::CBC)
+                    else if constexpr (Mode == AESModes::CBC)
                     {
-                        _Mode = EVP_aes_256_cbc;
+                        return EVP_aes_256_cbc;
                     }
-                    else if constexpr (TMode == AESModes::CFB)
+                    else if constexpr (Mode == AESModes::CFB)
                     {
-                        _Mode = EVP_aes_256_cfb;
+                        return EVP_aes_256_cfb;
+                    }
+                    else if constexpr (Mode == AESModes::OFB)
+                    {
+                        return EVP_aes_256_ofb;
+                    }
+                    else if constexpr (Mode == AESModes::CTR)
+                    {
+                        return EVP_aes_256_ctr;
                     }
                 }
                 else
@@ -103,23 +121,79 @@ namespace Core
                 }
             }
 
-            int PlainSize()
+        public:
+            static constexpr int BlockSize = 128 / 8;
+
+            AES() = default;
+            AES(Cryptography::Key Key, Cryptography::Key IV) : _Key(Key), _IV(IV)
             {
-                return TLength / 8;
+                // @todo : Check if key and IV are valid
+
+                if ((Key.Size * 8) != TLength)
+                {
+                    throw std::runtime_error("Key length must be " + std::to_string(TLength));
+                }
             }
 
-            int CypherSize()
+            inline Cryptography::Key Key() const
             {
-                return TLength / 8;
+                return _Key;
             }
 
-            void handleErrors(void)
+            inline Cryptography::Key IV() const
             {
-                ERR_print_errors_fp(stderr);
-                abort();
+                return _IV;
             }
 
-            int Encrypt(const unsigned char *Plain, int Size, unsigned char *Cypher)
+            inline Cryptography::Key &Key()
+            {
+                return _Key;
+            }
+
+            inline Cryptography::Key &IV()
+            {
+                return _IV;
+            }
+
+            // @todo Implement
+
+            template <AESModes Mode>
+            static constexpr size_t PlainSize(size_t CypherSize)
+            {
+                return CypherSize;
+            }
+
+            template <AESModes Mode>
+            static constexpr size_t CypherSize(size_t PlainSize)
+            {
+                switch (Mode)
+                {
+                case AESModes::CFB:
+                {
+                    return PlainSize;
+                }
+                case AESModes::OFB:
+                {
+                    return PlainSize;
+                }
+                case AESModes::CTR:
+                {
+                    return PlainSize;
+                }
+                // case AESModes::CCM:
+                // {
+                //     return PlainSize;
+                // }
+                default:
+                {
+                    auto Temp = PlainSize % BlockSize;
+                    return Temp ? ((PlainSize - Temp) + BlockSize) : PlainSize;
+                }
+                }
+            }
+
+            template <AESModes TMode>
+            int Encrypt(const unsigned char *Plain, int Size, unsigned char *Cypher) const
             {
                 EVP_CIPHER_CTX *ctx;
 
@@ -128,35 +202,25 @@ namespace Core
                 int ciphertext_len;
 
                 if (!(ctx = EVP_CIPHER_CTX_new()))
-                    handleErrors();
+                    HandleErrors();
 
-                /*
-                 * Initialise the encryption operation. IMPORTANT - ensure you use a key
-                 * and IV size appropriate for your cipher
-                 * In this example we are using 256 bit AES (i.e. a 256 bit key). The
-                 * IV size for *most* modes is the same as the block size. For AES this
-                 * is 128 bits
-                 */
                 if (1 != EVP_EncryptInit_ex(
                              ctx,
-                             _Mode(),
+                             (GetMode<TMode>())(),
                              NULL,
                              reinterpret_cast<const unsigned char *>(_Key.Data),
                              reinterpret_cast<const unsigned char *>(_IV.Data)))
-                    handleErrors();
+                    //  NULL))
+                    HandleErrors();
 
                 if (1 != EVP_EncryptUpdate(ctx, Cypher, &len, Plain, Size))
-                    handleErrors();
+                    HandleErrors();
 
                 ciphertext_len = len;
 
-                /*
-                 * Finalise the encryption. Further ciphertext bytes may be written at
-                 * this stage.
-                 */
                 if (1 != EVP_EncryptFinal_ex(ctx, Cypher + len, &len))
-                    handleErrors();
-                
+                    HandleErrors();
+
                 ciphertext_len += len;
 
                 EVP_CIPHER_CTX_free(ctx);
@@ -164,13 +228,14 @@ namespace Core
                 return ciphertext_len;
             }
 
-            Iterable::Span<char> Encrypt(const unsigned char *Plain, int Size)
+            template <AESModes TMode>
+            Iterable::Span<char> Encrypt(const unsigned char *Plain, int Size) const
             {
-                Iterable::Span<char> Cypher(CypherSize());
+                Iterable::Span<char> Cypher(CypherSize<TMode>(Size));
 
-                int len = Encrypt(Plain, Size, reinterpret_cast<unsigned char *>(Cypher.Content()));
+                int len = Encrypt<TMode>(Plain, Size, reinterpret_cast<unsigned char *>(Cypher.Content()));
 
-                if(len != CypherSize())
+                if (static_cast<size_t>(len) != Cypher.Length())
                 {
                     Cypher.Resize(len);
                 }
@@ -178,12 +243,14 @@ namespace Core
                 return Cypher;
             }
 
-            Iterable::Span<char> Encrypt(const Iterable::Span<char>& Plain)
+            template <AESModes TMode>
+            Iterable::Span<char> Encrypt(const Iterable::Span<char> &Plain) const
             {
-                return Encrypt(reinterpret_cast<const unsigned char *>(Plain.Content()), Plain.Length());
+                return Encrypt<TMode>(reinterpret_cast<const unsigned char *>(Plain.Content()), Plain.Length());
             }
 
-            int Decrypt(const unsigned char *Cypher, int Size, unsigned char *Plain)
+            template <AESModes TMode>
+            int Decrypt(const unsigned char *Cypher, int Size, unsigned char *Plain) const
             {
                 EVP_CIPHER_CTX *ctx;
 
@@ -192,35 +259,25 @@ namespace Core
                 int ciphertext_len;
 
                 if (!(ctx = EVP_CIPHER_CTX_new()))
-                    handleErrors();
+                    HandleErrors();
 
-                /*
-                 * Initialise the encryption operation. IMPORTANT - ensure you use a key
-                 * and IV size appropriate for your cipher
-                 * In this example we are using 256 bit AES (i.e. a 256 bit key). The
-                 * IV size for *most* modes is the same as the block size. For AES this
-                 * is 128 bits
-                 */
                 if (1 != EVP_DecryptInit_ex(
                              ctx,
-                             _Mode(),
+                             (GetMode<TMode>())(),
                              NULL,
                              reinterpret_cast<const unsigned char *>(_Key.Data),
                              reinterpret_cast<const unsigned char *>(_IV.Data)))
-                    handleErrors();
+                    //  NULL))
+                    HandleErrors();
 
                 if (1 != EVP_DecryptUpdate(ctx, Plain, &len, Cypher, Size))
-                    handleErrors();
+                    HandleErrors();
 
                 ciphertext_len = len;
 
-                /*
-                 * Finalise the encryption. Further ciphertext bytes may be written at
-                 * this stage.
-                 */
                 if (1 != EVP_DecryptFinal_ex(ctx, Plain + len, &len))
-                    handleErrors();
-                
+                    HandleErrors();
+
                 ciphertext_len += len;
 
                 EVP_CIPHER_CTX_free(ctx);
@@ -228,13 +285,14 @@ namespace Core
                 return ciphertext_len;
             }
 
-            Iterable::Span<char> Decrypt(const unsigned char *Cypher, int Size)
+            template <AESModes TMode>
+            Iterable::Span<char> Decrypt(const unsigned char *Cypher, int Size) const
             {
-                Iterable::Span<char> Plain(PlainSize());
+                Iterable::Span<char> Plain(PlainSize<TMode>(Size));
 
-                int len = Decrypt(Cypher, Size, reinterpret_cast<unsigned char *>(Plain.Content()));
+                int len = Decrypt<TMode>(Cypher, Size, reinterpret_cast<unsigned char *>(Plain.Content()));
 
-                if(len != PlainSize())
+                if (static_cast<size_t>(len) != Plain.Length())
                 {
                     Plain.Resize(len);
                 }
@@ -242,9 +300,10 @@ namespace Core
                 return Plain;
             }
 
-            Iterable::Span<char> Decrypt(const Iterable::Span<char>& Cypher)
+            template <AESModes TMode>
+            Iterable::Span<char> Decrypt(const Iterable::Span<char> &Cypher) const
             {
-                return Decrypt(reinterpret_cast<const unsigned char *>(Cypher.Content()), Cypher.Length());
+                return Decrypt<TMode>(reinterpret_cast<const unsigned char *>(Cypher.Content()), Cypher.Length());
             }
         };
     }
