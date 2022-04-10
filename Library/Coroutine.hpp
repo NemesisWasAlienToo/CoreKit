@@ -154,32 +154,29 @@ namespace Core
     class Coroutine<void(TArgs...)> : public __Coroutine_Helper
     {
     protected:
-        using ArgsContainer = std::tuple<TArgs...>;
+        static_assert(!(std::is_reference_v<TArgs> || ...), "Coroutine arguments can't be reference, use pointers instead");
 
-        ArgsContainer *_Args;
+        template <size_t N>
+        using TArgument = std::tuple_element_t<N, std::tuple<TArgs...>>;
+
+        using ArgsContainer = std::tuple<std::remove_const_t<TArgs>...>;
+
+        ArgsContainer _Args;
 
     public:
         Coroutine() = default;
 
         Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize) {}
 
-        ~Coroutine()
-        {
-            delete _Args;
-            _Args = nullptr;
-        }
+        ~Coroutine() = default;
 
         // Peroperties
 
-        ArgsContainer &Arguments()
-        {
-            return *_Args;
-        }
-
         template <size_t TNumber>
-        auto &Argument()
+        constexpr TArgument<TNumber> &
+        Argument()
         {
-            return std::get<TNumber>(*_Args);
+            return std::get<TNumber>(_Args);
         }
 
         // Functionalities
@@ -188,14 +185,7 @@ namespace Core
         {
             SaveRegs;
 
-            // Must allocate new space cus if TReturn is const, it cannot be assigned without reallocating
-
-            if (_Args != nullptr)
-            {
-                delete _Args;
-            }
-
-            _Args = new ArgsContainer(std::forward<TArgs>(Args)...);
+            _Args = ArgsContainer(std::forward<TArgs>(Args)...);
 
             if (!this->Parent.Save())
             {
@@ -223,14 +213,7 @@ namespace Core
         {
             SaveRegs;
 
-            if (_Args == nullptr)
-            {
-                _Args = new ArgsContainer(std::forward<TArgs>(Args)...);
-            }
-            else
-            {
-                *_Args = ArgsContainer(std::forward<TArgs>(Args)...);
-            }
+            _Args = ArgsContainer(std::forward<TArgs>(Args)...);
 
             if (!this->Parent.Save())
             {
@@ -292,55 +275,44 @@ namespace Core
     class Coroutine<TReturn(TArgs...)> : public __Coroutine_Helper
     {
     protected:
-        using ArgsContainer = std::tuple<TArgs...>;
-        using RetContainer = std::tuple<TReturn>;
+        static_assert(!(std::is_reference_v<TArgs> || ...), "Coroutine arguments can't be reference, use pointers instead");
+        static_assert(!std::is_reference_v<TReturn>, "Coroutine return type must not be reference, use pointers instead");
 
-        ArgsContainer *_Args = nullptr;
-        RetContainer *_Return = nullptr;
+        template <size_t N>
+        using TArgument = std::tuple_element_t<N, std::tuple<TArgs...>>;
+
+        // Types
+
+        using ArgsContainer = std::tuple<std::remove_const_t<TArgs>...>;
+
+        // Internal variables
+
+        ArgsContainer _Args;
+        TReturn _Return;
 
     public:
         Coroutine() = default;
 
         Coroutine(size_t stackSize) : __Coroutine_Helper(stackSize) {}
 
-        ~Coroutine()
-        {
-            delete _Args;
-            _Args = nullptr;
-
-            delete _Return;
-            _Return = nullptr;
-        }
+        ~Coroutine() = default;
 
         // Peroperties
 
         template <size_t TNumber>
-        constexpr auto &Argument()
+        constexpr TArgument<TNumber> &
+        Argument()
         {
-            return std::get<TNumber>(*_Args);
-        }
-
-        constexpr TReturn &Return()
-        {
-            return std::get<0>(*_Return);
+            return std::get<TNumber>(_Args);
         }
 
         // Functionalities
-
-        // @todo Take arguments by value
 
         TReturn Start(std::remove_reference_t<TArgs> &...Args)
         {
             SaveRegs;
 
-            // Must allocate new space cus if TReturn is const, it cannot be assigned without reallocating
-
-            if (_Args != nullptr)
-            {
-                delete _Args;
-            }
-
-            _Args = new ArgsContainer(std::forward<TArgs>(Args)...);
+            _Args = ArgsContainer(std::forward<TArgs>(Args)...);
 
             if (!this->Parent.Save())
             {
@@ -366,7 +338,7 @@ namespace Core
             {
                 // Returned
 
-                return std::forward<TReturn>(Return());
+                return std::forward<TReturn>(_Return);
             }
         }
 
@@ -374,14 +346,7 @@ namespace Core
         {
             SaveRegs;
 
-            if (_Args == nullptr)
-            {
-                _Args = new ArgsContainer(std::forward<TArgs>(Args)...);
-            }
-            else
-            {
-                *_Args = ArgsContainer(std::forward<TArgs>(Args)...);
-            }
+            _Args = ArgsContainer(std::forward<TArgs>(Args)...);
 
             if (!this->Parent.Save())
             {
@@ -407,7 +372,7 @@ namespace Core
             {
                 // Returned
 
-                return std::forward<TReturn>(Return());
+                return std::forward<TReturn>(_Return);
             }
         }
 
@@ -425,7 +390,7 @@ namespace Core
             }
             else
             {
-                return std::forward<TReturn>(Return());
+                return std::forward<TReturn>(_Return);
             }
         }
 
@@ -433,14 +398,7 @@ namespace Core
         {
             SaveRegs;
 
-            if (_Return == nullptr)
-            {
-                _Return = new RetContainer(std::forward<TReturn>(Value));
-            }
-            else
-            {
-                *_Return = RetContainer(std::forward<TReturn>(Value));
-            }
+            _Return = std::forward<TReturn>(Value);
 
             if (!this->My.Save())
             {
@@ -452,14 +410,7 @@ namespace Core
         {
             SaveRegs;
 
-            if (_Return == nullptr)
-            {
-                _Return = new RetContainer(std::forward<TReturn>(Value));
-            }
-            else
-            {
-                *_Return = RetContainer(std::forward<TReturn>(Value));
-            }
+            _Return = std::forward<TReturn>(Value);
 
             if (!this->My.Save())
             {
@@ -469,14 +420,7 @@ namespace Core
 
         void Terminate(std::remove_reference_t<TReturn> &Value)
         {
-            // Must allocate new space cus if TReturn is const, it cannot be assigned without reallocating
-
-            if (_Return != nullptr)
-            {
-                delete _Return;
-            }
-
-            _Return = new RetContainer(std::forward<TReturn>(Value));
+            _Return = std::forward<TReturn>(Value);
 
             this->Finished = true;
 
@@ -485,14 +429,7 @@ namespace Core
 
         void Terminate(std::remove_reference_t<TReturn> &&Value)
         {
-            if (_Return == nullptr)
-            {
-                _Return = new RetContainer(std::forward<TReturn>(Value));
-            }
-            else
-            {
-                *_Return = RetContainer(std::forward<TReturn>(Value));
-            }
+            _Return = std::forward<TReturn>(Value);
 
             this->Finished = true;
 

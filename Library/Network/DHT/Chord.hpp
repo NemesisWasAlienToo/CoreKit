@@ -61,7 +61,7 @@ namespace Core
                             ent = Iterable::List<Node>(1);
                         });
 
-                    Entries[0].Add(Node{Identity, {"0.0.0.0:0"}});
+                    Entries[0].Add({Identity, {"0.0.0.0:0"}});
                 }
 
                 ~Chord() = default;
@@ -228,6 +228,8 @@ namespace Core
                 template <typename TCallback>
                 void ForEach(TCallback Callback)
                 {
+                    // Lock here
+                    
                     for (size_t i = 1; i < Entries.Length(); i++)
                     {
                         Callback(Entries[i]);
