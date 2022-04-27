@@ -22,11 +22,9 @@ int main(int argc, char const *argv[])
     {
         std::cout << Node.Id << " : ";
 
-        Serializer.Take<Iterable::Span<char>>().ForEach(
-            [](char c)
-            {
-                std::cout << c;
-            });
+        auto Data = Serializer.Take<Iterable::Span<char>>();
+
+        std::cout.write(Data.Content(), Data.Length());
 
         std::cout << std::endl;
     };

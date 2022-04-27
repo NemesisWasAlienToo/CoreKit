@@ -61,7 +61,7 @@ namespace Core
                             ent = Iterable::List<Node>(1);
                         });
 
-                    Entries[0].Add({Identity, {"0.0.0.0:0"}});
+                    Entries[0].Add(DHT::Node{Identity, {"0.0.0.0:0"}});
                 }
 
                 ~Chord() = default;

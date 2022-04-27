@@ -11,9 +11,11 @@
 #include <Iterable/Poll.hpp>
 #include <Iterable/List.hpp>
 #include <Network/Socket.hpp>
-#include <Network/DNS.hpp>
 #include <Network/HTTP/HTTP.hpp>
 #include <Format/Serializer.hpp>
+#include <Network/HTTP/Response.hpp>
+#include <Network/HTTP/Request.hpp>
+#include <Network/HTTP/Router.hpp>
 
 namespace Core
 {
@@ -41,6 +43,8 @@ namespace Core
                 volatile States State;
 
                 Iterable::Span<std::thread> Pool;
+
+                HTTP::Router Router;
 
                 void HandleClient(Network::Socket Client, Network::EndPoint Info)
                 {
@@ -119,16 +123,7 @@ namespace Core
 
                     // Handle request and form response
 
-                    Core::Network::HTTP::Response Res;
-
-                    Res.Version = "1.1";
-                    Res.Headers["Host"] = Network::DNS::HostName();
-
-                    OnRequest(Info, Req, Res);
-
-                    Res.Brief = StatusMessage.at(Res.Status);
-
-                    Res.Headers.insert_or_assign("Content-Length", std::to_string(Res.Content.length()));
+                    Core::Network::HTTP::Response Res = OnRequest(Info, Req);
 
                     // Serialize response
 
@@ -151,9 +146,16 @@ namespace Core
                     Client.Close();
                 }
 
-            public:
-                std::function<void(const Network::EndPoint &, const HTTP::Request &, HTTP::Response &)> OnRequest;
+                HTTP::Response OnRequest(const Network::EndPoint &Target, Network::HTTP::Request &Request)
+                {
+                    // Search in routes for match
 
+                    auto [Route, Parameters] = Router.Match(Request.Type, Request.Path);
+
+                    return Route.Action(Target, Request, Parameters);
+                }
+
+            public:
                 Server(const Network::EndPoint &Host, Duration Timout) : Socket(Network::Socket::IPv4, Network::Socket::TCP), Host(Host), TimeOut(Timout), State(States::Stopped)
                 {
                     Socket.Bind(Host);
@@ -167,9 +169,112 @@ namespace Core
                     Socket.Close();
                 }
 
-                void Listen(int Max)
+                // Functions
+
+                void SetDefault(const std::string &Pattern, HTTP::Router::Handler Action)
+                {
+                    Router.Default(
+                        HTTP::Router::Route::From(
+                            HTTP::Request::Methods::Any,
+                            Pattern,
+                            std::move(Action)));
+                }
+
+                void Set(HTTP::Request::Methods Method, const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                {
+                    Router.Add(
+                        HTTP::Router::Route::From(
+                            Method,
+                            Pattern,
+                            std::move(Action)));
+                }
+
+                void GET(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                {
+                    Set(
+                        HTTP::Request::Methods::GET,
+                        Pattern,
+                        std::move(Action));
+                }
+
+                void POST(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                {
+                    Set(
+                        HTTP::Request::Methods::POST,
+                        Pattern,
+                        std::move(Action));
+                }
+
+                void PUT(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                {
+                    Set(
+                        HTTP::Request::Methods::PUT,
+                        Pattern,
+                        std::move(Action));
+                }
+
+                void DELETE(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                {
+                    Set(
+                        HTTP::Request::Methods::DELETE,
+                        Pattern,
+                        std::move(Action));
+                }
+
+                void HEAD(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                {
+                    Set(
+                        HTTP::Request::Methods::HEAD,
+                        Pattern,
+                        std::move(Action));
+                }
+
+                void OPTIONS(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                {
+                    Set(
+                        HTTP::Request::Methods::OPTIONS,
+                        Pattern,
+                        std::move(Action));
+                }
+
+                void PATCH(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                {
+                    Set(
+                        HTTP::Request::Methods::PATCH,
+                        Pattern,
+                        std::move(Action));
+                }
+
+                void TRACE(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                {
+                    Set(
+                        HTTP::Request::Methods::TRACE,
+                        Pattern,
+                        std::move(Action));
+                }
+
+                void CONNECT(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                {
+                    Set(
+                        HTTP::Request::Methods::CONNECT,
+                        Pattern,
+                        std::move(Action));
+                }
+
+                void Any(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                {
+                    Set(
+                        HTTP::Request::Methods::Any,
+                        Pattern,
+                        std::move(Action));
+                }
+
+                // Startup functions
+
+                HTTP::Server& Listen(int Max)
                 {
                     Socket.Listen(Max);
+                    return *this;
                 }
 
                 void GetInPool()
@@ -196,7 +301,7 @@ namespace Core
                     }
                 }
 
-                void Start(int Count = std::thread::hardware_concurrency())
+                HTTP::Server& Start(int Count = std::thread::hardware_concurrency())
                 {
                     Pool = Iterable::Span<std::thread>(Count);
 

@@ -497,7 +497,7 @@ namespace Core
             }
 
             template <class TCallback>
-            bool ContainsWhere(TCallback Condition) const
+            std::tuple <bool, size_t> ContainsWhere(TCallback Condition) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -505,28 +505,11 @@ namespace Core
 
                     if (Condition(item))
                     {
-                        return true;
+                        return {true, i};
                     }
                 }
 
-                return false;
-            }
-
-            template <class TCallback>
-            bool ContainsWhere(TCallback Condition, size_t First) const
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    const T &item = _ElementAt(i);
-
-                    if (Condition(item))
-                    {
-                        First = i;
-                        return true;
-                    }
-                }
-
-                return false;
+                return {false, 0};
             }
 
             template <typename O, class TCallback>

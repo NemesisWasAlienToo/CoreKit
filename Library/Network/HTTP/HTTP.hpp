@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <map>
+#include <regex>
 
 #include <Duration.hpp>
 #include <Iterable/List.hpp>
@@ -18,6 +19,7 @@ namespace Core
     {
         namespace HTTP
         {
+            // @todo Move this to response
             enum class Status : unsigned short
             {
                 Continue = 100,
@@ -62,7 +64,7 @@ namespace Core
                 HTTPVersionNotSupported = 505
             };
 
-            const std::string Message[]{
+            std::string const Message[]{
                 "Continue",
                 "Switching Protocols",
                 "OK",
@@ -104,7 +106,7 @@ namespace Core
                 "Gateway Timeout",
                 "HTTP Version Not Supported"};
 
-            const std::map<Status, std::string> StatusMessage{
+            std::map<Status, std::string> const StatusMessage{
                 {Status::Continue, "Continue"},
                 {Status::SwitchingProtocols, "Switching Protocols"},
                 {Status::OK, "OK"},
@@ -146,6 +148,8 @@ namespace Core
                 {Status::GatewayTimeout, "Gateway Timeout"},
                 {Status::HTTPVersionNotSupported, "HTTP Version Not Supported"}};
 
+            std::string const MethodStrings[]{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "CONNECT", "PATCH", ""};
+
             class Common
             {
             public:
@@ -156,311 +160,77 @@ namespace Core
                 virtual std::string ToString() const = 0;
             };
 
-            class Request : public Common
+            void applicationForm(const std::string &Message, std::map<std::string, std::string> &Result)
             {
-            public:
-                std::string Type;
-                std::string Path;
+                std::regex Capture("([^&]+)=([^&]+)");
 
-                std::string ToString() const
+                auto QueryBegin = std::sregex_iterator(Message.begin(), Message.end(), Capture);
+                auto QueryEnd = std::sregex_iterator();
+
+                std::smatch Matches;
+
+                for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
                 {
-                    std::string str = Type + " " + Path + " HTTP/" + Version + "\r\n";
-                    for (auto const &kv : Headers)
-                        str += kv.first + ": " + kv.second + "\r\n";
-
-                    return str + "\r\n" + Content;
+                    std::cout << i->str(1) << " : " << i->str(2) << std::endl;
+                    Result[i->str(1)] = i->str(2);
                 }
-
-                static Request From(const std::string &Method, const std::string &Path, const std::string &Version = "1.1", const std::map<std::string, std::string> &Headers = {}, const std::string &Content = "")
-                {
-                    Request request;
-                    request.Type = Method;
-                    request.Path = Path;
-                    request.Version = Version;
-                    request.Headers = Headers;
-                    request.Content = Content;
-                    return request;
-                }
-
-                static Request From(const std::string &Text, size_t BodyIndex = 0)
-                {
-                    size_t Cursor = 0;
-                    Request ret;
-
-                    auto _Sepration = BodyIndex ? BodyIndex : Text.find("\r\n\r\n");
-
-                    // Pars headers
-
-                    {
-                        // Pars first line
-
-                        // Pars method
-
-                        size_t CursorTmp = Text.find(' ', Cursor);
-                        ret.Type = Text.substr(Cursor, CursorTmp - Cursor);
-                        Cursor = CursorTmp + 1;
-
-                        // Pars path
-
-                        CursorTmp = Text.find(" HTTP/", Cursor);
-                        ret.Path = Text.substr(Cursor, CursorTmp - Cursor);
-                        Cursor = CursorTmp + 6;
-
-                        // Pars version
-
-                        CursorTmp = Text.find("\r\n", Cursor);
-                        ret.Version = Text.substr(Cursor, CursorTmp - Cursor);
-                        Cursor = CursorTmp + 2;
-                    }
-
-                    // Pars the rest of the headers
-
-                    {
-                        while (Cursor < _Sepration)
-                        {
-                            // Find key
-
-                            size_t CursorTmp = Text.find(": ", Cursor);
-                            std::string HeaderKey = Text.substr(Cursor, CursorTmp - Cursor);
-                            Cursor = CursorTmp + 2;
-
-                            // Find value
-
-                            CursorTmp = Text.find("\r\n", Cursor);
-                            std::string HeaderValue = Text.substr(Cursor, CursorTmp - Cursor);
-                            Cursor = CursorTmp + 2;
-
-                            ret.Headers.insert_or_assign(std::move(HeaderKey), std::move(HeaderValue));
-                        }
-                    }
-
-                    // Pars the body
-
-                    ret.Content = Text.substr(_Sepration + 4);
-
-                    return ret;
-                }
-
-                static Request From(const std::string &Method, const std::string &Path, const std::string &Content)
-                {
-                    return Request::From(
-                        Method,
-                        Path,
-                        "1.1",
-                        {{"Host", Network::DNS::HostName()}, {"Connection", "closed"}, {"Content-Length", std::to_string(Content.size())}},
-                        Content);
-                }
-                
-                static Request Get(const std::string &Path)
-                {
-                    return Request::From(
-                        "GET",
-                        Path,
-                        "1.1",
-                        {{"Host", Network::DNS::HostName()}, {"Connection", "closed"}},
-                        "");
-                }
-
-                static Request Post(const std::string &Path, const std::string &Content)
-                {
-                    return Request::From(
-                        "POST",
-                        Path,
-                        "1.1",
-                        {{"Host", Network::DNS::HostName()}, {"Connection", "closed"}, {"Content-Length", std::to_string(Content.size())}},
-                        Content);
-                }
-
-                static Request Put(const std::string &Path, const std::string &Content)
-                {
-                    return Request::From(
-                        "PUT",
-                        Path,
-                        "1.1",
-                        {{"Host", Network::DNS::HostName()}, {"Connection", "closed"}, {"Content-Length", std::to_string(Content.size())}},
-                        Content);
-                }
-
-                static Request Delete(const std::string &Path)
-                {
-                    return Request::From(
-                        "DELETE",
-                        Path,
-                        "1.1",
-                        {{"Host", Network::DNS::HostName()}, {"Connection", "closed"}},
-                        "");
-                }
-
-                static Request Options(const std::string &Path)
-                {
-                    return Request::From(
-                        "OPTIONS",
-                        Path,
-                        "1.1",
-                        {{"Host", Network::DNS::HostName()}, {"Connection", "closed"}},
-                        "");
-                }
-
-                static Request Head(const std::string &Path)
-                {
-                    return Request::From(
-                        "HEAD",
-                        Path,
-                        "1.1",
-                        {{"Host", Network::DNS::HostName()}, {"Connection", "closed"}},
-                        "");
-                }
-
-                static Request Trace(const std::string &Path)
-                {
-                    return Request::From(
-                        "TRACE",
-                        Path,
-                        "1.1",
-                        {{"Host", Network::DNS::HostName()}, {"Connection", "closed"}},
-                        "");
-                }
-
-                static Request Connect(const std::string &Path)
-                {
-                    return Request::From(
-                        "CONNECT",
-                        Path,
-                        "1.1",
-                        {{"Host", Network::DNS::HostName()}, {"Connection", "closed"}},
-                        "");
-                }
-
-                static Request Patch(const std::string &Path, const std::string &Content)
-                {
-                    return Request::From(
-                        "PATCH",
-                        Path,
-                        "1.1",
-                        {{"Host", Network::DNS::HostName()}, {"Connection", "closed"}, {"Content-Length", std::to_string(Content.size())}},
-                        Content);
-                }
-            };
-
-            class Response : public Common
-            {
-            public:
-                HTTP::Status Status;
-                std::string Brief;
-
-                std::string ToString() const
-                {
-                    std::string str = "HTTP/" + Version + " " + std::to_string(static_cast<unsigned short>(Status)) + " " + Brief + "\r\n";
-                    for (auto const &kv : Headers)
-                        str += kv.first + ": " + kv.second + "\r\n";
-
-                    return str + "\r\n" + Content;
-                }
-
-                static Response From(HTTP::Status Status, const std::string &Version = "1.1", const std::map<std::string, std::string> &Headers = {}, const std::string &Content = "")
-                {
-                    Response response;
-                    response.Status = Status;
-                    response.Version = Version;
-                    response.Headers = Headers;
-                    response.Content = Content;
-                    response.Brief = StatusMessage.at(Status);
-                    return response;
-                }
-
-                static Response From(const std::string &Text, size_t BodyIndex = 0)
-                {
-                    size_t Cursor = 5;
-                    Response ret;
-
-                    auto _Sepration = BodyIndex ? BodyIndex : Text.find("\r\n\r\n");
-
-                    // Pars headers
-
-                    {
-                        size_t CursorTmp = 0;
-
-                        // Pars first line
-
-                        // Pars version
-
-                        CursorTmp = Text.find(' ', Cursor);
-                        ret.Version = Text.substr(Cursor, CursorTmp - Cursor);
-                        Cursor = CursorTmp + 1;
-
-                        // Pars code
-
-                        CursorTmp = Text.find(' ', Cursor);
-                        ret.Status = HTTP::Status(std::stoul(Text.substr(Cursor, CursorTmp - Cursor)));
-                        Cursor = CursorTmp + 1;
-
-                        // Pars breif
-
-                        CursorTmp = Text.find("\r\n", Cursor);
-                        ret.Brief = Text.substr(Cursor, CursorTmp - Cursor);
-                        Cursor = CursorTmp + 6;
-                    }
-
-                    // Pars the rest of the headers
-
-                    {
-                        while (Cursor < _Sepration)
-                        {
-                            // Find key
-
-                            size_t CursorTmp = Text.find(": ", Cursor);
-                            std::string HeaderKey = Text.substr(Cursor, CursorTmp - Cursor);
-                            Cursor = CursorTmp + 2;
-
-                            // Find value
-
-                            CursorTmp = Text.find("\r\n", Cursor);
-                            std::string HeaderValue = Text.substr(Cursor, CursorTmp - Cursor);
-                            Cursor = CursorTmp + 2;
-
-                            ret.Headers.insert_or_assign(std::move(HeaderKey), std::move(HeaderValue));
-                        }
-                    }
-
-                    // Pars the body
-
-                    ret.Content = Text.substr(_Sepration + 4);
-
-                    return ret;
-                }
-            };
-
-            Response Send(const EndPoint Target, const Request &Request, Duration TimeOut = {0, 0})
-            {
-                Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP);
-
-                client.Connect(Target);
-
-                client.Await(Network::Socket::Out);
-
-                Iterable::Queue<char> buffer;
-                Format::Serializer Ser(buffer);
-
-                Ser << Request.ToString();
-
-                while (!buffer.IsEmpty())
-                {
-                    client << Ser;
-                }
-
-                Ser.Clear();
-
-                client.Await(Network::Socket::Out);
-
-                for (client.Await(Network::Socket::In); client.Received() > 0; client.Await(Network::Socket::In))
-                {
-                    client >> Ser;
-                }
-
-                client.Close();
-
-                return Response::From(Ser.Take<std::string>());
             }
+
+            void multipartForm(const std::string &Boundry, const std::string &Message, std::map<std::string, std::string> &Result)
+            {
+                std::regex Capture(Boundry + "\r\nContent-Disposition:\\s?form-data;\\s?name=\"([^\"]+)\"\r\n\r\n([^-\n]+)");
+
+                auto QueryBegin = std::sregex_iterator(Message.begin(), Message.end(), Capture);
+                auto QueryEnd = std::sregex_iterator();
+
+                std::smatch Matches;
+
+                for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
+                {
+                    Result[i->str(1)] = i->str(2);
+                }
+            }
+
+            void multipartForm(const std::string &Message, std::map<std::string, std::string> &Result)
+            {
+                std::regex Capture("name=\"([^\"]+)\"\r\n\r\n([^-\n]+)");
+
+                auto QueryBegin = std::sregex_iterator(Message.begin(), Message.end(), Capture);
+                auto QueryEnd = std::sregex_iterator();
+
+                std::smatch Matches;
+
+                for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
+                {
+                    Result[i->str(1)] = i->str(2);
+                }
+            }
+
+            void FormData(const Common &Message, std::map<std::string, std::string> &Result)
+            {
+                std::smatch Matches;
+
+                auto Iterator = Message.Headers.find("Content-Type");
+
+                if (Iterator == Message.Headers.end())
+                {
+                    return;
+                }
+
+                // @todo Optimize this later
+
+                if(std::regex_match(Iterator->second, Matches, std::regex("application/x-www-form-urlencoded")))
+                {
+                    applicationForm(Message.Content, Result);
+                }
+                else if(std::regex_match(Iterator->second, Matches, std::regex("multipart/form-data; boundary=\"?([^\"]+)\"?")))
+                {
+                    auto BoundryString = Matches.str(1);
+                    // multipartForm(BoundryString, Message.Content, Result);
+                    multipartForm(Message.Content, Result);
+                }
+            }
+
         }
     }
 }

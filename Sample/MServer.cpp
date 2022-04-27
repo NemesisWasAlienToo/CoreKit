@@ -8,6 +8,8 @@
 #include "Network/Address.hpp"
 #include "Network/Socket.hpp"
 #include "Network/HTTP/HTTP.hpp"
+#include "Network/HTTP/Response.hpp"
+#include "Network/HTTP/Request.hpp"
 #include "Format/Serializer.hpp"
 
 using namespace Core;
@@ -86,19 +88,7 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 
     Core::Iterable::Queue<char> Buffer(1024);
 
-    Core::Network::HTTP::Response Res;
-
-    Res.Version = "1.1";
-    Res.Status = 200;
-    Res.Brief = "OK";
-    Res.Headers["Host"] = "ConfusionBox";
-    Res.Headers["Connection"] = "closed";
-    Res.Headers["Content-Type"] = "text/html; charset=UTF-8";
-    // Res.Headers["Content-Type"] = "text/plain";
-    // Res.Headers["Content-Type"] = "application/json; charset=UTF-8";
-    // Res.Headers["Content-Type"] = "application/json";
-
-    Res.Body = "<h1>Hi</h1>";
+    Core::Network::HTTP::Response Res = Core::Network::HTTP::Response::HTML(Core::Network::HTTP::Status::OK, "<h1>Hi</h1>");
 
     std::string ResponseText = Res.ToString();
     Buffer.Add(ResponseText.c_str(), ResponseText.length());

@@ -74,6 +74,10 @@ namespace Core
 
             Map::iterator Tracking;
 
+            // @todo implement this
+
+            size_t MaxConnection = 0;
+
         public:
             BuilderCallback Builder;
             CleanCallback OnClean;

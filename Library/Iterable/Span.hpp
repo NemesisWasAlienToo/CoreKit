@@ -77,6 +77,11 @@ namespace Core
                 return _Length;
             }
 
+            inline void Length(size_t Length)
+            {
+                _Length = Length;
+            }
+
             void Resize(size_t NewSize)
             {
                 auto NewData = new T[NewSize];
@@ -119,7 +124,7 @@ namespace Core
                 return false;
             }
 
-            template<typename TCallback>
+            template <typename TCallback>
             void ForEach(TCallback Action)
             {
                 for (size_t i = 0; i < _Length; i++)
@@ -128,7 +133,7 @@ namespace Core
                 }
             }
 
-            template<typename TCallback>
+            template <typename TCallback>
             void ForEach(TCallback Action) const
             {
                 for (size_t i = 0; i < _Length; i++)
@@ -155,17 +160,19 @@ namespace Core
 
             Span &operator=(const Span &Other)
             {
-                if (this != &Other)
+                if (this == &Other)
                 {
-                    _Length = Other._Length;
+                    return *this;
+                }
 
-                    delete[] _Content;
-                    _Content = new T[_Length];
+                _Length = Other._Length;
 
-                    for (size_t i = 0; i < _Length; i++)
-                    {
-                        _Content[i] = Other._Content[i];
-                    }
+                delete[] _Content;
+                _Content = new T[_Length];
+
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    _Content[i] = Other._Content[i];
                 }
 
                 return *this;
@@ -173,16 +180,18 @@ namespace Core
 
             Span &operator=(Span &&Other)
             {
-                if (this != &Other)
+                if (this == &Other)
                 {
-                    delete[] _Content;
-
-                    _Content = Other._Content;
-                    _Length = Other._Length;
-
-                    Other._Content = nullptr;
-                    Other._Length = 0;
+                    return *this;
                 }
+                
+                delete[] _Content;
+
+                _Content = Other._Content;
+                _Length = Other._Length;
+
+                Other._Content = nullptr;
+                Other._Length = 0;
 
                 return *this;
             }

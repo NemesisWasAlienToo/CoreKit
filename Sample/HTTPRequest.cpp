@@ -8,7 +8,7 @@ using namespace Core;
 
 int main(int argc, char const *argv[])
 {
-    Network::HTTP::Response Response = Network::HTTP::Send(Network::DNS::ResolveSingle("google.com", "http"), Network::HTTP::Request::Get("/"));
+    Network::HTTP::Response Response = Network::HTTP::Request::Get("/").Send(Network::DNS::ResolveSingle("google.com", "http"));
 
     std::cout << Response.Content << std::endl;
 
