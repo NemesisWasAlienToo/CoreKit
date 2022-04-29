@@ -69,8 +69,6 @@ namespace Core
 
             Socket(const Socket &Other) : Descriptor(Other) {}
 
-            Socket(const Descriptor &Other) : Descriptor(Other) {}
-
             void Bind(const EndPoint &Host) const
             {
 
@@ -556,6 +554,16 @@ namespace Core
 
             // @todo Maybe add rvalue later?
 
+            Socket& operator=(Socket &&Other)
+            {
+                if (this != &Other)
+                {
+                    _INode = Other._INode;
+                    Other._INode = -1;
+                }
+
+                return *this;
+            }
             Socket &operator=(const Socket &Other) = delete;
         };
     }

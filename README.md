@@ -41,7 +41,8 @@ Checked items are implemented completly at the moment and unchecked items are to
 - [x] Directory : Directory functionality including content list
 - [x] Event : Linux Eventfd based event mechanism
 - [x] Timer : Linux Timerfd based timer mechanism
-- [ ] Coroutine : Linux implementation of a asymmetric coroutine
+- [x] Coroutine : Linux implementation of a stackful asymmetric coroutine
+- [ ] Machine : Linux implementation of a duff device state machine coroutine
 - [x] Foramt:
     - [x] Base64 : Base64 Encoding
     - [x] Hex : Hexadecimal String Encoding
@@ -58,7 +59,7 @@ Checked items are implemented completly at the moment and unchecked items are to
     - [ ] Linked List
     - [ ] Binary tree
     - [x] Poll : Poll io file descriptor watching mechanism
-    - [ ] ePoll : ePoll io file descriptor watching mechanism
+    - [x] ePoll : ePoll io file descriptor watching mechanism
 
 - [ ] Network:
     - [x] DNS : Basic DNS lookup functionalities
@@ -78,11 +79,11 @@ Checked items are implemented completly at the moment and unchecked items are to
         - [x] Server : UDP Server
         - [x] Runner : A DHT node runner
 
-- [ ] Cryptography:
+- [x] Cryptography:
     - [x] Random : Cryptographicly secure random number generation and tools
     - [x] Digest : Digest functions like SHA , MD
     - [x] RSA
-    - [ ] AES
+    - [x] AES
 
 ## To do
 

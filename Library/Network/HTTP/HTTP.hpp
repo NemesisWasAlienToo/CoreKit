@@ -6,6 +6,7 @@
 #include <map>
 #include <regex>
 
+#include <Machine.hpp>
 #include <Duration.hpp>
 #include <Iterable/List.hpp>
 #include <Iterable/Queue.hpp>
@@ -19,6 +20,96 @@ namespace Core
     {
         namespace HTTP
         {
+            struct Parser : Machine<void(Network::Socket)>
+            {
+                std::string Message;
+
+                size_t ContetLength = 0;
+                size_t lenPos = 0;
+
+                size_t bodyPos = 0;
+                size_t bodyPosTmp = 0;
+
+                template <typename TMessage>
+                inline TMessage Parse()
+                {
+                    return TMessage::From(Message, bodyPos - 4);
+                }
+
+                void operator()()
+                {
+                    auto Client = Argument<0>();
+
+                    size_t Received = Client.Received();
+
+                    // Read received data
+
+                    char RequestBuffer[Received];
+
+                    Client.Receive(RequestBuffer, Received);
+
+                    Message.append(RequestBuffer, Received);
+
+                    CO_START;
+
+                    while (true)
+                    {
+                        // Detect content lenght
+
+                        // Search for content lenght
+
+                        if (ContetLength == 0 && bodyPos == 0)
+                        {
+                            lenPos = Message.find("Content-Length: ", lenPos);
+
+                            if (lenPos == std::string::npos)
+                            {
+                                lenPos = Message.length() - 15;
+                            }
+                            else
+                            {
+                                // @todo Optimize this
+
+                                lenPos += 16;
+
+                                size_t end = Message.find("\r\n", lenPos);
+
+                                std::string len = Message.substr(lenPos, end - lenPos);
+
+                                ContetLength = std::stoul(len);
+                            }
+                        }
+
+                        // Search for body
+
+                        if (bodyPos == 0)
+                        {
+                            bodyPosTmp = Message.find("\r\n\r\n", bodyPosTmp);
+
+                            if (bodyPosTmp == std::string::npos)
+                            {
+                                bodyPosTmp = Message.length() - 3;
+                            }
+                            else
+                            {
+                                bodyPos = bodyPosTmp + 4;
+                            }
+                        }
+
+                        // Break if we have found the body and we rreached the end of body
+
+                        if (bodyPos && (Message.length() - bodyPos) >= ContetLength)
+                            break;
+
+                        CO_YIELD();
+                    }
+
+                    CO_TERMINATE();
+
+                    CO_END;
+                }
+            };
+
             // @todo Move this to response
             enum class Status : unsigned short
             {
@@ -159,78 +250,6 @@ namespace Core
 
                 virtual std::string ToString() const = 0;
             };
-
-            void applicationForm(const std::string &Message, std::map<std::string, std::string> &Result)
-            {
-                std::regex Capture("([^&]+)=([^&]+)");
-
-                auto QueryBegin = std::sregex_iterator(Message.begin(), Message.end(), Capture);
-                auto QueryEnd = std::sregex_iterator();
-
-                std::smatch Matches;
-
-                for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
-                {
-                    std::cout << i->str(1) << " : " << i->str(2) << std::endl;
-                    Result[i->str(1)] = i->str(2);
-                }
-            }
-
-            void multipartForm(const std::string &Boundry, const std::string &Message, std::map<std::string, std::string> &Result)
-            {
-                std::regex Capture(Boundry + "\r\nContent-Disposition:\\s?form-data;\\s?name=\"([^\"]+)\"\r\n\r\n([^-\n]+)");
-
-                auto QueryBegin = std::sregex_iterator(Message.begin(), Message.end(), Capture);
-                auto QueryEnd = std::sregex_iterator();
-
-                std::smatch Matches;
-
-                for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
-                {
-                    Result[i->str(1)] = i->str(2);
-                }
-            }
-
-            void multipartForm(const std::string &Message, std::map<std::string, std::string> &Result)
-            {
-                std::regex Capture("name=\"([^\"]+)\"\r\n\r\n([^-\n]+)");
-
-                auto QueryBegin = std::sregex_iterator(Message.begin(), Message.end(), Capture);
-                auto QueryEnd = std::sregex_iterator();
-
-                std::smatch Matches;
-
-                for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
-                {
-                    Result[i->str(1)] = i->str(2);
-                }
-            }
-
-            void FormData(const Common &Message, std::map<std::string, std::string> &Result)
-            {
-                std::smatch Matches;
-
-                auto Iterator = Message.Headers.find("Content-Type");
-
-                if (Iterator == Message.Headers.end())
-                {
-                    return;
-                }
-
-                // @todo Optimize this later
-
-                if(std::regex_match(Iterator->second, Matches, std::regex("application/x-www-form-urlencoded")))
-                {
-                    applicationForm(Message.Content, Result);
-                }
-                else if(std::regex_match(Iterator->second, Matches, std::regex("multipart/form-data; boundary=\"?([^\"]+)\"?")))
-                {
-                    auto BoundryString = Matches.str(1);
-                    // multipartForm(BoundryString, Message.Content, Result);
-                    multipartForm(Message.Content, Result);
-                }
-            }
-
         }
     }
 }

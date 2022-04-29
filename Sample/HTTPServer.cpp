@@ -5,31 +5,41 @@
 
 #include <Network/HTTP/Server.hpp>
 
-using namespace Core;
+using namespace Core::Network;
 
 int main(int argc, char const *argv[])
 {
-    Network::HTTP::Server Server({"0.0.0.0:8888"}, {5, 0});
+    HTTP::Server Server({"0.0.0.0:8888"}, {5, 0});
 
     Server.SetDefault(
         "/",
-        [](const Network::EndPoint &, const Network::HTTP::Request &, std::map<std::string, std::string> &)
+        [](const EndPoint &, const HTTP::Request &Request, std::map<std::string, std::string> &Parameters)
         {
-            return Network::HTTP::Response::Text(Network::HTTP::Status::NotFound, "This path does not exist");
+            Request.Cookies(Parameters);
+
+            for (auto &Pair : Parameters)
+            {
+                std::cout << Pair.first << ": " << Pair.second << std::endl;
+            }
+
+            return HTTP::Response::Text(HTTP::Status::NotFound, "This path does not exist")
+                .SetCookie("Name", "TestName")
+                .SetCookie("Family", "TestFamily")
+                .SetCookie("Id", "TestFamily");
         });
 
     Server.GET(
         "/Home",
-        [](const Network::EndPoint &, const Network::HTTP::Request &Request, std::map<std::string, std::string> &Parameters)
+        [](const EndPoint &, const HTTP::Request &Request, std::map<std::string, std::string> &Parameters)
         {
-            return Network::HTTP::Response::Redirect("/Home/1");
+            return HTTP::Response::Redirect("/Home/1");
         });
 
     Server.POST(
         "/Home/[Index]",
-        [](const Network::EndPoint &, const Network::HTTP::Request &Request, std::map<std::string, std::string> &Parameters)
+        [](const EndPoint &, const HTTP::Request &Request, std::map<std::string, std::string> &Parameters)
         {
-            Network::HTTP::FormData(Request, Parameters);
+            Request.FormData(Parameters);
 
             // print all Parameters
 
@@ -38,7 +48,7 @@ int main(int argc, char const *argv[])
                 std::cout << Pair.first << ": " << Pair.second << std::endl;
             }
 
-            return Network::HTTP::Response::HTML(Network::HTTP::Status::OK, "<h1>Index = " + Parameters["Index"] + "</h1>");
+            return HTTP::Response::HTML(HTTP::Status::OK, "<h1>Index = " + Parameters["Index"] + "</h1>");
         });
 
     Server.Listen(20)

@@ -36,13 +36,131 @@ namespace Core
                 std::string Type;
                 std::string Path;
 
+                Iterable::Queue<char> ToBuffer()
+                {
+                    Iterable::Queue<char> Result(20);
+
+                    Format::Stringifier Ser(Result);
+
+                    Ser << Type << ' ' << Path << " HTTP/" << Version << "\r\n";
+
+                    for (auto const &kv : Headers)
+                        Ser << kv.first << ": " << kv.second << "\r\n";
+
+                    Ser << "\r\n"
+                        << Content;
+
+                    return Result;
+                }
+
                 std::string ToString() const
                 {
-                    std::string str = Type + " " + Path + " HTTP/" + Version + "\r\n";
-                    for (auto const &kv : Headers)
-                        str += kv.first + ": " + kv.second + "\r\n";
+                    std::stringstream ss;
 
-                    return str + "\r\n" + Content;
+                    ss << Type << ' ' << Path << " HTTP/" << Version << "\r\n";
+
+                    for (auto const &kv : Headers)
+                        ss << kv.first << ": " << kv.second << "\r\n";
+
+                    ss << "\r\n"
+                       << Content;
+
+                    return ss.str();
+                }
+
+                void Cookies(std::map<std::string, std::string> &Result) const
+                {
+                    auto Iterator = Headers.find("Cookie");
+
+                    if (Iterator == Headers.end())
+                    {
+                        return;
+                    }
+
+                    const std::string &Cookie = Iterator->second;
+
+                    std::regex Capture("([^;]+)=([^;]+)(?:;\\s)?");
+
+                    auto QueryBegin = std::sregex_iterator(Cookie.begin(), Cookie.end(), Capture);
+                    auto QueryEnd = std::sregex_iterator();
+
+                    std::smatch Matches;
+
+                    for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
+                    {
+                        Result[i->str(1)] = i->str(2);
+                    }
+                }
+
+                void applicationForm(std::map<std::string, std::string> &Result) const
+                {
+                    std::regex Capture("([^&]+)=([^&]+)");
+
+                    auto QueryBegin = std::sregex_iterator(Content.begin(), Content.end(), Capture);
+                    auto QueryEnd = std::sregex_iterator();
+
+                    std::smatch Matches;
+
+                    for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
+                    {
+                        std::cout << i->str(1) << " : " << i->str(2) << std::endl;
+                        Result[i->str(1)] = i->str(2);
+                    }
+                }
+
+                void multipartForm(const std::string &Boundry, std::map<std::string, std::string> &Result) const
+                {
+                    std::regex Capture(Boundry + "\r\nContent-Disposition:\\s?form-data;\\s?name=\"([^\"]+)\"\r\n\r\n([^-\n]+)");
+
+                    auto QueryBegin = std::sregex_iterator(Content.begin(), Content.end(), Capture);
+                    auto QueryEnd = std::sregex_iterator();
+
+                    std::smatch Matches;
+
+                    for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
+                    {
+                        Result[i->str(1)] = i->str(2);
+                    }
+                }
+
+                void multipartForm(std::map<std::string, std::string> &Result) const
+                {
+                    std::regex Capture("name=\"([^\"]+)\"\r\n\r\n([^-\n]+)");
+
+                    auto QueryBegin = std::sregex_iterator(Content.begin(), Content.end(), Capture);
+                    auto QueryEnd = std::sregex_iterator();
+
+                    std::smatch Matches;
+
+                    for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
+                    {
+                        Result[i->str(1)] = i->str(2);
+                    }
+                }
+
+                void FormData(std::map<std::string, std::string> &Result) const
+                {
+                    std::smatch Matches;
+
+                    auto Iterator = Headers.find("Content-Type");
+
+                    if (Iterator == Headers.end())
+                    {
+                        return;
+                    }
+
+                    // @todo Optimize this later
+
+                    if (std::regex_match(Iterator->second, Matches, std::regex("application/x-www-form-urlencoded")))
+                    {
+                        applicationForm(Result);
+                    }
+                    else if (std::regex_match(Iterator->second, Matches, std::regex("multipart/form-data; boundary=\"?([^\"]+)\"?")))
+                    {
+                        auto BoundryString = Matches.str(1);
+                        // multipartForm(BoundryString, Content, Result);
+                        multipartForm(Content, Result);
+                    }
                 }
 
                 Response Send(const EndPoint Target, Duration TimeOut = {0, 0})
@@ -109,6 +227,8 @@ namespace Core
                     }
 
                     // Pars the rest of the headers
+
+                    // @todo Handle multiple cookie
 
                     {
                         while (Cursor < _Sepration)

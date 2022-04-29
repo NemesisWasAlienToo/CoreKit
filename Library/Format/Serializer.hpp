@@ -160,11 +160,10 @@ namespace Core
             {
                 *this << Value.Length();
 
-                Value.ForEach(
-                    [this](const TValue &Item)
-                    {
-                        *this << Item;
-                    });
+                for (size_t i = 0; i < Value.Length(); i++)
+                {
+                    *this << Value[i];
+                }
 
                 return *this;
             }
@@ -176,11 +175,10 @@ namespace Core
             {
                 *this << Value.Length();
 
-                Value.ForEach(
-                    [this](const TValue &Item)
-                    {
-                        *this << Item;
-                    });
+                for (size_t i = 0; i < Value.Length(); i++)
+                {
+                    *this << Value[i];
+                }
 
                 return *this;
             }

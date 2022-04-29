@@ -182,6 +182,25 @@ namespace Core
             return buffer;
         }
 
+        std::string Format(const std::string &Format) const
+        {
+            char buffer[120];
+
+            strftime(buffer, 40, Format.c_str(), &State);
+
+            return buffer;
+        }
+
+        DateTime ToGMT() const
+        {
+            // struct timespec _Spec;
+            struct tm _State;
+
+            gmtime_r(&Spec.tv_sec, &_State);
+
+            return DateTime(Spec, _State);
+        }
+
         // Static functions
 
         static DateTime Now()

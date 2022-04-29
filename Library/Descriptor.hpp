@@ -148,7 +148,7 @@ namespace Core
 
         Descriptor &operator=(const Descriptor &Other) = delete;
 
-        Descriptor &operator=(Descriptor &&Other)
+        Descriptor &operator=(Descriptor &&Other) noexcept
         {
             _INode = Other._INode;
             Other._INode = -1;
@@ -157,22 +157,22 @@ namespace Core
 
         // ### Operators
 
-        inline bool operator==(const Descriptor &Other) const
+        inline bool operator==(const Descriptor &Other) const noexcept
         {
             return _INode == Other._INode;
         }
 
-        inline bool operator!=(const Descriptor &Other) const
+        inline bool operator!=(const Descriptor &Other) const noexcept
         {
             return _INode != Other._INode;
         }
 
-        inline bool operator>(const Descriptor &Other) const
+        inline bool operator>(const Descriptor &Other) const noexcept
         {
             return _INode > Other._INode;
         }
 
-        inline bool operator<(const Descriptor &Other) const
+        inline bool operator<(const Descriptor &Other) const noexcept
         {
             return _INode < Other._INode;
         }

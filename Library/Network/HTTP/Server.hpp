@@ -89,9 +89,12 @@ namespace Core
                                 lenPos = Request.length();
                             }
                             else
-                            {
-                                std::string len = Request.substr(lenPos + 16);
-                                len = len.substr(0, len.find("\r\n"));
+                            { 
+                                // @todo Optimize this
+
+                                size_t end = Request.find("\r\n", lenPos + 16);
+
+                                std::string len = Request.substr(lenPos + 16, end - lenPos - 16);
 
                                 ContetLength = std::stoul(len);
                             }
@@ -127,12 +130,9 @@ namespace Core
 
                     // Serialize response
 
-                    std::string ResponseText = Res.ToString();
+                    Core::Iterable::Queue<char> Buffer = Res.ToBuffer();
 
-                    Core::Iterable::Queue<char> Buffer(ResponseText.length());
-                    Buffer.Add(ResponseText.c_str(), ResponseText.length());
-
-                    Format::Serializer Ser(Buffer);
+                    Format::Stringifier Ser(Buffer);
 
                     // Send response
 
@@ -315,6 +315,8 @@ namespace Core
                                 GetInPool();
                             });
                     }
+
+                    return *this;
                 }
 
                 void Stop()

@@ -4,7 +4,11 @@
 #include <string>
 #include <map>
 
+#include <Duration.hpp>
+#include <DateTime.hpp>
 #include <Network/HTTP/HTTP.hpp>
+#include <Iterable/List.hpp>
+#include <Format/Stringifier.hpp>
 
 namespace Core
 {
@@ -17,14 +21,164 @@ namespace Core
             public:
                 HTTP::Status Status;
                 std::string Brief;
+                Iterable::List<std::string> SetCookies;
+
+                Iterable::Queue<char> ToBuffer()
+                {
+                    Iterable::Queue<char> Result(20);
+
+                    Format::Stringifier Ser(Result);
+
+                    Ser << "HTTP/" << Version << ' ' << std::to_string(static_cast<unsigned short>(Status)) << ' ' << Brief << "\r\n";
+
+                    for (auto const &kv : Headers)
+                        Ser << kv.first + ": " << kv.second << "\r\n";
+
+                    SetCookies.ForEach([&Ser](std::string const &Cookie)
+                    {
+                        Ser << "Set-Cookie: " << Cookie << "\r\n";
+                    });
+
+                    Ser << "\r\n" << Content;
+
+                    return Result;
+                }
 
                 std::string ToString() const
                 {
-                    std::string str = "HTTP/" + Version + " " + std::to_string(static_cast<unsigned short>(Status)) + " " + Brief + "\r\n";
-                    for (auto const &kv : Headers)
-                        str += kv.first + ": " + kv.second + "\r\n";
+                    std::stringstream ss;
 
-                    return str + "\r\n" + Content;
+                    ss << "HTTP/" << Version << " " << std::to_string(static_cast<unsigned short>(Status)) << " " << Brief << "\r\n";
+                    
+                    for (auto const &kv : Headers)
+                        ss << kv.first + ": " << kv.second << "\r\n";
+
+                    SetCookies.ForEach([&ss](std::string const &Cookie)
+                    {
+                        ss << "Set-Cookie: " << Cookie << "\r\n";
+                    });
+
+                    ss << "\r\n" << Content;
+
+                    return ss.str();
+                }
+
+                Response& SetCookie(const std::string &Name, const std::string &Value,
+                               const std::string &Path = "", const std::string &Domain = "",
+                               bool Secure = false, bool HttpOnly = false)
+                {
+                    std::stringstream ResultStream;
+
+                    ResultStream << Name << "=" << Value;
+
+                    if (!Path.empty())
+                    {
+                        ResultStream << "; Path=" << Path;
+                    }
+
+                    if (!Domain.empty())
+                    {
+                        ResultStream << "; Domain=" << Domain;
+                    }
+
+                    if (Secure)
+                    {
+                        ResultStream << "; Secure";
+                    }
+
+                    if (HttpOnly)
+                    {
+                        ResultStream << "; HttpOnly";
+                    }
+
+                    SetCookies.Add(ResultStream.str());
+
+                    return *this;
+                }
+
+                Response& SetCookie(const std::string &Name, const std::string &Value, size_t MaxAge,
+                               const std::string &Path = "", const std::string &Domain = "",
+                               bool Secure = false, bool HttpOnly = false)
+                {
+                    std::stringstream ResultStream;
+
+                    ResultStream << Name << "=" << Value;
+
+                    ResultStream << "; Max-Age=" << MaxAge;
+
+                    if (!Path.empty())
+                    {
+                        ResultStream << "; Path=" << Path;
+                    }
+
+                    if (!Domain.empty())
+                    {
+                        ResultStream << "; Domain=" << Domain;
+                    }
+
+                    if (Secure)
+                    {
+                        ResultStream << "; Secure";
+                    }
+
+                    if (HttpOnly)
+                    {
+                        ResultStream << "; HttpOnly";
+                    }
+
+                    SetCookies.Add(ResultStream.str());
+
+                    return *this;
+                }
+
+                Response& SetCookie(const std::string &Name, const std::string &Value, const DateTime &Expires,
+                               const std::string &Path = "", const std::string &Domain = "",
+                               bool Secure = false, bool HttpOnly = false)
+                {
+                    // Expires=Thu, 21 Oct 2021 07:28:00 GMT;
+
+                    std::stringstream ResultStream;
+
+                    ResultStream << Name << "=" << Value;
+
+                    ResultStream << "; Expires=" << Expires.ToGMT().Format("%a, %d %b %Y %T %X GMT");
+
+                    if (!Path.empty())
+                    {
+                        ResultStream << "; Path=" << Path;
+                    }
+
+                    if (!Domain.empty())
+                    {
+                        ResultStream << "; Domain=" << Domain;
+                    }
+
+                    if (Secure)
+                    {
+                        ResultStream << "; Secure";
+                    }
+
+                    if (HttpOnly)
+                    {
+                        ResultStream << "; HttpOnly";
+                    }
+
+                    SetCookies.Add(ResultStream.str());
+
+                    return *this;
+                }
+
+                Response& RemoveCookie(const std::string &Name)
+                {
+                    std::stringstream ResultStream;
+
+                    ResultStream << Name << "=";
+
+                    ResultStream << "; Max-Age=-1";
+
+                    SetCookies.Add(ResultStream.str());
+
+                    return *this;
                 }
 
                 static Response From(const std::string &Text, size_t BodyIndex = 0)
@@ -57,7 +211,7 @@ namespace Core
 
                         CursorTmp = Text.find("\r\n", Cursor);
                         ret.Brief = Text.substr(Cursor, CursorTmp - Cursor);
-                        Cursor = CursorTmp + 6;
+                        Cursor = CursorTmp + 2;
                     }
 
                     // Pars the rest of the headers
@@ -105,7 +259,7 @@ namespace Core
                 {
                     return From(Status, "1.0", {{"Content-Type", "text/plain"}}, std::move(Content));
                 }
-                
+
                 static Response HTML(HTTP::Status Status, std::string Content)
                 {
                     auto size = Content.size();
