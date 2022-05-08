@@ -16,6 +16,7 @@ namespace Core
     _IsFinished = true;   \
     return RES;
 
+// @todo Maybe check the coroutine is already terminated
 #define CO_START    \
     switch (_State) \
     {               \
@@ -48,7 +49,7 @@ namespace Core
 
     public:
         bool IsStarted() { return _State; }
-        bool IsFinished() const { return _IsFinished == true; }
+        bool IsFinished() const { return _IsFinished; }
         void Terminate() { _IsFinished = true; }
 
         template <size_t TNumber>
@@ -61,7 +62,7 @@ namespace Core
         inline TReturn Start(TArgs... Args)
         {
             _State = 0;
-            _Args = ArgsContainer(std::forward<TArgs&&>(Args)...);
+            _Args = ArgsContainer(std::forward<TArgs &&>(Args)...);
             _IsFinished = false;
 
             if constexpr (std::is_same_v<void, TReturn>)

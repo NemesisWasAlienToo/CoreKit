@@ -13,42 +13,49 @@ int main(int argc, char const *argv[])
 
     Server.SetDefault(
         "/",
-        [](const EndPoint &, const HTTP::Request &Request, std::map<std::string, std::string> &Parameters)
+        [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
         {
             Request.Cookies(Parameters);
 
-            for (auto &Pair : Parameters)
+            for (auto &[Key, Value] : Parameters)
             {
-                std::cout << Pair.first << ": " << Pair.second << std::endl;
+                std::cout << Key << ": " << Value << std::endl;
             }
 
-            return HTTP::Response::Text(HTTP::Status::NotFound, "This path does not exist")
-                .SetCookie("Name", "TestName")
-                .SetCookie("Family", "TestFamily")
-                .SetCookie("Id", "TestFamily");
+            return HTTP::Response::Text(HTTP::HTTP10, HTTP::Status::NotFound, "This path does not exist");
         });
 
     Server.GET(
         "/Home",
-        [](const EndPoint &, const HTTP::Request &Request, std::map<std::string, std::string> &Parameters)
-        {
-            return HTTP::Response::Redirect("/Home/1");
-        });
-
-    Server.POST(
-        "/Home/[Index]",
-        [](const EndPoint &, const HTTP::Request &Request, std::map<std::string, std::string> &Parameters)
+        [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
         {
             Request.FormData(Parameters);
 
             // print all Parameters
 
-            for (auto &Pair : Parameters)
+            for (auto &[Key, Value] : Parameters)
             {
-                std::cout << Pair.first << ": " << Pair.second << std::endl;
+                std::cout << Key << ": " << Value << std::endl;
             }
 
-            return HTTP::Response::HTML(HTTP::Status::OK, "<h1>Index = " + Parameters["Index"] + "</h1>");
+            return HTTP::Response::Redirect(HTTP::HTTP10, "/Home/1", {{"test", "test2"}});
+        });
+
+    Server.GET(
+        "/Home/[Index]",
+        [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
+        {
+            return HTTP::Response::HTML(HTTP::HTTP10, HTTP::Status::OK, "<h1>Index = " + Parameters["Index"] + "</h1>")
+                .SetCookie("Name", "TestName", DateTime::FromNow(Duration(60, 0)))
+                .SetCookie("Family", "TestFamily", 60)
+                .SetCookie("Id", "TestFamily");
+        });
+
+    Server.POST(
+        "/Home/[Index]",
+        [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
+        {
+            return HTTP::Response::HTML(HTTP::HTTP10, HTTP::Status::OK, "<h1>Index = " + Parameters["Index"] + "</h1>");
         });
 
     Server.Listen(20)

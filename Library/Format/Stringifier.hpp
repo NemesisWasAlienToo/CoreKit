@@ -41,14 +41,14 @@ namespace Core
 
             // Peroperties
 
-            inline size_t Length()
+            std::string ToString() const
             {
-                return Queue.Length();
+                return std::string(Queue.Content(), Queue.Length());
             }
 
-            void Realign()
+            std::string_view ToStringView() const
             {
-                Queue.Resize(Queue.Capacity());
+                return std::string_view(Queue.Content(), Queue.Length());
             }
 
             void Clear()
@@ -73,15 +73,6 @@ namespace Core
             {
                 *this << Object;
                 return *this;
-            }
-
-            Iterable::Span<char> Dump()
-            {
-                Iterable::Span<char> Result(Queue.Length());
-
-                Queue.Take(Result.Content(), Queue.Length());
-
-                return Result;
             }
 
             // Input operators

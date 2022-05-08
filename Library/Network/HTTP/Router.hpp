@@ -54,7 +54,7 @@ namespace Core
 
                     static Route From(Request::Methods Method, const std::string& Pattern, Handler Action /*, Validator Filter = nullptr*/)
                     {
-                        std::regex Parameter("\\[([^[/]+)\\]");
+                        std::regex Parameter("\\[([^[/?]+)\\]");
                         std::regex Slash("/");
 
                         // Build matching capture
@@ -65,6 +65,8 @@ namespace Core
 
                         auto Begin = std::sregex_iterator(Pattern.begin(), Pattern.end(), Parameter);
                         auto End = std::sregex_iterator();
+
+                        // @todo Optimize this
 
                         Iterable::Span<std::string> Parameters(std::distance(Begin, End));
 

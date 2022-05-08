@@ -130,11 +130,6 @@ namespace Core
                 this->_Length -= Count;
             }
 
-            std::string ToString()
-            {
-                return ToString(this->_Length);
-            }
-
             // ### Operators
 
             Queue &operator=(const Queue &Other) = default;

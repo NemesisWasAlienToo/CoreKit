@@ -1,18 +1,10 @@
 #pragma once
 
-#include <iostream>
 #include <string>
-#include <sstream>
 #include <map>
-#include <regex>
 
-#include <Machine.hpp>
 #include <Duration.hpp>
-#include <Iterable/List.hpp>
 #include <Iterable/Queue.hpp>
-#include <Network/DNS.hpp>
-#include <Network/Socket.hpp>
-#include <Format/Serializer.hpp>
 
 namespace Core
 {
@@ -20,95 +12,8 @@ namespace Core
     {
         namespace HTTP
         {
-            struct Parser : Machine<void(Network::Socket)>
-            {
-                std::string Message;
-
-                size_t ContetLength = 0;
-                size_t lenPos = 0;
-
-                size_t bodyPos = 0;
-                size_t bodyPosTmp = 0;
-
-                template <typename TMessage>
-                inline TMessage Parse()
-                {
-                    return TMessage::From(Message, bodyPos - 4);
-                }
-
-                void operator()()
-                {
-                    auto Client = Argument<0>();
-
-                    size_t Received = Client.Received();
-
-                    // Read received data
-
-                    char RequestBuffer[Received];
-
-                    Client.Receive(RequestBuffer, Received);
-
-                    Message.append(RequestBuffer, Received);
-
-                    CO_START;
-
-                    while (true)
-                    {
-                        // Detect content lenght
-
-                        // Search for content lenght
-
-                        if (ContetLength == 0 && bodyPos == 0)
-                        {
-                            lenPos = Message.find("Content-Length: ", lenPos);
-
-                            if (lenPos == std::string::npos)
-                            {
-                                lenPos = Message.length() - 15;
-                            }
-                            else
-                            {
-                                // @todo Optimize this
-
-                                lenPos += 16;
-
-                                size_t end = Message.find("\r\n", lenPos);
-
-                                std::string len = Message.substr(lenPos, end - lenPos);
-
-                                ContetLength = std::stoul(len);
-                            }
-                        }
-
-                        // Search for body
-
-                        if (bodyPos == 0)
-                        {
-                            bodyPosTmp = Message.find("\r\n\r\n", bodyPosTmp);
-
-                            if (bodyPosTmp == std::string::npos)
-                            {
-                                bodyPosTmp = Message.length() - 3;
-                            }
-                            else
-                            {
-                                bodyPos = bodyPosTmp + 4;
-                            }
-                        }
-
-                        // Break if we have found the body and we rreached the end of body
-
-                        if (bodyPos && (Message.length() - bodyPos) >= ContetLength)
-                            break;
-
-                        CO_YIELD();
-                    }
-
-                    CO_TERMINATE();
-
-                    CO_END;
-                }
-            };
+            constexpr auto HTTP10 = "1.0";
+            constexpr auto HTTP11 = "1.1";
 
             // @todo Move this to response
             enum class Status : unsigned short
@@ -239,16 +144,63 @@ namespace Core
                 {Status::GatewayTimeout, "Gateway Timeout"},
                 {Status::HTTPVersionNotSupported, "HTTP Version Not Supported"}};
 
-            std::string const MethodStrings[]{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE", "CONNECT", "PATCH", ""};
+            std::string const MethodStrings[]{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH", ""};
 
-            class Common
+            class Message
             {
             public:
                 std::string Version;
                 std::map<std::string, std::string> Headers;
                 std::string Content;
 
+                // virtual bool IsValid() = 0;
                 virtual std::string ToString() const = 0;
+                virtual size_t ParseFirstLine(std::string_view const &Text) = 0;
+
+                size_t ParseHeaders(std::string_view const &Text, size_t Start, size_t End = 0)
+                {
+                    size_t Cursor = Start;
+                    size_t CursorTmp = 0;
+                    size_t BodyStart = End;
+
+                    if (End == 0)
+                    {
+                        BodyStart = Text.find("\r\n\r\n");
+                        BodyStart = BodyStart == std::string::npos ? Text.length() : BodyStart;
+                    }
+
+                    while (Cursor < BodyStart && (CursorTmp = Text.find(':', Cursor)) < BodyStart)
+                    {
+                        // Find key
+
+                        std::string HeaderKey(Text.substr(Cursor, CursorTmp - Cursor));
+                        Cursor = Text[CursorTmp + 1] == ' ' ? CursorTmp + 2 : CursorTmp + 1;
+
+                        // Find value
+
+                        CursorTmp = Text.find('\r', Cursor);
+
+                        if (CursorTmp == std::string::npos)
+                        {
+                            std::string HeaderValue(Text.substr(Cursor));
+                            Headers.insert_or_assign(std::move(HeaderKey), HeaderValue);
+
+                            break;
+                        }
+
+                        std::string HeaderValue(Text.substr(Cursor, CursorTmp - Cursor));
+                        Cursor = CursorTmp + 2;
+
+                        Headers.insert_or_assign(std::move(HeaderKey), std::move(HeaderValue));
+                    }
+
+                    return BodyStart + 4;
+                }
+
+                void ParseContent(const std::string_view &Text, size_t BodyIndex)
+                {
+                    Content = std::string{Text.substr(BodyIndex)};
+                }
             };
         }
     }

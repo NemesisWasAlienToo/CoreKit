@@ -182,9 +182,11 @@ namespace Core
             return buffer;
         }
 
-        std::string Format(const std::string &Format) const
+        // @todo Fix this
+
+        std::string Format(size_t Size, const std::string &Format) const
         {
-            char buffer[120];
+            char buffer[Size];
 
             strftime(buffer, 40, Format.c_str(), &State);
 

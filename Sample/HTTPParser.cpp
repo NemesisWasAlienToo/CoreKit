@@ -1,12 +1,13 @@
 #include <iostream>
 #include <string>
 
-#include <Machine.hpp>
+#include <Network/DNS.hpp>
 #include <Network/Socket.hpp>
 #include <Iterable/Queue.hpp>
 #include <Network/HTTP/HTTP.hpp>
 #include <Network/HTTP/Response.hpp>
 #include <Network/HTTP/Request.hpp>
+#include <Network/HTTP/Parser.hpp>
 
 using namespace Core;
 
@@ -18,7 +19,8 @@ int main(int argc, char const *argv[])
 
     Network::EndPoint Google(result[0], 80);
 
-    std::cout << "Google is at " << Google << std::endl << std::endl;
+    std::cout << "Google is at " << Google << std::endl
+              << std::endl;
 
     Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP);
 
@@ -31,6 +33,7 @@ int main(int argc, char const *argv[])
 
     ser << "GET / HTTP/1.1 \r\n"
            "Host: ConfusionBox \r\n"
+           "Content-Length: abc \r\n"
            "Connection: closed\r\n\r\n";
 
     while (!ser.Queue.IsEmpty())
@@ -38,20 +41,25 @@ int main(int argc, char const *argv[])
         client << ser;
     }
 
-    Network::HTTP::Parser p;
+    Network::HTTP::Parser<Network::HTTP::Response> p;
 
     client.Await(Network::Socket::In);
 
     p.Start(client);
 
-    for (client.Await(Network::Socket::In); !p.IsFinished() && client.Received() > 0; client.Await(Network::Socket::In))
+    while (!p.IsFinished())
     {
+        client.Await(Network::Socket::In);
+
+        if (!client.Received())
+        {
+            break;
+        }
+
         p.Continue();
     }
 
-    auto Response = p.Parse<Network::HTTP::Response>();
-
-    std::cout << Response.ToString() << std::endl;
+    std::cout << p.Result.ToString() << std::endl;
 
     client.Close();
 

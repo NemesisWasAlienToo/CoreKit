@@ -16,6 +16,7 @@
 #include <Network/HTTP/Response.hpp>
 #include <Network/HTTP/Request.hpp>
 #include <Network/HTTP/Router.hpp>
+#include <Network/HTTP/Parser.hpp>
 
 namespace Core
 {
@@ -48,89 +49,38 @@ namespace Core
 
                 void HandleClient(Network::Socket Client, Network::EndPoint Info)
                 {
-                    std::string Request;
+                    Network::HTTP::Request Req;
+                    HTTP::Parser<HTTP::Request> parser;
 
-                    size_t ContetLength = 0;
-                    size_t lenPos = 0;
+                    // @todo catch(const HTTP::Response& Response)
 
-                    size_t bodyPos = 0;
-                    size_t bodyPosTmp = 0;
+                    // @todo Optimize the loop
 
-                    while (true)
+                    Client.Await(Network::Socket::In);
+
+                    parser.Start(Client);
+
+                    while (!parser.IsFinished())
                     {
-                        // Await for data
+                        Client.Await(Network::Socket::In);
 
-                        Client.Await(Network::Socket::In, TimeOut.AsMilliseconds());
-
-                        size_t Received = Client.Received();
-
-                        if (Received == 0)
+                        if (!Client.Received())
                         {
-                            Client.Close();
-                            return;
-                        }
-
-                        // Read received data
-
-                        char RequestBuffer[Received];
-
-                        Client.Receive(RequestBuffer, Received);
-
-                        Request.append(RequestBuffer, Received);
-
-                        // Detect content lenght
-
-                        if (ContetLength == 0 && bodyPos == 0)
-                        {
-                            lenPos = Request.find("Content-Length: ", lenPos - 15);
-
-                            if (lenPos == std::string::npos)
-                            {
-                                lenPos = Request.length();
-                            }
-                            else
-                            { 
-                                // @todo Optimize this
-
-                                size_t end = Request.find("\r\n", lenPos + 16);
-
-                                std::string len = Request.substr(lenPos + 16, end - lenPos - 16);
-
-                                ContetLength = std::stoul(len);
-                            }
-                        }
-
-                        // Detect start of content
-
-                        if (bodyPos == 0)
-                        {
-                            bodyPosTmp = Request.find("\r\n\r\n", bodyPosTmp);
-
-                            if (bodyPosTmp == std::string::npos)
-                            {
-                                bodyPosTmp = Request.length() - 3;
-                            }
-                            else
-                            {
-                                bodyPos = bodyPosTmp + 4;
-                            }
-                        }
-
-                        if (bodyPos && (Request.length() - bodyPos) >= ContetLength)
                             break;
+                        }
+
+                        parser.Continue();
                     }
-
-                    // Parse request
-
-                    Core::Network::HTTP::Request Req = Core::Network::HTTP::Request::From(Request, bodyPos - 4);
+                    
+                    Req = std::move(parser.Result);
 
                     // Handle request and form response
 
-                    Core::Network::HTTP::Response Res = OnRequest(Info, Req);
+                    Network::HTTP::Response Res = OnRequest(Info, Req);
 
                     // Serialize response
 
-                    Core::Iterable::Queue<char> Buffer = Res.ToBuffer();
+                    Iterable::Queue<char> Buffer = Res.ToBuffer();
 
                     Format::Stringifier Ser(Buffer);
 
@@ -171,7 +121,7 @@ namespace Core
 
                 // Functions
 
-                void SetDefault(const std::string &Pattern, HTTP::Router::Handler Action)
+                inline void SetDefault(const std::string &Pattern, HTTP::Router::Handler Action)
                 {
                     Router.Default(
                         HTTP::Router::Route::From(
@@ -180,7 +130,7 @@ namespace Core
                             std::move(Action)));
                 }
 
-                void Set(HTTP::Request::Methods Method, const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void Set(HTTP::Request::Methods Method, const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
                 {
                     Router.Add(
                         HTTP::Router::Route::From(
@@ -189,7 +139,7 @@ namespace Core
                             std::move(Action)));
                 }
 
-                void GET(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void GET(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::GET,
@@ -197,7 +147,7 @@ namespace Core
                         std::move(Action));
                 }
 
-                void POST(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void POST(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::POST,
@@ -205,7 +155,7 @@ namespace Core
                         std::move(Action));
                 }
 
-                void PUT(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void PUT(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::PUT,
@@ -213,7 +163,7 @@ namespace Core
                         std::move(Action));
                 }
 
-                void DELETE(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void DELETE(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::DELETE,
@@ -221,7 +171,7 @@ namespace Core
                         std::move(Action));
                 }
 
-                void HEAD(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void HEAD(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::HEAD,
@@ -229,7 +179,7 @@ namespace Core
                         std::move(Action));
                 }
 
-                void OPTIONS(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void OPTIONS(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::OPTIONS,
@@ -237,7 +187,7 @@ namespace Core
                         std::move(Action));
                 }
 
-                void PATCH(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void PATCH(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::PATCH,
@@ -245,23 +195,7 @@ namespace Core
                         std::move(Action));
                 }
 
-                void TRACE(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
-                {
-                    Set(
-                        HTTP::Request::Methods::TRACE,
-                        Pattern,
-                        std::move(Action));
-                }
-
-                void CONNECT(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
-                {
-                    Set(
-                        HTTP::Request::Methods::CONNECT,
-                        Pattern,
-                        std::move(Action));
-                }
-
-                void Any(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void Any(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::Any,
@@ -271,7 +205,7 @@ namespace Core
 
                 // Startup functions
 
-                HTTP::Server& Listen(int Max)
+                HTTP::Server &Listen(int Max)
                 {
                     Socket.Listen(Max);
                     return *this;
@@ -301,7 +235,7 @@ namespace Core
                     }
                 }
 
-                HTTP::Server& Start(int Count = std::thread::hardware_concurrency())
+                HTTP::Server &Start(int Count = std::thread::hardware_concurrency())
                 {
                     Pool = Iterable::Span<std::thread>(Count);
 
