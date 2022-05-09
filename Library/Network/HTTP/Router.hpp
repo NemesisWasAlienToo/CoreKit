@@ -52,7 +52,7 @@ namespace Core
                         }
                     }
 
-                    static Route From(Request::Methods Method, const std::string& Pattern, Handler Action /*, Validator Filter = nullptr*/)
+                    static Route From(Request::Methods Method, std::string const &Pattern, Handler Action, std::string Extension = "" /*, Validator Filter = nullptr*/)
                     {
                         std::regex Parameter("\\[([^[/?]+)\\]");
                         std::regex Slash("/");
@@ -61,7 +61,12 @@ namespace Core
 
                         // @todo Optimize query parameter processing
 
-                        std::string Capture = std::regex_replace(std::regex_replace(Pattern + "(?:\\?.*)?$", Parameter, "([^[/?]+)"), Slash, "\\/");
+                        std::string Capture =
+                            std::regex_replace(
+                                std::regex_replace(Pattern, Parameter, "([^[/?]+)"),
+                                Slash,
+                                "\\/") +
+                            (Extension.empty() ? "(?:\\/|\\?.*)?" : "(?:\\/([^?]*))?(?:\\/|\\?.*)?");
 
                         // Get the parameters
 
@@ -70,13 +75,20 @@ namespace Core
 
                         // @todo Optimize this
 
-                        Iterable::Span<std::string> Parameters(std::distance(Begin, End));
+                        size_t Size = std::distance(Begin, End);
+
+                        Iterable::Span<std::string> Parameters(Extension.empty() ? Size : Size + 1);
 
                         int j = 0;
 
                         for (std::sregex_iterator i = Begin; i != End; ++i, ++j)
                         {
                             Parameters[j] = i->str(1);
+                        }
+
+                        if (!Extension.empty())
+                        {
+                            Parameters[j] = std::move(Extension);
                         }
 
                         // Create the capture regex
@@ -111,20 +123,9 @@ namespace Core
                             auto &Match = Matches[i + 1];
 
                             Res[Parameters[i]] = Match;
-
-                            // Get tge position of start of query parameters
-
-                            // @todo Optimize this
-
-                            if (i == Parameters.Length() - 1)
-                            {
-                                // Advance the iterator to the start of query parameters
-
-                                QueryParamsStartIndex = Match.second;
-                            }
                         }
 
-                        // QueryParamsStartIndex = Matches.back().second;
+                        QueryParamsStartIndex = Matches[Matches.size() - 1].second;
 
                         // Query parameters
 

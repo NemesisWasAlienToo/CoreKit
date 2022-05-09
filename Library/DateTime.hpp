@@ -14,6 +14,33 @@ namespace Core
         struct tm State;
 
     public:
+        enum class DaysOfWeek : unsigned short
+        {
+            Sunday = 0,
+            Monday,
+            Tuesday,
+            Wednesday,
+            Thursday,
+            Friday,
+            Saturday
+        };
+
+        enum class Months : unsigned short
+        {
+            January = 0,
+            February,
+            March,
+            April,
+            May,
+            June,
+            July,
+            August,
+            September,
+            October,
+            November,
+            December
+        };
+
         DateTime() = default;
 
         DateTime(timespec spec) : Spec(spec)
@@ -127,6 +154,11 @@ namespace Core
             return State.tm_mday;
         }
 
+        inline DaysOfWeek DayOfWeek() const
+        {
+            return DaysOfWeek(State.tm_wday);
+        }
+
         inline void AddDay(int day)
         {
             State.tm_mday += day;
@@ -134,9 +166,9 @@ namespace Core
             Spec.tv_sec = mktime(&State);
         }
 
-        inline int Month() const
+        inline Months Month() const
         {
-            return State.tm_mon + 1;
+            return Months(State.tm_mon);
         }
 
         inline void AddMonth(int month)
@@ -156,11 +188,6 @@ namespace Core
             State.tm_year += year;
 
             Spec.tv_sec = mktime(&State);
-        }
-
-        inline int DayOfWeek() const
-        {
-            return State.tm_wday;
         }
 
         inline int DayOfYear() const

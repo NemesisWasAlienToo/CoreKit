@@ -136,8 +136,7 @@ namespace Core
 
                     if ((CursorTmp = Text.find(' ', Cursor)) == std::string::npos)
                     {
-                        Type = std::string(Text.substr(Cursor));
-                        return Text.length();
+                        throw std::invalid_argument("Invalid method");
                     }
 
                     Type = Text.substr(Cursor, CursorTmp - Cursor);
@@ -147,8 +146,7 @@ namespace Core
 
                     if ((CursorTmp = Text.find(' ', Cursor)) == std::string::npos)
                     {
-                        Path = Text.substr(Cursor);
-                        return Text.length();
+                        throw std::invalid_argument("Invalid path");
                     }
 
                     Path = Text.substr(Cursor, CursorTmp - Cursor);
@@ -156,14 +154,14 @@ namespace Core
 
                     // Parse version
 
+                    // @todo Maybe check the version's length?
+
                     if ((CursorTmp = Text.find('\r', Cursor)) == std::string::npos)
                     {
-                        Version = Text.substr(Cursor);
-                        return Text.length();
+                        throw std::invalid_argument("Invalid version");
                     }
 
                     Version = Text.substr(Cursor, CursorTmp - Cursor);
-                    // Cursor = CursorTmp + 2;
 
                     return CursorTmp + 2;
                 }

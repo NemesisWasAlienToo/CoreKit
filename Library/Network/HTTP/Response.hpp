@@ -223,10 +223,11 @@ namespace Core
 
                     // Parse version
 
+                    // @todo Maybe check the version's length?
+
                     if((CursorTmp = Text.find(' ', Cursor)) == std::string::npos)
                     {
-                        Version = Text.substr(Cursor);
-                        return Text.length();
+                        throw std::invalid_argument("Invalid version");
                     }
                     
                     Version = Text.substr(Cursor, CursorTmp - Cursor);
@@ -234,13 +235,13 @@ namespace Core
 
                     // Parse code
 
+                    // @todo Maybe check the code's length?
+
                     if((CursorTmp = Text.find(' ', Cursor)) == std::string::npos)
                     {
                         // @todo Optimize this
                         
-                        Status = HTTP::Status(std::stoul(std::string(Text.substr(Cursor))));
-
-                        return Text.length();
+                        throw std::invalid_argument("Invalid status code");
                     }
 
                     // @todo Optimize this
@@ -252,12 +253,10 @@ namespace Core
 
                     if((CursorTmp = Text.find('\r', Cursor)) == std::string::npos)
                     {
-                        Brief = Text.substr(Cursor);
-                        return Text.length();
+                        throw std::invalid_argument("Invalid breif");
                     }
                     
                     Brief = Text.substr(Cursor, CursorTmp - Cursor);
-                    // Cursor = CursorTmp + 2;
 
                     return CursorTmp + 2;
                 }
@@ -324,26 +323,6 @@ namespace Core
                 static inline Response Redirect(std::string Version, std::string Location, std::map<std::string, std::string> Parameters = {})
                 {
                     return Redirect(std::move(Version), HTTP::Status::Found, std::move(Location), std::move(Parameters));
-                }
-
-                static inline Response NotImplemented(std::string Version, std::map<std::string, std::string> Parameters = {}, std::string Content = "")
-                {
-                    return From(std::move(Version), HTTP::Status::NotImplemented, std::move(Parameters), std::move(Content));
-                }
-
-                static inline Response BadRequest(std::string Version, std::map<std::string, std::string> Parameters = {}, std::string Content = "")
-                {
-                    return From(std::move(Version), HTTP::Status::BadRequest, std::move(Parameters), std::move(Content));
-                }
-
-                static inline Response ExpectationFailed(std::string Version, std::map<std::string, std::string> Parameters = {}, std::string Content = "")
-                {
-                    return From(std::move(Version), HTTP::Status::ExpectationFailed, std::move(Parameters), std::move(Content));
-                }
-
-                static inline Response RequestEntityTooLarge(std::string Version, std::map<std::string, std::string> Parameters = {}, std::string Content = "")
-                {
-                    return From(std::move(Version), HTTP::Status::RequestEntityTooLarge, std::move(Parameters), std::move(Content));
                 }
             };
         }

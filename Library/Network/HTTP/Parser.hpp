@@ -51,12 +51,12 @@ namespace Core
 
                         if (Result.Version[5] == '1' && Result.Version[7] == '0')
                         {
-                            throw HTTP::Response::ExpectationFailed(Result.Version, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::ExpectationFailed, {{"Connection", "close"}});
                         }
 
                         if (ContetLength == 0)
                         {
-                            throw HTTP::Response::BadRequest(Result.Version, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}});
                         }
 
                         // Respond to 100-continue
@@ -133,7 +133,27 @@ namespace Core
 
                     // Parse first line and headers
 
-                    Result.ParseHeaders(Message, Result.ParseFirstLine(Message), bodyPos);
+                    {
+                        size_t TempIndex = 0;
+
+                        try
+                        {
+                            TempIndex = Result.ParseFirstLine(Message);
+                        }
+                        catch (...)
+                        {
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}});
+                        }
+
+                        // Check for version
+
+                        if (Result.Version[0] != '1' || (Result.Version[2] != '0' && Result.Version[2] != '1'))
+                        {
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::HTTPVersionNotSupported, {{"Connection", "close"}});
+                        }
+
+                        Result.ParseHeaders(Message, TempIndex, bodyPos);
+                    }
 
                     // Check for content length
 
@@ -149,14 +169,14 @@ namespace Core
                         }
                         catch (...)
                         {
-                            throw HTTP::Response::BadRequest(Result.Version, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}});
                         }
 
                         // Check if the length is in valid range
 
                         if (ContetLength > ContentLimit)
                         {
-                            throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}});
                         }
 
                         // Handle 100-continue
@@ -201,7 +221,7 @@ namespace Core
                             // @todo Check content length to be in the acceptable range
                             // throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
 
-                            throw HTTP::Response::NotImplemented(Result.Version, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}});
                         }
                         else if (Iterator->second == "gzip")
                         {
@@ -213,13 +233,13 @@ namespace Core
 
                             // @todo Implement later
 
-                            throw HTTP::Response::NotImplemented(Result.Version, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}});
                         }
                         else
                         {
                             // Not implemented
 
-                            throw HTTP::Response::NotImplemented(Result.Version, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}});
                         }
                     }
 

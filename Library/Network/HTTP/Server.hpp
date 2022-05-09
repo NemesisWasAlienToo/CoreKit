@@ -124,77 +124,86 @@ namespace Core
                             std::move(Action)));
                 }
 
-                inline void Set(HTTP::Request::Methods Method, const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void Set(HTTP::Request::Methods Method, const std::string &Pattern, HTTP::Router::Handler Action, std::string Extension = "" /*, Validator Filter = nullptr*/)
                 {
                     Router.Add(
                         HTTP::Router::Route::From(
                             Method,
                             Pattern,
-                            std::move(Action)));
+                            std::move(Action),
+                            std::move(Extension)));
                 }
 
-                inline void GET(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void GET(const std::string &Pattern, HTTP::Router::Handler Action, std::string Extension = "" /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::GET,
                         Pattern,
-                        std::move(Action));
+                        std::move(Action),
+                        std::move(Extension));
                 }
 
-                inline void POST(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void POST(const std::string &Pattern, HTTP::Router::Handler Action, std::string Extension = "" /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::POST,
                         Pattern,
-                        std::move(Action));
+                        std::move(Action),
+                        std::move(Extension));
                 }
 
-                inline void PUT(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void PUT(const std::string &Pattern, HTTP::Router::Handler Action, std::string Extension = "" /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::PUT,
                         Pattern,
-                        std::move(Action));
+                        std::move(Action),
+                        std::move(Extension));
                 }
 
-                inline void DELETE(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void DELETE(const std::string &Pattern, HTTP::Router::Handler Action, std::string Extension = "" /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::DELETE,
                         Pattern,
-                        std::move(Action));
+                        std::move(Action),
+                        std::move(Extension));
                 }
 
-                inline void HEAD(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void HEAD(const std::string &Pattern, HTTP::Router::Handler Action, std::string Extension = "" /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::HEAD,
                         Pattern,
-                        std::move(Action));
+                        std::move(Action),
+                        std::move(Extension));
                 }
 
-                inline void OPTIONS(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void OPTIONS(const std::string &Pattern, HTTP::Router::Handler Action, std::string Extension = "" /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::OPTIONS,
                         Pattern,
-                        std::move(Action));
+                        std::move(Action),
+                        std::move(Extension));
                 }
 
-                inline void PATCH(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void PATCH(const std::string &Pattern, HTTP::Router::Handler Action, std::string Extension = "" /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::PATCH,
                         Pattern,
-                        std::move(Action));
+                        std::move(Action),
+                        std::move(Extension));
                 }
 
-                inline void Any(const std::string &Pattern, HTTP::Router::Handler Action /*, Validator Filter = nullptr*/)
+                inline void Any(const std::string &Pattern, HTTP::Router::Handler Action, std::string Extension = "" /*, Validator Filter = nullptr*/)
                 {
                     Set(
                         HTTP::Request::Methods::Any,
                         Pattern,
-                        std::move(Action));
+                        std::move(Action),
+                        std::move(Extension));
                 }
 
                 // Startup functions

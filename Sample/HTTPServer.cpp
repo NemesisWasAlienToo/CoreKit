@@ -21,8 +21,22 @@ int main(int argc, char const *argv[])
                 std::cout << Key << ": " << Value << std::endl;
             }
 
-            return HTTP::Response::Text(HTTP::HTTP10, HTTP::Status::NotFound, "This path does not exist");
+            return HTTP::Response::Text(Request.Version, HTTP::Status::NotFound, "This path does not exist");
         });
+
+    Server.GET(
+        "/Static/[Folder]",
+        [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
+        {
+            Iterable::Queue<char> Queue;
+            Format::Stringifier Stringifier(Queue);
+
+            Stringifier << "<h1>Folder = " << Parameters["Folder"] << "</h1>"
+                        << "<h1>Extension = " << Parameters["Ext"] << "</h1>";
+
+            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Stringifier.ToString());
+        },
+        "Ext");
 
     Server.GET(
         "/Home",
@@ -37,7 +51,7 @@ int main(int argc, char const *argv[])
                 std::cout << Key << ": " << Value << std::endl;
             }
 
-            return HTTP::Response::Redirect(HTTP::HTTP10, "/Home/1", {{"test", "test2"}});
+            return HTTP::Response::Redirect(Request.Version, "/Home/1", {{"test", "test2"}});
         });
 
     Server.GET(
@@ -49,7 +63,7 @@ int main(int argc, char const *argv[])
 
             Stringifier << "<h1>Index = " << Parameters["Index"] << "</h1>";
 
-            return HTTP::Response::HTML(HTTP::HTTP10, HTTP::Status::OK, Stringifier.ToString())
+            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Stringifier.ToString())
                 .SetCookie("Name", "TestName", DateTime::FromNow(Duration(60, 0)))
                 .SetCookie("Family", "TestFamily", 60)
                 .SetCookie("Id", "TestFamily");
@@ -59,7 +73,7 @@ int main(int argc, char const *argv[])
         "/Home/[Index]",
         [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
         {
-            return HTTP::Response::HTML(HTTP::HTTP10, HTTP::Status::OK, "<h1>Index = " + Parameters["Index"] + "</h1>");
+            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Index = " + Parameters["Index"] + "</h1>");
         });
 
     Server.Listen(20)
