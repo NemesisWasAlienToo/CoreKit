@@ -59,6 +59,8 @@ namespace Core
 
                         // Build matching capture
 
+                        // @todo Optimize query parameter processing
+
                         std::string Capture = std::regex_replace(std::regex_replace(Pattern + "(?:\\?.*)?$", Parameter, "([^[/?]+)"), Slash, "\\/");
 
                         // Get the parameters
@@ -112,6 +114,8 @@ namespace Core
 
                             // Get tge position of start of query parameters
 
+                            // @todo Optimize this
+
                             if (i == Parameters.Length() - 1)
                             {
                                 // Advance the iterator to the start of query parameters
@@ -119,6 +123,8 @@ namespace Core
                                 QueryParamsStartIndex = Match.second;
                             }
                         }
+
+                        // QueryParamsStartIndex = Matches.back().second;
 
                         // Query parameters
 

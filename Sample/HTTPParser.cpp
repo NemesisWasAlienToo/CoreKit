@@ -22,11 +22,11 @@ int main(int argc, char const *argv[])
     std::cout << "Google is at " << Google << std::endl
               << std::endl;
 
-    Network::Socket client(Network::Socket::IPv4, Network::Socket::TCP);
+    Network::Socket Client(Network::Socket::IPv4, Network::Socket::TCP);
 
-    client.Connect(Google);
+    Client.Connect(Google);
 
-    client.Await(Network::Socket::Out);
+    Client.Await(Network::Socket::Out);
 
     Iterable::Queue<char> buffer;
     Format::Serializer ser(buffer);
@@ -38,30 +38,25 @@ int main(int argc, char const *argv[])
 
     while (!ser.Queue.IsEmpty())
     {
-        client << ser;
+        Client << ser;
     }
 
-    Network::HTTP::Parser<Network::HTTP::Response> p;
+    Network::HTTP::Parser parser;
 
-    client.Await(Network::Socket::In);
+    Client.Await(Network::Socket::In);
 
-    p.Start(client);
+    parser.Start(Client);
 
-    while (!p.IsFinished())
+    while (!parser.IsFinished())
     {
-        client.Await(Network::Socket::In);
+        Client.Await(Network::Socket::In);
 
-        if (!client.Received())
-        {
-            break;
-        }
-
-        p.Continue();
+        parser.Continue();
     }
 
-    std::cout << p.Result.ToString() << std::endl;
+    std::cout << parser.Result.ToString() << std::endl;
 
-    client.Close();
+    Client.Close();
 
     return 0;
 }

@@ -43,8 +43,8 @@ namespace Core
 
                     Ser << Type << ' ' << Path << " HTTP/" << Version << "\r\n";
 
-                    for (auto const &kv : Headers)
-                        Ser << kv.first << ": " << kv.second << "\r\n";
+                    for (auto const &[k, v] : Headers)
+                        Ser << k << ": " << v << "\r\n";
 
                     Ser << "\r\n"
                         << Content;
@@ -58,8 +58,8 @@ namespace Core
 
                     ss << Type << ' ' << Path << " HTTP/" << Version << "\r\n";
 
-                    for (auto const &kv : Headers)
-                        ss << kv.first << ": " << kv.second << "\r\n";
+                    for (auto const &[k, v] : Headers)
+                        ss << k << ": " << v << "\r\n";
 
                     ss << "\r\n"
                        << Content;

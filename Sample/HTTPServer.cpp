@@ -1,8 +1,7 @@
 #include <iostream>
 #include <string>
-#include <tuple>
-#include <functional>
 
+#include <Format/Stringifier.hpp>
 #include <Network/HTTP/Server.hpp>
 
 using namespace Core::Network;
@@ -45,7 +44,12 @@ int main(int argc, char const *argv[])
         "/Home/[Index]",
         [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
         {
-            return HTTP::Response::HTML(HTTP::HTTP10, HTTP::Status::OK, "<h1>Index = " + Parameters["Index"] + "</h1>")
+            Iterable::Queue<char> Queue;
+            Format::Stringifier Stringifier(Queue);
+
+            Stringifier << "<h1>Index = " << Parameters["Index"] << "</h1>";
+
+            return HTTP::Response::HTML(HTTP::HTTP10, HTTP::Status::OK, Stringifier.ToString())
                 .SetCookie("Name", "TestName", DateTime::FromNow(Duration(60, 0)))
                 .SetCookie("Family", "TestFamily", 60)
                 .SetCookie("Id", "TestFamily");

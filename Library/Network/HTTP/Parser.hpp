@@ -11,15 +11,19 @@
 #include <Network/Socket.hpp>
 #include <Network/HTTP/Request.hpp>
 
+// @todo Limit the number of clients
+
 namespace Core
 {
     namespace Network
     {
         namespace HTTP
         {
-            template <typename TMessage>
             struct Parser : Machine<void(Network::Socket)>
             {
+                static constexpr auto HeaderLimit = 16 * 1024;
+                static constexpr auto ContentLimit = 16 * 1024;
+
                 // @todo Change initial size
 
                 Iterable::Queue<char> Queue{1024};
@@ -30,8 +34,50 @@ namespace Core
                 size_t bodyPos = 0;
                 size_t bodyPosTmp = 0;
 
-                TMessage Result;
+                HTTP::Request Result;
                 std::map<std::string, std::string>::iterator Iterator;
+
+                // @todo Make this asynchronus
+
+                void Continue100()
+                {
+                    auto Client = Argument<0>();
+
+                    auto ExpectIterator = Result.Headers.find("Expect");
+
+                    if (ExpectIterator != Result.Headers.end() && ExpectIterator->second == "100-continue")
+                    {
+                        // Ensure version is HTTP 1.1
+
+                        if (Result.Version[5] == '1' && Result.Version[7] == '0')
+                        {
+                            throw HTTP::Response::ExpectationFailed(Result.Version, {{"Connection", "close"}});
+                        }
+
+                        if (ContetLength == 0)
+                        {
+                            throw HTTP::Response::BadRequest(Result.Version, {{"Connection", "close"}});
+                        }
+
+                        // Respond to 100-continue
+
+                        // @todo Maybe hanlde HTTP 2.0 later too?
+
+                        constexpr auto ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
+
+                        Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
+                        Format::Stringifier ContinueStream(Temp);
+
+                        Temp.Add(ContinueResponse, sizeof(ContinueResponse));
+
+                        // Send the response
+
+                        while (Temp.Length() > 0)
+                        {
+                            Client << ContinueStream;
+                        }
+                    }
+                }
 
                 void operator()()
                 {
@@ -41,6 +87,9 @@ namespace Core
                         Format::Stringifier Stream(Queue);
 
                         size_t Received = Client.Received();
+
+                        if (Received == 0)
+                            Terminate();
 
                         // Read received data
 
@@ -60,6 +109,10 @@ namespace Core
                     // Take all the header
 
                     // @todo Optimize this
+                    // @todo Set limit for header size
+
+                    // while (bodyPos == 0 && Queue.Length() < HeaderLimit)
+                    // Queue.Length() < HeaderLimit -> BadRequest
 
                     while (bodyPos == 0)
                     {
@@ -92,12 +145,23 @@ namespace Core
 
                         try
                         {
-                            ContetLength = std::stoul(Iterator->second);
+                            ContetLength = std::stoull(Iterator->second);
                         }
                         catch (...)
                         {
                             throw HTTP::Response::BadRequest(Result.Version, {{"Connection", "close"}});
                         }
+
+                        // Check if the length is in valid range
+
+                        if (ContetLength > ContentLimit)
+                        {
+                            throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
+                        }
+
+                        // Handle 100-continue
+
+                        Continue100();
 
                         // Get the content
 
@@ -108,8 +172,7 @@ namespace Core
 
                         // fill the content
 
-                        // Result.Content = std::string(Message.substr(bodyPos, ContetLength));
-                        Result.Content = std::string{Message.substr(bodyPos, ContetLength)};
+                        Result.Content = Message.substr(bodyPos, ContetLength);
 
                         // @todo Maybe crop the used chunk of data and leave the rest to be parsed as a seperate request?
 
@@ -123,22 +186,30 @@ namespace Core
 
                         if (Iterator == Result.Headers.end())
                         {
+                            Continue100();
+
                             CO_TERMINATE();
                         }
 
-                        // @todo Maybe parse weighted encoding?
+                        // @todo Maybe parse weighted encoding too?
 
-                        if (Iterator->second == "chunked")
+                        else if (Iterator->second == "chunked")
                         {
-                            // Read the body chinks till the end
+                            // Read the body chunks untill the end
 
                             // @todo Implement later
+                            // @todo Check content length to be in the acceptable range
+                            // throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
 
                             throw HTTP::Response::NotImplemented(Result.Version, {{"Connection", "close"}});
                         }
                         else if (Iterator->second == "gzip")
                         {
                             // Read the body chinks till the end
+
+                            // @todo Implement later
+                            // @todo Check content length to be in the acceptable range
+                            // throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
 
                             // @todo Implement later
 

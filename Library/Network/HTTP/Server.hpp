@@ -49,8 +49,7 @@ namespace Core
 
                 void HandleClient(Network::Socket Client, Network::EndPoint Info)
                 {
-                    Network::HTTP::Request Req;
-                    HTTP::Parser<HTTP::Request> parser;
+                    HTTP::Parser parser;
 
                     // @todo catch(const HTTP::Response& Response)
 
@@ -64,19 +63,12 @@ namespace Core
                     {
                         Client.Await(Network::Socket::In);
 
-                        if (!Client.Received())
-                        {
-                            break;
-                        }
-
                         parser.Continue();
                     }
                     
-                    Req = std::move(parser.Result);
-
                     // Handle request and form response
 
-                    Network::HTTP::Response Res = OnRequest(Info, Req);
+                    Network::HTTP::Response Res = OnRequest(Info, parser.Result);
 
                     // Serialize response
 
@@ -92,6 +84,8 @@ namespace Core
 
                         Client.Await(Core::Network::Socket::Out);
                     }
+
+                    // Check if connection should be closed
 
                     Client.Close();
                 }

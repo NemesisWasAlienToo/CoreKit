@@ -31,8 +31,8 @@ namespace Core
 
                     Ser << "HTTP/" << Version << ' ' << std::to_string(static_cast<unsigned short>(Status)) << ' ' << Brief << "\r\n";
 
-                    for (auto const &kv : Headers)
-                        Ser << kv.first + ": " << kv.second << "\r\n";
+                    for (auto const &[k, v] : Headers)
+                        Ser << k + ": " << v << "\r\n";
 
                     SetCookies.ForEach([&Ser](std::string const &Cookie)
                                        { Ser << "Set-Cookie: " << Cookie << "\r\n"; });
@@ -49,8 +49,8 @@ namespace Core
 
                     ss << "HTTP/" << Version << " " << std::to_string(static_cast<unsigned short>(Status)) << " " << Brief << "\r\n";
 
-                    for (auto const &kv : Headers)
-                        ss << kv.first + ": " << kv.second << "\r\n";
+                    for (auto const &[k, v] : Headers)
+                        ss << k + ": " << v << "\r\n";
 
                     SetCookies.ForEach([&ss](std::string const &Cookie)
                                        { ss << "Set-Cookie: " << Cookie << "\r\n"; });
@@ -334,6 +334,16 @@ namespace Core
                 static inline Response BadRequest(std::string Version, std::map<std::string, std::string> Parameters = {}, std::string Content = "")
                 {
                     return From(std::move(Version), HTTP::Status::BadRequest, std::move(Parameters), std::move(Content));
+                }
+
+                static inline Response ExpectationFailed(std::string Version, std::map<std::string, std::string> Parameters = {}, std::string Content = "")
+                {
+                    return From(std::move(Version), HTTP::Status::ExpectationFailed, std::move(Parameters), std::move(Content));
+                }
+
+                static inline Response RequestEntityTooLarge(std::string Version, std::map<std::string, std::string> Parameters = {}, std::string Content = "")
+                {
+                    return From(std::move(Version), HTTP::Status::RequestEntityTooLarge, std::move(Parameters), std::move(Content));
                 }
             };
         }
