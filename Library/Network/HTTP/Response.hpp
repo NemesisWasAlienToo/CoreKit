@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <string>
-#include <map>
+#include <unordered_map>
 
 #include <Duration.hpp>
 #include <DateTime.hpp>
@@ -275,7 +275,7 @@ namespace Core
 
                 // @todo Optimize rvalue
 
-                static Response From(std::string Version, HTTP::Status Status, std::map<std::string, std::string> Headers = {}, std::string Content = "")
+                static Response From(std::string Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, std::string Content = "")
                 {
                     Response response;
                     response.Status = Status;
@@ -304,7 +304,7 @@ namespace Core
                     return From(std::move(Version), Status, {{"Content-Type", "application/json"}, {"Content-Length", std::to_string(size)}}, std::move(Content));
                 }
 
-                static inline Response Redirect(std::string Version, HTTP::Status Status, std::string Location, std::map<std::string, std::string> Parameters = {})
+                static inline Response Redirect(std::string Version, HTTP::Status Status, std::string Location, std::unordered_map<std::string, std::string> Parameters = {})
                 {
                     std::stringstream str;
 
@@ -320,7 +320,7 @@ namespace Core
                     return From(std::move(Version), Status, std::move(Parameters), "");
                 }
 
-                static inline Response Redirect(std::string Version, std::string Location, std::map<std::string, std::string> Parameters = {})
+                static inline Response Redirect(std::string Version, std::string Location, std::unordered_map<std::string, std::string> Parameters = {})
                 {
                     return Redirect(std::move(Version), HTTP::Status::Found, std::move(Location), std::move(Parameters));
                 }

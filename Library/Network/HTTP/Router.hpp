@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 #include <regex>
-#include <map>
+#include <unordered_map>
 
 #include <Network/HTTP/HTTP.hpp>
 #include <Network/HTTP/Response.hpp>
@@ -20,7 +20,7 @@ namespace Core
             class Router
             {
             public:
-                using Handler = std::function<HTTP::Response(const Network::EndPoint &, const Network::HTTP::Request &, std::map<std::string, std::string> &)>;
+                using Handler = std::function<HTTP::Response(const Network::EndPoint &, const Network::HTTP::Request &, std::unordered_map<std::string, std::string> &)>;
                 // using Validator = std::function<bool(Network::EndPoint &, HTTP::Request &)>;
 
                 struct Route
@@ -34,7 +34,7 @@ namespace Core
 
                     // get query parameters
 
-                    void Query(std::string::const_iterator Start, const std::string &Path, std::map<std::string, std::string> &Result) const
+                    void Query(std::string::const_iterator Start, const std::string &Path, std::unordered_map<std::string, std::string> &Result) const
                     {
                         if (Start == Path.end())
                             return;
@@ -101,9 +101,9 @@ namespace Core
 
                     // @todo Optimize this
 
-                    std::tuple<bool, std::map<std::string, std::string>> Match(const std::string &Path) const
+                    std::tuple<bool, std::unordered_map<std::string, std::string>> Match(const std::string &Path) const
                     {
-                        std::map<std::string, std::string> Res;
+                        std::unordered_map<std::string, std::string> Res;
 
                         std::smatch Matches;
 
@@ -152,7 +152,7 @@ namespace Core
                     Routes.Add(std::move(route));
                 }
 
-                std::tuple<Route &, std::map<std::string, std::string>>
+                std::tuple<Route &, std::unordered_map<std::string, std::string>>
                 Match(const std::string &Method, const std::string &Path)
                 {
                     for (size_t i = 0; i < Routes.Length(); i++)

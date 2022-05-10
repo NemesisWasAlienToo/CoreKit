@@ -30,6 +30,8 @@
 #include <Format/Serializer.hpp>
 #include "Network/DHT/DHT.hpp"
 
+// @todo Change std::map to std::unordered_map
+
 namespace Core
 {
     namespace Network

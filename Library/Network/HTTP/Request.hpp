@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <string>
-#include <map>
+#include <unordered_map>
 #include <regex>
 
 #include <Duration.hpp>
@@ -67,7 +67,7 @@ namespace Core
                     return ss.str();
                 }
 
-                void Cookies(std::map<std::string, std::string> &Result) const
+                void Cookies(std::unordered_map<std::string, std::string> &Result) const
                 {
                     auto Iterator = Headers.find("Cookie");
 
@@ -91,16 +91,16 @@ namespace Core
                     }
                 }
 
-                std::map<std::string, std::string> Cookies() const
+                std::unordered_map<std::string, std::string> Cookies() const
                 {
-                    std::map<std::string, std::string> Result;
+                    std::unordered_map<std::string, std::string> Result;
 
                     Cookies(Result);
 
                     return Result;
                 }
 
-                void FormData(std::map<std::string, std::string> &Result) const
+                void FormData(std::unordered_map<std::string, std::string> &Result) const
                 {
                     std::regex Capture("([^&]+)=([^&]+)");
 
@@ -116,9 +116,9 @@ namespace Core
                     }
                 }
 
-                std::map<std::string, std::string> FormData() const
+                std::unordered_map<std::string, std::string> FormData() const
                 {
-                    std::map<std::string, std::string> Result;
+                    std::unordered_map<std::string, std::string> Result;
 
                     FormData(Result);
 
@@ -178,7 +178,7 @@ namespace Core
                     return ret;
                 }
 
-                inline static Request From(std::string Version, std::string Method, std::string Path, std::map<std::string, std::string> Headers = {}, std::string Content = "")
+                inline static Request From(std::string Version, std::string Method, std::string Path, std::unordered_map<std::string, std::string> Headers = {}, std::string Content = "")
                 {
                     Request request;
                     request.Type = std::move(Method);

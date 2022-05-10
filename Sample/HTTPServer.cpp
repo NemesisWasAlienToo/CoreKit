@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <unordered_map>
 
 #include <Format/Stringifier.hpp>
 #include <Network/HTTP/Server.hpp>
@@ -12,7 +13,7 @@ int main(int argc, char const *argv[])
 
     Server.SetDefault(
         "/",
-        [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
+        [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
         {
             Request.Cookies(Parameters);
 
@@ -26,7 +27,7 @@ int main(int argc, char const *argv[])
 
     Server.GET(
         "/Static/[Folder]",
-        [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
+        [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
         {
             Iterable::Queue<char> Queue;
             Format::Stringifier Stringifier(Queue);
@@ -40,7 +41,7 @@ int main(int argc, char const *argv[])
 
     Server.GET(
         "/Home",
-        [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
+        [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
         {
             Request.FormData(Parameters);
 
@@ -56,7 +57,7 @@ int main(int argc, char const *argv[])
 
     Server.GET(
         "/Home/[Index]",
-        [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
+        [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
         {
             Iterable::Queue<char> Queue;
             Format::Stringifier Stringifier(Queue);
@@ -71,7 +72,7 @@ int main(int argc, char const *argv[])
 
     Server.POST(
         "/Home/[Index]",
-        [](EndPoint const &, HTTP::Request const &Request, std::map<std::string, std::string> &Parameters)
+        [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
         {
             return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Index = " + Parameters["Index"] + "</h1>");
         });

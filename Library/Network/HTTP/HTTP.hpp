@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <map>
+#include <unordered_map>
 
 #include <Duration.hpp>
 #include <Iterable/Queue.hpp>
@@ -102,7 +102,7 @@ namespace Core
                 "Gateway Timeout",
                 "HTTP Version Not Supported"};
 
-            std::map<Status, std::string> const StatusMessage{
+            std::unordered_map<Status, std::string> const StatusMessage{
                 {Status::Continue, "Continue"},
                 {Status::SwitchingProtocols, "Switching Protocols"},
                 {Status::OK, "OK"},
@@ -150,7 +150,7 @@ namespace Core
             {
             public:
                 std::string Version;
-                std::map<std::string, std::string> Headers;
+                std::unordered_map<std::string, std::string> Headers;
                 std::string Content;
 
                 // virtual bool IsValid() = 0;

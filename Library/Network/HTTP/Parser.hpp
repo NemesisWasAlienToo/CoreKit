@@ -35,7 +35,7 @@ namespace Core
                 size_t bodyPosTmp = 0;
 
                 HTTP::Request Result;
-                std::map<std::string, std::string>::iterator Iterator;
+                std::unordered_map<std::string, std::string>::iterator Iterator;
 
                 // @todo Make this asynchronus
 
