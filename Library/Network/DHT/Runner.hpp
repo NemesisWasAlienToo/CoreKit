@@ -47,7 +47,7 @@ namespace Core
 
                 Runner() = default;
 
-                Runner(const Network::DHT::Node &identity, const Duration &Timeout) : Identity(identity), TimeOut(Timeout), Server(identity.EndPoint), State(States::Stopped), Cache(Identity.Id)
+                Runner(const Network::DHT::Node &identity, const Duration &Timeout) : Identity(identity), TimeOut(Timeout), Server(identity.EndPoint, TimeOut, Duration::FromMilliseconds(1000)), State(States::Stopped), Cache(Identity.Id)
                 {
                     Server.Builder = [this](const EndPoint &Peer)
                     {
@@ -96,14 +96,15 @@ namespace Core
 
                     State = States::Running;
 
-                    for (size_t i = 0; i < Pool.Length(); i++)
-                    {
-                        Pool[i] = std::thread(
-                            [this]
-                            {
-                                GetInPool();
-                            });
-                    }
+                    Pool.ForEach(
+                        [this](auto &Thread)
+                        {
+                            Thread = std::thread(
+                                [this]()
+                                {
+                                    GetInPool();
+                                });
+                        });
                 }
 
                 void Stop()
@@ -366,9 +367,8 @@ namespace Core
                     Serializer.Modify<uint32_t>(4) = Format::Serializer::Order(static_cast<uint32_t>(Buffer.Length()));
 
                     return {
-                        DateTime::FromNow(TimeOut),
                         std::move(End),
-                        [Peer, QU = std::move(Buffer)](Network::Socket Socket, UDPServer::EndCallback &End) mutable
+                        [Peer, QU = std::move(Buffer)](Network::Socket const &Socket, UDPServer::EndCallback &End) mutable
                         {
                             if (!QU.IsEmpty())
                             {
@@ -395,7 +395,8 @@ namespace Core
 
                                 return true;
                             }
-                        }};
+                        },
+                        };
                 }
 
                 template <class TCallback>
@@ -405,9 +406,8 @@ namespace Core
                     TCallback Callback)
                 {
                     return {
-                        DateTime::FromNow(TimeOut),
                         std::move(End),
-                        [this, Queue = Iterable::Queue<char>(), Peer, _Callback = std::move(Callback)](Network::Socket Socket, UDPServer::EndCallback &End) mutable
+                        [this, Queue = Iterable::Queue<char>(), Peer, _Callback = std::move(Callback)](Network::Socket const &Socket, UDPServer::EndCallback &End) mutable
                         {
                             constexpr size_t Padding = 8;
 
@@ -534,15 +534,7 @@ namespace Core
                     default:
                     {
                         Test::Warn("Unknown command") << Node.Id << "@" << Node.EndPoint << std::endl;
-
-                        SendTo(
-                            Node.EndPoint,
-                            [](Format::Serializer &Response)
-                            {
-                                Response << (char)Operations::Invalid << "Invalid command";
-                            },
-                            nullptr);
-
+                        
                         break;
                     }
                     }

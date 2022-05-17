@@ -3,7 +3,7 @@
 #include <poll.h>
 #include <system_error>
 
-#include "Iterable/Iterable.hpp"
+#include "Iterable/List.hpp"
 #include "Descriptor.hpp"
 
 namespace Core
@@ -12,15 +12,15 @@ namespace Core
     class Poll
     {
     public:
-        struct Container
+        struct Entry
         {
             int Descriptor;
             short int Mask;
             short int Events;
 
-            Container() = default;
+            Entry() = default;
 
-            constexpr Container(const Core::Descriptor &Descriptor, short int Masks) noexcept
+            constexpr Entry(const Core::Descriptor &Descriptor, short int Masks) noexcept
             {
                 this->Descriptor = Descriptor.INode();
                 this->Mask = Masks;
@@ -54,33 +54,36 @@ namespace Core
             }
         };
 
+        using List = Iterable::List<Entry>;
+
         typedef short Event;
 
-        enum PollEvents
+        enum PollOptions
         {
             In = POLLIN,
+            UrgentIn = POLLPRI,
             Out = POLLOUT,
-            Error = POLLNVAL,
+            Error = POLLERR,
+            HangUp = POLLHUP,
+            ReadHangUp = POLLRDHUP,
+            Invalid = POLLNVAL,
         };
 
         Poll() = default;
 
         // Operators
 
-        int operator()(Iterable::Iterable<Container> &Events, int Timeout = -1)
+        int operator()(List &Events, int Timeout = -1)
         {
-            int Result = poll((pollfd *)Events.Content(), Events.Length(), Timeout);
+            int Result = poll((pollfd *)Events.Content(), static_cast<nfds_t>(Events.Length()), Timeout);
+            int Saved = errno;
 
-            if (Result == -1)
+            if (Result == -1 && Saved != EINTR)
             {
-                throw std::system_error(errno, std::generic_category());
+                throw std::system_error(Saved, std::generic_category());
             }
 
             return Result;
         }
-
-        Poll &operator=(const Poll &Other) = delete;
-
-        Poll &operator=(Poll &&Other) noexcept = default;
     };
 }

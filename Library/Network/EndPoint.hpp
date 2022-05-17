@@ -81,13 +81,13 @@ namespace Core
 
             EndPoint(const EndPoint &Othere) : _Address(Othere._Address), _Port(Othere._Port), _Flow(Othere._Flow), _Scope(Othere._Scope) {}
 
-            EndPoint(const std::string& address, unsigned short Port)
+            EndPoint(const std::string &address, unsigned short Port)
             {
                 _Address = Network::Address(address);
                 _Port = htons(Port);
             }
 
-            EndPoint(const std::string& Content)
+            EndPoint(const std::string &Content)
             {
                 int Seprator = Content.find(':');
 
@@ -156,22 +156,22 @@ namespace Core
             Network::Address &Address() { return _Address; }
             Network::Address Address() const { return _Address; }
 
-            unsigned short port() const { return _Port; }
-            unsigned short port(unsigned short Port)
+            unsigned short Port() const { return _Port; }
+            unsigned short Port(unsigned short Port)
             {
                 _Port = Port;
                 return _Port;
             }
 
-            int flow() const { return _Flow; }
-            int flow(int Flow)
+            int Flow() const { return _Flow; }
+            int Flow(int Flow)
             {
                 _Flow = Flow;
                 return _Flow;
             }
 
-            int scope() const { return _Scope; }
-            int scope(int Scope)
+            int Scope() const { return _Scope; }
+            int Scope(int Scope)
             {
                 _Scope = Scope;
                 return _Scope;
@@ -193,37 +193,39 @@ namespace Core
 
             inline bool operator>(const EndPoint &Other) const
             {
-                if(_Address > Other._Address)
+                if (_Address > Other._Address)
                 {
                     return true;
                 }
-                else if(_Address < Other._Address)
+                else if (_Address < Other._Address)
                 {
                     return false;
                 }
                 else
                 {
-                    if(_Port <= Other._Port)  return false;
+                    if (_Port <= Other._Port)
+                        return false;
                 }
-                
+
                 return true;
             }
 
             inline bool operator<(const EndPoint &Other) const
             {
-                if(_Address > Other._Address)
+                if (_Address > Other._Address)
                 {
                     return false;
                 }
-                else if(_Address < Other._Address)
+                else if (_Address < Other._Address)
                 {
                     return true;
                 }
                 else
                 {
-                    if(_Port >= Other._Port)  return false;
+                    if (_Port >= Other._Port)
+                        return false;
                 }
-                
+
                 return true;
             }
 
@@ -243,21 +245,21 @@ namespace Core
                     return false;
             }
 
-            // inline bool operator>=(const EndPoint &Other) const
-            // {
-            //     if (_Address >= Other._Address && _Port >= Other._Port)
-            //         return true;
-            //     else
-            //         return false;
-            // }
+            inline bool operator>=(const EndPoint &Other) const
+            {
+                if (_Address >= Other._Address && _Port >= Other._Port)
+                    return true;
+                else
+                    return false;
+            }
 
-            // inline bool operator<=(const EndPoint &Other) const
-            // {
-            //     if (_Address <= Other._Address && _Port<= Other._Port)
-            //         return true;
-            //     else
-            //         return false;
-            // }
+            inline bool operator<=(const EndPoint &Other) const
+            {
+                if (_Address > Other._Address || _Port > Other._Port)
+                    return false;
+                else
+                    return true;
+            }
 
             friend std::ostream &operator<<(std::ostream &os, const EndPoint &tc)
             {
@@ -265,4 +267,16 @@ namespace Core
             }
         };
     }
+}
+
+namespace std
+{
+    template<>
+    struct hash<Core::Network::EndPoint>
+    {
+        size_t operator()(const Core::Network::EndPoint &EndPoint) const
+        {
+            return hash<Core::Network::Address>()(EndPoint.Address()) ^ hash<unsigned short>()(EndPoint.Port());
+        }
+    };
 }

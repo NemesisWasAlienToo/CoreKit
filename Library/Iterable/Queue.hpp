@@ -64,6 +64,16 @@ namespace Core
                 return std::tuple(&_ElementAt(0), std::min((this->_Capacity - this->_First), this->_Length));
             }
 
+            // inline size_t First() const
+            // {
+            //     return this->_First;
+            // }
+
+            // inline void First(size_t Value)
+            // {
+            //     this->_First = Value;
+            // }
+
             // ### Public Functions
 
             void Resize(size_t Size) // @todo Fix this bug
@@ -73,15 +83,32 @@ namespace Core
                 _First = 0;
             }
 
-            T Take()
+            void Pop()
             {
                 if (this->IsEmpty())
                     throw std::out_of_range("");
 
-                T Item = std::move(_ElementAt(0)); // OK?
+                _ElementAt(0).~T(); // OK?
                 this->_Length--;
                 _First = (_First + 1) % this->_Capacity;
+            }
 
+            void Take(T& Item)
+            {
+                if (this->IsEmpty())
+                    throw std::out_of_range("");
+
+                Item = std::move(_ElementAt(0)); // OK?
+                this->_Length--;
+                _First = (_First + 1) % this->_Capacity;
+            }
+
+            // @todo Optimize this
+
+            T Take()
+            {
+                T Item;
+                Take(Item);
                 return Item;
             }
 
@@ -128,6 +155,21 @@ namespace Core
 
                 _First = (_First + Count) % this->_Capacity;
                 this->_Length -= Count;
+            }
+
+            void Rewind(size_t Steps)
+            {
+                if constexpr (std::is_integral_v<T>)
+                {
+                    throw std::runtime_error("You cannot rewind an unitegral queue.");
+                }
+
+                if(this->_Capacity < Steps)
+                    throw std::out_of_range("");
+
+                _First = (this->_Capacity - Steps + _First) % this->_Capacity;
+
+                this->_Length += Steps;
             }
 
             // ### Operators

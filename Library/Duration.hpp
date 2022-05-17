@@ -35,57 +35,67 @@ namespace Core
 
         Duration(timespec TimeSpec)
         {
-            Seconds = TimeSpec.tv_sec + (TimeSpec.tv_nsec / (long)10e8);
+            Seconds = TimeSpec.tv_sec + (TimeSpec.tv_nsec / (long)1e9);
 
-            Nanoseconds = TimeSpec.tv_nsec % (long)10e8;
+            Nanoseconds = TimeSpec.tv_nsec % (long)1e9;
         }
 
         Duration(time_t nanoseconds)
         {
-            Seconds = nanoseconds / (long)10e8;
+            Seconds = nanoseconds / (long)1e9;
 
-            Nanoseconds = nanoseconds % (long)10e8;
+            Nanoseconds = nanoseconds % (long)1e9;
+        }
+
+        static Duration FromMilliseconds(size_t milliseconds)
+        {
+            return Duration(milliseconds / 1000, (milliseconds % 1000) * 1e6);
+        }
+
+        static Duration FromMicroseconds(size_t microseconds)
+        {
+            return Duration(microseconds / 1000'000, (microseconds % 1000) * 1e3);
         }
 
         void AddMilliseconds(time_t Value)
         {
-            Seconds += Value / (long)10e2;
+            Seconds += Value / (long)1e3;
 
-            Value %= (long)10e2;
+            Value %= (long)1e3;
 
-            Nanoseconds += (Value * (long)10e5);
+            Nanoseconds += (Value * (long)1e6);
 
-            Seconds += Nanoseconds / (long)10e8;
+            Seconds += Nanoseconds / (long)1e9;
 
-            Nanoseconds %= (long)10e8;
+            Nanoseconds %= (long)1e9;
         }
 
         void AddMicroseconds(time_t Value)
         {
-            Seconds += Value / (long)10e5;
+            Seconds += Value / (long)1e6;
 
-            Value %= (long)10e5;
+            Value %= (long)1e6;
 
             Nanoseconds += (Value * (long)10e2);
 
-            Seconds += Nanoseconds / (long)10e8;
+            Seconds += Nanoseconds / (long)1e9;
 
-            Nanoseconds %= (long)10e8;
+            Nanoseconds %= (long)1e9;
         }
 
         time_t AsMilliseconds() const
         {
-            return (Seconds * (long)10e2) + (Nanoseconds / (long)10e5);
+            return (Seconds * (long)10e2) + (Nanoseconds / (long)1e6);
         }
 
         time_t AsMicroseconds() const
         {
-            return (Seconds * (long)10e5) + (Nanoseconds / (long)10e2);
+            return (Seconds * (long)1e6) + (Nanoseconds / (long)10e2);
         }
 
         time_t AsNanoseconds() const
         {
-            return (Seconds * (long)10e8 ) +  Nanoseconds;
+            return (Seconds * (long)1e9 ) +  Nanoseconds;
         }
 
         bool IsZero() { return Seconds == 0 && Nanoseconds == 00; }

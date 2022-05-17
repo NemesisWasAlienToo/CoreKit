@@ -38,6 +38,11 @@ namespace Core
 
         Descriptor(const Descriptor &Other) : _INode(Other._INode) {}
 
+        virtual ~Descriptor()
+        {
+            Close();
+        }
+
         // ### Functionalitues
 
         inline bool IsValid()

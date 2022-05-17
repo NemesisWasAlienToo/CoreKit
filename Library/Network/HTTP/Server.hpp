@@ -108,11 +108,6 @@ namespace Core
                     Poll.Add(Interrupt, Event::In);
                 }
 
-                ~Server()
-                {
-                    Socket.Close();
-                }
-
                 // Functions
 
                 inline void SetDefault(const std::string &Pattern, HTTP::Router::Handler Action)

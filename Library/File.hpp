@@ -222,7 +222,7 @@ namespace Core
             return static_cast<size_t>(Result);
         }
 
-        void WriteLine(const std::string& Message)
+        void WriteLine(const std::string &Message)
         {
             *this << Message << '\n';
         }
@@ -236,7 +236,7 @@ namespace Core
 
             while ((RRead = Read(&c, 1)) > 0)
             {
-                if(c == '\n')
+                if (c == '\n')
                 {
                     break;
                 }

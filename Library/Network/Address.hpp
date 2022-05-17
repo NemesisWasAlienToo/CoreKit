@@ -18,22 +18,22 @@ namespace Core
             enum AddressFamily
             {
                 AnyFamily = AF_UNSPEC,
-                // Local = AF_LOCAL,
-                // Bluetooth = AF_BLUETOOTH,
-                // NFCAddress = AF_NFC,
-                // CAN = AF_CAN,
+                Local = AF_LOCAL,
+                Bluetooth = AF_BLUETOOTH,
+                NFC = AF_NFC,
+                CAN = AF_CAN,
                 Unix = AF_UNIX,
                 IPv4 = AF_INET,
                 IPv6 = AF_INET6,
             };
 
-        private:
             typedef struct in_addr _IN_ADDR;
             typedef struct in6_addr _IN6_ADDR;
             typedef struct sockaddr_in _SOCKADDR_IN;
             typedef struct sockaddr_in6 _SOCKADDR_IN6;
             typedef struct sockaddr_storage _SOCKADDR_STORAGE;
 
+        private:
             AddressFamily _Family = AnyFamily;
             unsigned char _Content[16] = {0};
 
@@ -136,10 +136,10 @@ namespace Core
             // Properties :
 
             inline AddressFamily Family() const { return _Family; }
-            inline const unsigned char* Content() const { return _Content; }
+            inline const unsigned char *Content() const { return _Content; }
 
-            inline AddressFamily& Family() { return _Family; }
-            inline unsigned char* Content() { return _Content; }
+            inline AddressFamily &Family() { return _Family; }
+            inline unsigned char *Content() { return _Content; }
 
             std::string IP() const
             {
@@ -189,7 +189,7 @@ namespace Core
                     {
                         return true;
                     }
-                    else if(_Content[i] < Other._Content[i])
+                    else if (_Content[i] < Other._Content[i])
                     {
                         return false;
                     }
@@ -206,7 +206,7 @@ namespace Core
                     {
                         return true;
                     }
-                    else if(_Content[i] > Other._Content[i])
+                    else if (_Content[i] > Other._Content[i])
                     {
                         return false;
                     }
@@ -305,4 +305,31 @@ namespace Core
             }
         };
     }
+}
+
+namespace std
+{
+    template <>
+    struct hash<Core::Network::Address>
+    {
+        size_t operator()(const Core::Network::Address &Address) const
+        {
+            if (Address.Family() == Core::Network::Address::IPv4)
+            {
+                return std::hash<uint32_t>()(*(uint32_t *)Address.Content());
+            }
+
+            size_t seed = 0;
+
+            for (int i = 0; i <= 15; i++)
+            {
+                // Boost combine function
+                // @todo Optimize this
+
+                seed ^= Address.Content()[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            }
+
+            return seed;
+        }
+    };
 }

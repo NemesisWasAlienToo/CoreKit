@@ -7,10 +7,10 @@
 
 namespace Core
 {
-    class ePoll : private Descriptor
+    class ePoll : public Descriptor
     {
     public:
-        struct Container
+        struct Entry
         {
             uint32_t Events;
             uint64_t Data;
@@ -36,22 +36,24 @@ namespace Core
                 Events &= ~Masks;
             }
 
-            static Container From(const Descriptor &descriptor, uint32_t Events)
+            static Entry From(const Descriptor &descriptor, uint32_t Events)
             {
-                Container Result;
+                Entry Result;
                 Result.DataAs<int>() = descriptor.INode();
                 Result.Events = Events;
                 return Result;
             }
 
-            static Container From(uint64_t Data, uint32_t Events)
+            static Entry From(uint64_t Data, uint32_t Events)
             {
-                Container Result;
+                Entry Result;
                 Result.Data = Data;
                 Result.Events = Events;
                 return Result;
             }
         } __EPOLL_PACKED;
+
+        using List = Iterable::List<Entry>;
 
     private:
     public:
@@ -64,12 +66,16 @@ namespace Core
             Delete = EPOLL_CTL_DEL,
         };
 
-        enum ePollEvents
+        enum ePollOptions
         {
             In = EPOLLIN,
+            UrgentIn = POLLPRI,
             Out = EPOLLOUT,
-            HangUp = EPOLLHUP,
             Error = EPOLLERR,
+            HangUp = EPOLLHUP,
+            ReadHangUp = EPOLLRDHUP,
+            EdgeTriggered = EPOLLET,
+            OneShot = EPOLLONESHOT,
         };
 
         ePoll(int Flags = 0)
@@ -79,14 +85,14 @@ namespace Core
 
         ~ePoll()
         {
-            close(_INode);
+            Close();
         }
 
         void Add(const Descriptor &descriptor, uint32_t Events, uint64_t Data)
         {
-            Container _Container = Container::From(Data, Events);
+            Entry _Entry = Entry::From(Data, Events);
 
-            if (epoll_ctl(_INode, int(Commands::Add), descriptor.INode(), (struct epoll_event *)&_Container) == -1)
+            if (epoll_ctl(_INode, int(Commands::Add), descriptor.INode(), (struct epoll_event *)&_Entry) == -1)
             {
                 throw std::system_error(errno, std::generic_category());
             }
@@ -94,9 +100,9 @@ namespace Core
 
         void Add(const Descriptor &descriptor, uint32_t Events)
         {
-            Container _Container = Container::From(descriptor.INode(), Events);
+            Entry _Entry = Entry::From(descriptor.INode(), Events);
 
-            if (epoll_ctl(_INode, int(Commands::Add), descriptor.INode(), (struct epoll_event *)&_Container) == -1)
+            if (epoll_ctl(_INode, int(Commands::Add), descriptor.INode(), (struct epoll_event *)&_Entry) == -1)
             {
                 throw std::system_error(errno, std::generic_category());
             }
@@ -104,16 +110,16 @@ namespace Core
 
         void Modify(const Descriptor &descriptor, uint32_t Events, uint64_t Data)
         {
-            Container _Container = Container::From(Data, Events);
+            Entry _Entry = Entry::From(Data, Events);
 
-            epoll_ctl(_INode, int(Commands::Modify), descriptor.INode(), (struct epoll_event *)&_Container);
+            epoll_ctl(_INode, int(Commands::Modify), descriptor.INode(), (struct epoll_event *)&_Entry);
         }
 
         void Modify(const Descriptor &descriptor, uint32_t Events)
         {
-            Container _Container = Container::From(descriptor.INode(), Events);
+            Entry _Entry = Entry::From(descriptor.INode(), Events);
 
-            epoll_ctl(_INode, int(Commands::Modify), descriptor.INode(), (struct epoll_event *)&_Container);
+            epoll_ctl(_INode, int(Commands::Modify), descriptor.INode(), (struct epoll_event *)&_Entry);
         }
 
         void Delete(const Descriptor &descriptor)
@@ -124,13 +130,14 @@ namespace Core
             }
         }
 
-        void operator()(Core::Iterable::List<Container> &Items, int Timeout = -1)
+        void operator()(List &Items, int Timeout = -1)
         {
-            int Count = epoll_wait(_INode, (struct epoll_event *)Items.Content(), Items.Capacity(), Timeout);
+            int Count = epoll_wait(_INode, (struct epoll_event *)Items.Content(), static_cast<int>(Items.Capacity()), Timeout);
+            int Saved = errno;
 
-            if (Count == -1)
+            if (Count == -1 && Saved != EINTR)
             {
-                throw std::system_error(errno, std::generic_category());
+                throw std::system_error(Saved, std::generic_category());
             }
 
             Items.Length(Count);

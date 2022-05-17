@@ -15,11 +15,12 @@
 #include <mutex>
 #include <thread>
 #include <functional>
-#include <map>
+#include <unordered_map>
 
 #include "Test.hpp"
 #include "Event.hpp"
 #include "Timer.hpp"
+#include "TimeWheel.hpp"
 
 #include "Network/EndPoint.hpp"
 #include "Network/Socket.hpp"
@@ -30,8 +31,6 @@
 #include <Format/Serializer.hpp>
 #include "Network/DHT/DHT.hpp"
 
-// @todo Change std::map to std::unordered_map
-
 namespace Core
 {
     namespace Network
@@ -39,20 +38,21 @@ namespace Core
         class UDPServer
         {
         public:
+            using WheelType = TimeWheel<20, 10>;
             using CleanCallback = std::function<void(const EndPoint &)>;
             using ProductCallback = std::function<void()>;
 
             using EndCallback = std::function<void()>;
-            using HandlerCallback = std::function<bool(Network::Socket, EndCallback &)>;
+            using HandlerCallback = std::function<bool(Network::Socket const &, EndCallback &)>;
 
             struct Entry
             {
-                DateTime Expire;
                 EndCallback End;
                 HandlerCallback Handler;
+                WheelType::Bucket::Iterator Timer;
             };
 
-            using Map = std::map<Network::EndPoint, Entry>;
+            using Map = std::unordered_map<Network::EndPoint, Entry>;
             using Queue = Iterable::Queue<Entry>;
 
             using BuilderCallback = std::function<Entry(const EndPoint &)>;
@@ -60,21 +60,18 @@ namespace Core
         protected:
             std::mutex Lock;
 
-            Timer Expire;
+            Duration TimeOut;
+            WheelType Wheel;
             Event Interrupt;
             Network::Socket Socket;
 
             Iterable::Poll Poll;
-
-            Duration TimeOut;
 
             std::mutex OLock;
             Queue Outgoing;
 
             std::mutex ILock;
             Map Incomming;
-
-            Map::iterator Tracking;
 
             // @todo implement this
 
@@ -88,13 +85,17 @@ namespace Core
 
             UDPServer() = default;
 
-            UDPServer(const Network::EndPoint &EndPoint) : Expire(Timer::Monotonic, 0), Interrupt(0, 0), Socket(Network::Socket::IPv4, Network::Socket::UDP), Poll(3)
+            UDPServer(const Network::EndPoint &EndPoint, Duration const &Timeout, Duration const &Interval) : TimeOut(Timeout), Wheel(Interval), Interrupt(0, 0), Socket(Network::Socket::IPv4, Network::Socket::UDP), Poll(3)
             {
                 Socket.Bind(EndPoint);
 
                 Poll.Add(Socket, Network::Socket::In);
-                Poll.Add(Expire, Timer::In);
+                Poll.Add(Wheel, Timer::In);
                 Poll.Add(Interrupt, Event::In);
+
+                // @todo Should it be here?
+
+                Wheel.Start();
             }
 
             // Functionalities
@@ -135,12 +136,25 @@ namespace Core
 
                 // Optimize winding
 
-                if (Incomming.size() == 1 || Iterator->second.Expire < Tracking->second.Expire)
-                {
-                    Tracking = Iterator;
-                }
+                auto Ptr = Wheel.Add(
+                    TimeOut,
+                    [this, Iterator]
+                    {
+                        std::lock_guard Lock(ILock);
 
-                SetClock();
+                        if (Iterator->second.End)
+                        {
+                            Iterator->second.End();
+                        }
+
+                        auto EP = Iterator->first;
+
+                        Incomming.erase(Iterator);
+
+                        OnClean(EP);
+                    });
+
+                Iterator->second.Timer = Ptr;
 
                 return true;
             }
@@ -150,7 +164,7 @@ namespace Core
             {
                 while (Condition())
                 {
-                    Lock.lock();
+                    std::unique_lock _Lock(Lock);
 
                 calc:
                     Await();
@@ -168,13 +182,14 @@ namespace Core
                     }
                     else if (Poll[1].HasEvent())
                     {
-                        Clean();
+                        Wheel.Listen();
+                        Wheel.Execute();
                     }
                     else if (Poll[2].HasEvent())
                     {
                         if (!Condition())
                         {
-                            Lock.unlock();
+                            _Lock.unlock();
                             break;
                         }
 
@@ -185,85 +200,6 @@ namespace Core
             }
 
         protected:
-            Core::Network::UDPServer::Map::iterator Soonest()
-            {
-                auto Result = Incomming.begin();
-                auto It = Incomming.begin()++;
-
-                for (size_t i = 1; i < Incomming.size(); i++, It++)
-                {
-                    if (It->second.Expire < Result->second.Expire)
-                    {
-                        Result = It;
-                    }
-                }
-
-                return Result;
-            }
-
-            void Wind()
-            {
-                if (Incomming.size() == 0)
-                {
-                    Expire.Stop();
-                    return;
-                }
-
-                Tracking = Soonest();
-
-                SetClock();
-            }
-
-            void SetClock()
-            {
-                if (Tracking->second.Expire.IsExpired())
-                {
-                    if (Tracking->second.End)
-                    {
-                        Tracking->second.End();
-                    }
-
-                    Wind();
-
-                    return;
-                }
-
-                Expire.Set(Tracking->second.Expire.Left());
-            }
-
-            bool Clean()
-            {
-                bool Ret = false;
-                Network::EndPoint EP;
-
-                Expire.Listen();
-                Lock.unlock();
-
-                {
-                    std::lock_guard lock(ILock);
-
-                    if ((Ret = Tracking->second.Expire.IsExpired()))
-                    {
-                        if (Tracking->second.End)
-                        {
-                            Tracking->second.End();
-                        }
-
-                        Incomming.erase(Tracking);
-                        EP = Tracking->first;
-                    }
-
-                    Wind();
-                }
-
-                if (Ret && OnClean)
-                {
-                    OnClean(EP);
-                }
-
-                return Ret;
-            }
-
             void OnSend()
             {
                 // @todo unclock mutex on exception
@@ -297,35 +233,57 @@ namespace Core
                 EndPoint Peer;
                 Socket.ReceiveFrom(nullptr, 0, Peer, Network::Socket::Peek);
 
-                ILock.lock();
-
-                auto [Iterator, Inserted] = Incomming.try_emplace(Peer, Entry());
-
-                if (Inserted)
                 {
-                    // @todo if Data contains multiple packets, Builder must add multiple handelrs
+                    std::unique_lock _lock(ILock);
 
-                    Iterator->second = Builder(Peer);
+                    auto [Iterator, Inserted] = Incomming.try_emplace(Peer, Entry());
+
+                    if (Inserted)
+                    {
+                        // @todo if Data contains multiple packets, Builder must add multiple handelrs
+
+                        Iterator->second = Builder(Peer);
+
+                        auto Ptr = Wheel.Add(
+                            TimeOut,
+                            [this, Iterator]
+                            {
+                                std::lock_guard Lock(ILock);
+
+                                if (Iterator->second.End)
+                                {
+                                    Iterator->second.End();
+                                }
+
+                                auto EP = Iterator->first;
+
+                                Incomming.erase(Iterator);
+
+                                OnClean(EP);
+                            });
+
+                        Iterator->second.Timer = Ptr;
+                    }
+
+                    auto IsReady = Iterator->second.Handler(Socket, Iterator->second.End);
+
+                    Lock.unlock();
+
+                    if (IsReady)
+                    {
+                        // @todo Check for concurrent access
+
+                        Wheel.Remove(Iterator->second.Timer);
+
+                        auto Ent = std::move(Iterator->second);
+
+                        Incomming.erase(Iterator);
+
+                        ILock.unlock();
+
+                        Ent.Handler({-1}, Ent.End);
+                    }
                 }
-
-                auto IsReady = Iterator->second.Handler(Socket, Iterator->second.End);
-
-                Lock.unlock();
-
-                if (IsReady)
-                {
-                    auto Ent = std::move(Iterator->second);
-
-                    Incomming.erase(Iterator);
-
-                    Wind();
-
-                    ILock.unlock();
-
-                    Ent.Handler({-1}, Ent.End);
-                }
-
-                ILock.unlock();
             }
 
             inline void Await()

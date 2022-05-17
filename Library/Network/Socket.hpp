@@ -24,6 +24,7 @@ namespace Core
         class Socket : public Descriptor
         {
         public:
+            static constexpr size_t SocketMaxConnections = SOMAXCONN;
             enum SocketFamily
             {
                 Any = PF_UNSPEC,
@@ -147,14 +148,14 @@ namespace Core
                 }
             }
 
-            std::tuple<Socket, EndPoint> Accept() const
+            std::tuple<Socket, EndPoint> Accept(int Flags = 0) const
             {
                 struct sockaddr_storage ClientAddress;
                 socklen_t Size;
                 int ClientDescriptor;
 
                 Size = sizeof ClientAddress;
-                ClientDescriptor = accept(_INode, (struct sockaddr *)&ClientAddress, &Size);
+                ClientDescriptor = accept4(_INode, (struct sockaddr *)&ClientAddress, &Size, Flags);
 
                 // Error handling here
 
@@ -166,14 +167,14 @@ namespace Core
                 return {ClientDescriptor, (struct sockaddr *)&ClientAddress};
             }
 
-            Socket Accept(EndPoint &Peer) const
+            Socket Accept(EndPoint &Peer, int Flags = 0) const
             {
                 struct sockaddr_storage ClientAddress;
                 socklen_t Size;
                 int ClientDescriptor;
 
                 Size = sizeof ClientAddress;
-                ClientDescriptor = accept(_INode, (struct sockaddr *)&ClientAddress, &Size);
+                ClientDescriptor = accept4(_INode, (struct sockaddr *)&ClientAddress, &Size, Flags);
 
                 // Error handling here
 
@@ -184,15 +185,27 @@ namespace Core
 
                 Peer = EndPoint((struct sockaddr *)&ClientAddress);
 
-                // @todo : The descriptor will not have NonBlocking flag in its type
-
-                Socket Ret(ClientDescriptor);
-
-                if (!IsBlocking())
-                    Ret.Blocking(false);
-
-                return Ret;
+                return ClientDescriptor;
             }
+
+            // @todo Implement these
+
+            // NoDelay option
+
+            // int SetOptions()
+            // int GetOptions()
+            // {
+            //     int error = 0;
+            //     socklen_t len = sizeof(error);
+                // int retval = getsockopt(_INode, SOL_SOCKET, SO_ERROR, &error, &len);
+
+            //     if (retval != 0)
+            //     {
+            //         throw std::system_error(errno, std::generic_category());
+            //     }
+
+            //     return error;
+            // }
 
             int Errors() const
             {
@@ -294,7 +307,7 @@ namespace Core
             {
                 // @todo Fix return type or return result of send
 
-                auto Result =  send(_INode, Data, Length, Flags);
+                auto Result = send(_INode, Data, Length, Flags);
 
                 if (Result < 0)
                 {
@@ -554,7 +567,7 @@ namespace Core
 
             // @todo Maybe add rvalue later?
 
-            Socket& operator=(Socket &&Other)
+            Socket &operator=(Socket &&Other)
             {
                 if (this != &Other)
                 {
