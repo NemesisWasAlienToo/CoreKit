@@ -95,7 +95,7 @@ namespace Core
 
             T &First()
             {
-                return *this[0];
+                return this->operator[](0);
             }
 
             T &Last()
