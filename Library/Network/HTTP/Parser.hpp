@@ -7,6 +7,7 @@
 
 #include <Machine.hpp>
 #include <Format/Stringifier.hpp>
+#include <Format/Serializer.hpp>
 #include <Iterable/Queue.hpp>
 #include <Network/Socket.hpp>
 #include <Network/HTTP/Request.hpp>
@@ -19,7 +20,7 @@ namespace Core
     {
         namespace HTTP
         {
-            struct Parser : Machine<void(Network::Socket)>
+            struct Parser : Machine<void(Network::Socket const *)>
             {
                 static constexpr auto HeaderLimit = 16 * 1024;
                 static constexpr auto ContentLimit = 16 * 1024;
@@ -39,9 +40,44 @@ namespace Core
 
                 // @todo Make this asynchronus
 
+                void Reset()
+                {
+                    // Crop buffer's content
+
+                    Machine::Reset();
+                    Queue.Free(bodyPos + ContetLength);
+
+                    if (Queue.Length() > 0)
+                        Queue.Resize(Queue.Capacity());
+
+                    ContetLength = 0;
+                    lenPos = 0;
+
+                    bodyPos = 0;
+                    bodyPosTmp = 0;
+
+                    Result = HTTP::Request();
+                    Iterator = Result.Headers.end();
+                }
+
+                void Clear()
+                {
+                    Machine::Reset();
+                    Queue.Free();
+
+                    ContetLength = 0;
+                    lenPos = 0;
+
+                    bodyPos = 0;
+                    bodyPosTmp = 0;
+
+                    Result = HTTP::Request();
+                    Iterator = Result.Headers.end();
+                }
+
                 void Continue100()
                 {
-                    auto Client = Argument<0>();
+                    const auto &Client = *Argument<0>();
 
                     auto ExpectIterator = Result.Headers.find("Expect");
 
@@ -81,7 +117,7 @@ namespace Core
 
                 void operator()()
                 {
-                    auto Client = Argument<0>();
+                    const auto &Client = *Argument<0>();
 
                     {
                         Format::Stringifier Stream(Queue);

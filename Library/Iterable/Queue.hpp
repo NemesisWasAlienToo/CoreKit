@@ -53,13 +53,19 @@ namespace Core
                 Other._First = 0;
             }
 
+            template<typename ...TArgs>
+            Queue(size_t Size, const TArgs &...Args) : Iterable<T>(Size, std::forward<TArgs>(Args)...) {}
+
+            template<typename ...TArgs>
+            Queue(size_t Size, TArgs &&...Args) : Iterable<T>(Size, std::forward<TArgs>(Args)...) {}
+
             // ### Destructor
 
             ~Queue() = default;
 
             // ### Properties
 
-            std::tuple<const T*, size_t> Chunk()
+            std::tuple<const T *, size_t> Chunk()
             {
                 return std::tuple(&_ElementAt(0), std::min((this->_Capacity - this->_First), this->_Length));
             }
@@ -93,7 +99,7 @@ namespace Core
                 _First = (_First + 1) % this->_Capacity;
             }
 
-            void Take(T& Item)
+            void Take(T &Item)
             {
                 if (this->IsEmpty())
                     throw std::out_of_range("");
@@ -136,8 +142,8 @@ namespace Core
                     }
                 }
 
-                this->_First = 0;
                 this->_Length = 0;
+                this->_First = 0;
             }
 
             void Free(size_t Count)
@@ -153,8 +159,16 @@ namespace Core
                     }
                 }
 
-                _First = (_First + Count) % this->_Capacity;
                 this->_Length -= Count;
+
+                if (this->_Length == 0)
+                {
+                    this->_First = 0;
+                }
+                else
+                {
+                    _First = (_First + Count) % this->_Capacity;
+                }
             }
 
             void Rewind(size_t Steps)
@@ -164,7 +178,7 @@ namespace Core
                     throw std::runtime_error("You cannot rewind an unitegral queue.");
                 }
 
-                if(this->_Capacity < Steps)
+                if (this->_Capacity < Steps)
                     throw std::out_of_range("");
 
                 _First = (this->_Capacity - Steps + _First) % this->_Capacity;

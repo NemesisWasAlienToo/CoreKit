@@ -9,12 +9,15 @@ using namespace Core::Network;
 
 int main(int argc, char const *argv[])
 {
-    HTTP::Server Server({"0.0.0.0:8888"}, {5, 0});
+    HTTP::Server Server({"0.0.0.0:8888"}, {5, 0}, 2);
 
     Server.SetDefault(
         "/",
         [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
         {
+            // @todo Store route arguments in a tuple.
+            // @todo Make argument names a compile time template parameter accessing the tuple to get access timeto O(1).
+
             Request.Cookies(Parameters);
 
             for (auto &[Key, Value] : Parameters)
@@ -57,7 +60,7 @@ int main(int argc, char const *argv[])
 
     Server.GET(
         "/Home/[Index]",
-        [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
+        [&](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
         {
             Iterable::Queue<char> Queue;
             Format::Stringifier Stringifier(Queue);
@@ -77,9 +80,21 @@ int main(int argc, char const *argv[])
             return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Index = " + Parameters["Index"] + "</h1>");
         });
 
-    Server.Listen(20)
-        .Start(0)
-        .GetInPool();
+    Server.Run();
+
+    Server.GetInPool();
+
+    while (true)
+    {
+        std::string input;
+
+        std::cin >> input;
+
+        if (input == "exit")
+            break;
+    }
+
+    Server.Stop();
 
     return 0;
 }

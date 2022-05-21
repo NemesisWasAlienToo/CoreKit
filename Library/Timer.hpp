@@ -47,9 +47,9 @@ namespace Core
             _INode = Result;
         }
 
-        Timer(const Timer &Other) : Descriptor(Other) {}
+        Timer(Timer &&Other) noexcept : Descriptor(std::move(Other)) {}
 
-        ~Timer() { Close(); }
+        Timer(Timer const &Other) = delete;
 
         // ### Functionalities
 
@@ -144,6 +144,13 @@ namespace Core
             return Listen();
         }
 
-        // TryAwait
+        Timer &operator=(Timer const &Other) = delete;
+
+        Timer &operator=(Timer &&Other) noexcept
+        {
+            Descriptor::operator=(std::move(Other));
+
+            return *this;
+        }
     };
 }

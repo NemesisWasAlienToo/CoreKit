@@ -79,7 +79,7 @@ namespace Core
 
         File(int INode) : Descriptor(INode) {}
 
-        File(const File &Other) : Descriptor(Other) {}
+        File(File &&Other) noexcept : Descriptor(std::move(Other)) {}
 
         // ### Static functions
 
@@ -248,6 +248,15 @@ namespace Core
         }
 
         // ### Operators
+
+        File &operator=(File &&Other) noexcept
+        {
+            Descriptor::operator=(std::move(Other));
+
+            return *this;
+        }
+
+        File &operator=(File const &Other) = delete;
 
         File &operator<<(const char Message)
         {

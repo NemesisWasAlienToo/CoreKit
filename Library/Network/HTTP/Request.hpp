@@ -35,6 +35,19 @@ namespace Core
                 std::string Type;
                 std::string Path;
 
+                void AppendToBuffer(Iterable::Queue<char>& Result)
+                {
+                    Format::Stringifier Ser(Result);
+
+                    Ser << Type << ' ' << Path << " HTTP/" << Version << "\r\n";
+
+                    for (auto const &[k, v] : Headers)
+                        Ser << k << ": " << v << "\r\n";
+
+                    Ser << "\r\n"
+                        << Content;
+                }
+
                 Iterable::Queue<char> ToBuffer()
                 {
                     Iterable::Queue<char> Result(20);

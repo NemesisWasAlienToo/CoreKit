@@ -56,6 +56,12 @@ namespace Core
                 }
             }
 
+            template <typename... TArgs>
+            Span(size_t Size, const TArgs &...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
+
+            template <typename... TArgs>
+            Span(size_t Size, TArgs &&...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
+
             ~Span()
             {
                 delete[] _Content;
@@ -80,6 +86,26 @@ namespace Core
             inline void Length(size_t Length)
             {
                 _Length = Length;
+            }
+
+            T &First()
+            {
+                return *this[0];
+            }
+
+            T &Last()
+            {
+                return *this[_Length - 1];
+            }
+
+            T const &First() const
+            {
+                return this->operator[](0);
+            }
+
+            T const &Last() const
+            {
+                return this->operator[](_Length - 1);
             }
 
             void Resize(size_t NewSize)
@@ -184,7 +210,7 @@ namespace Core
                 {
                     return *this;
                 }
-                
+
                 delete[] _Content;
 
                 _Content = Other._Content;

@@ -17,7 +17,7 @@ namespace Core
 
             enum AddressFamily
             {
-                AnyFamily = AF_UNSPEC,
+                Unspecified = AF_UNSPEC,
                 Local = AF_LOCAL,
                 Bluetooth = AF_BLUETOOTH,
                 NFC = AF_NFC,
@@ -34,7 +34,7 @@ namespace Core
             typedef struct sockaddr_storage _SOCKADDR_STORAGE;
 
         private:
-            AddressFamily _Family = AnyFamily;
+            AddressFamily _Family = Unspecified;
             unsigned char _Content[16] = {0};
 
         public:

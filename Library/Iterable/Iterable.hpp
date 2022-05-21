@@ -83,6 +83,12 @@ namespace Core
                 Other._Growable = false;
             }
 
+            template <typename... TArgs>
+            Iterable(size_t Size, const TArgs &...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
+
+            template <typename... TArgs>
+            Iterable(size_t Size, TArgs &&...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
+
             // ### Destructor
 
             ~Iterable()
@@ -93,7 +99,7 @@ namespace Core
 
             // ### Statics
 
-            template<typename TBuilder>
+            template <typename TBuilder>
             static Iterable<T> Build(size_t Start, size_t End, TBuilder Builder)
             {
                 Iterable<T> result((End - Start) + 1);
@@ -151,40 +157,33 @@ namespace Core
 
             T &First()
             {
-                if (IsEmpty())
-                    throw std::out_of_range("Instance is empty");
-
-                return _ElementAt(0);
-            }
-
-            const T &First() const
-            {
-                if (IsEmpty())
-                    throw std::out_of_range("Instance is empty");
-
-                return _ElementAt(0);
+                return *this[0];
             }
 
             T &Last()
             {
-                if (IsEmpty())
-                    throw std::out_of_range("Instance is empty");
-
-                return _ElementAt(_Length - 1);
+                return this->operator[](_Length - 1);
             }
-        
-            const T &Last() const
-            {
-                if (IsEmpty())
-                    throw std::out_of_range("Instance is empty");
 
-                return _ElementAt(_Length - 1);
+            T const &First() const
+            {
+                return this->operator[](0);
+            }
+
+            T const &Last() const
+            {
+                return *this[_Length - 1];
             }
 
             // Functions
 
             void Resize(size_t Size)
             {
+                // if(Size != _Capacity)
+                // {
+
+                // }
+
                 T *_New = new T[Size];
 
                 for (size_t i = 0; i < this->_Length; i++)
@@ -497,7 +496,7 @@ namespace Core
             }
 
             template <class TCallback>
-            std::tuple <bool, size_t> ContainsWhere(TCallback Condition) const
+            std::tuple<bool, size_t> ContainsWhere(TCallback Condition) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {

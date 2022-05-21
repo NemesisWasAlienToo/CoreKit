@@ -22,17 +22,7 @@ namespace Core
 
         // ### Constructors
 
-        Event()
-        {
-            int Result = eventfd(0, 0);
-
-            if (Result < 0)
-            {
-                throw std::system_error(errno, std::generic_category());
-            }
-
-            _INode = Result;
-        }
+        Event() = default;
 
         Event(int Handler) : Descriptor(Handler) {}
 
@@ -48,9 +38,8 @@ namespace Core
             _INode = Result;
         }
 
-        Event(const Event &Other) : Descriptor(Other) {}
-
-        ~Event() { Close(); }
+        Event(Event &&Other) noexcept : Descriptor(std::move(Other)) {}
+        Event(Event const &Other) = delete;
 
         // ### Functionalitues
 
@@ -92,6 +81,15 @@ namespace Core
             }
 
             return Value;
+        }
+
+        Event &operator=(Event const &Other) = delete;
+
+        Event &operator=(Event &&Other) noexcept
+        {
+            Descriptor::operator=(std::move(Other));
+
+            return *this;
         }
 
         // ### Peroperties

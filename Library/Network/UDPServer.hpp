@@ -61,6 +61,7 @@ namespace Core
             std::mutex Lock;
 
             Duration TimeOut;
+            Timer Expire;
             WheelType Wheel;
             Event Interrupt;
             Network::Socket Socket;
@@ -85,17 +86,17 @@ namespace Core
 
             UDPServer() = default;
 
-            UDPServer(const Network::EndPoint &EndPoint, Duration const &Timeout, Duration const &Interval) : TimeOut(Timeout), Wheel(Interval), Interrupt(0, 0), Socket(Network::Socket::IPv4, Network::Socket::UDP), Poll(3)
+            UDPServer(const Network::EndPoint &EndPoint, Duration const &Timeout, Duration const &Interval) : TimeOut(Timeout), Expire(Timer::Monotonic, 0), Wheel(Interval), Interrupt(0, 0), Socket(Network::Socket::IPv4, Network::Socket::UDP), Poll(3)
             {
                 Socket.Bind(EndPoint);
 
                 Poll.Add(Socket, Network::Socket::In);
-                Poll.Add(Wheel, Timer::In);
+                Poll.Add(Expire, Timer::In);
                 Poll.Add(Interrupt, Event::In);
 
                 // @todo Should it be here?
 
-                Wheel.Start();
+                Expire.Set(Interval, Interval);
             }
 
             // Functionalities
@@ -182,8 +183,8 @@ namespace Core
                     }
                     else if (Poll[1].HasEvent())
                     {
-                        Wheel.Listen();
-                        Wheel.Execute();
+                        Expire.Listen();
+                        Wheel.Tick();
                     }
                     else if (Poll[2].HasEvent())
                     {

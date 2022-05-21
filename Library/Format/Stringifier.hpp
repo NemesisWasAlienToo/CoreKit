@@ -26,7 +26,6 @@ namespace Core
         class Stringifier
         {
         public:
-
             // Public variables
 
             Iterable::Queue<char> &Queue;
@@ -176,10 +175,31 @@ namespace Core
 
             friend Descriptor &operator<<(Descriptor &descriptor, Stringifier &Stringifier)
             {
-                Stringifier.Queue.Free(descriptor.Write(&Stringifier.Queue.First(), Stringifier.Queue.Length()));
+                auto [Pointer, Size] = Stringifier.Queue.Chunk();
+
+                Stringifier.Queue.Free(descriptor.Write(Pointer, Size));
                 return descriptor;
             }
 
+            friend Descriptor const &operator<<(Descriptor const &descriptor, Stringifier &Stringifier)
+            {
+                auto [Pointer, Size] = Stringifier.Queue.Chunk();
+
+                Stringifier.Queue.Free(descriptor.Write(Pointer, Size));
+                return descriptor;
+            }
+
+            friend Descriptor const &operator>>(Descriptor const &descriptor, Stringifier &Stringifier)
+            {
+                // @todo Optimize when NoWrap was implemented in iterable resize
+
+                size_t size = descriptor.Received();
+                char data[size];
+                descriptor.Read(data, size);
+                Stringifier.Queue.Add(data, size);
+
+                return descriptor;
+            }
             friend Descriptor &operator>>(Descriptor &descriptor, Stringifier &Stringifier)
             {
                 // @todo Optimize when NoWrap was implemented in iterable resize

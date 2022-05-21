@@ -36,7 +36,11 @@ namespace Core
 
         Descriptor(int Handler) : _INode(Handler) {}
 
-        Descriptor(const Descriptor &Other) : _INode(Other._INode) {}
+        Descriptor(Descriptor const &) = delete;
+        Descriptor(Descriptor &&Other) noexcept : _INode(Other._INode)
+        {
+            Other._INode = -1;
+        }
 
         virtual ~Descriptor()
         {
@@ -45,7 +49,7 @@ namespace Core
 
         // ### Functionalitues
 
-        inline bool IsValid()
+        inline bool IsValid() const
         {
             return fcntl(_INode, F_GETFD) != -1 || errno != EBADF;
         }
@@ -64,7 +68,7 @@ namespace Core
             return Count;
         }
 
-        ssize_t Write(const void *Data, size_t Size)
+        ssize_t Write(const void *Data, size_t Size) const
         {
             ssize_t Result = write(_INode, Data, Size);
 
@@ -76,7 +80,7 @@ namespace Core
             return Result;
         }
 
-        ssize_t Read(void *Data, size_t Size)
+        ssize_t Read(void *Data, size_t Size) const
         {
             ssize_t Result = read(_INode, Data, Size);
 
@@ -151,14 +155,18 @@ namespace Core
 
         inline int INode() const { return _INode; }
 
-        Descriptor &operator=(const Descriptor &Other) = delete;
-
         Descriptor &operator=(Descriptor &&Other) noexcept
         {
-            _INode = Other._INode;
-            Other._INode = -1;
+            if (this != &Other)
+            {
+                _INode = Other._INode;
+                Other._INode = -1;
+            }
+
             return *this;
         }
+
+        Descriptor &operator=(Descriptor const &Other) = delete;
 
         // ### Operators
 
@@ -180,6 +188,18 @@ namespace Core
         inline bool operator<(const Descriptor &Other) const noexcept
         {
             return _INode < Other._INode;
+        }
+    };
+}
+
+namespace std
+{
+    template <>
+    struct hash<Core::Descriptor>
+    {
+        size_t operator()(Core::Descriptor const &descriptor) const
+        {
+            return hash<int32_t>()(descriptor.INode());
         }
     };
 }

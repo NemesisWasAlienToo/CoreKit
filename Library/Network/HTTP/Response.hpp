@@ -23,6 +23,22 @@ namespace Core
                 std::string Brief;
                 Iterable::List<std::string> SetCookies;
 
+                void AppendToBuffer(Iterable::Queue<char>& Result) const
+                {
+                    Format::Stringifier Ser(Result);
+
+                    Ser << "HTTP/" << Version << ' ' << std::to_string(static_cast<unsigned short>(Status)) << ' ' << Brief << "\r\n";
+
+                    for (auto const &[k, v] : Headers)
+                        Ser << k + ": " << v << "\r\n";
+
+                    SetCookies.ForEach([&Ser](std::string const &Cookie)
+                                       { Ser << "Set-Cookie: " << Cookie << "\r\n"; });
+
+                    Ser << "\r\n"
+                        << Content;
+                }
+
                 Iterable::Queue<char> ToBuffer() const
                 {
                     Iterable::Queue<char> Result(20);
@@ -316,6 +332,7 @@ namespace Core
                     }
 
                     Parameters.insert_or_assign("Location", str.str());
+                    Parameters.insert_or_assign("Content-Length", "0");
 
                     return From(std::move(Version), Status, std::move(Parameters), "");
                 }

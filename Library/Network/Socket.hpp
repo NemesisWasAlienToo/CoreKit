@@ -24,10 +24,14 @@ namespace Core
         class Socket : public Descriptor
         {
         public:
-            static constexpr size_t SocketMaxConnections = SOMAXCONN;
+            static constexpr size_t MaxConnections = SOMAXCONN;
             enum SocketFamily
             {
-                Any = PF_UNSPEC,
+                Unspecified = PF_UNSPEC,
+                Local = PF_LOCAL,
+                Bluetooth = PF_BLUETOOTH,
+                NFC = PF_NFC,
+                CAN = PF_CAN,
                 Unix = PF_UNIX,
                 IPv4 = PF_INET,
                 IPv6 = PF_INET6,
@@ -68,7 +72,7 @@ namespace Core
                 }
             }
 
-            Socket(const Socket &Other) : Descriptor(Other) {}
+            Socket(Socket &&Other) noexcept : Descriptor(std::move(Other)) {}
 
             void Bind(const EndPoint &Host) const
             {
@@ -136,7 +140,7 @@ namespace Core
                 Connect(EndPoint(address, Port));
             }
 
-            void Listen(int Count) const
+            void Listen(int Count = MaxConnections) const
             {
                 int Result = listen(_INode, Count);
 
@@ -197,7 +201,7 @@ namespace Core
             // {
             //     int error = 0;
             //     socklen_t len = sizeof(error);
-                // int retval = getsockopt(_INode, SOL_SOCKET, SO_ERROR, &error, &len);
+            // int retval = getsockopt(_INode, SOL_SOCKET, SO_ERROR, &error, &len);
 
             //     if (retval != 0)
             //     {
@@ -565,18 +569,13 @@ namespace Core
                 return Other._INode != _INode;
             }
 
-            // @todo Maybe add rvalue later?
-
-            Socket &operator=(Socket &&Other)
+            Socket &operator=(Socket &&Other) noexcept
             {
-                if (this != &Other)
-                {
-                    _INode = Other._INode;
-                    Other._INode = -1;
-                }
+                Descriptor::operator=(std::move(Other));
 
                 return *this;
             }
+
             Socket &operator=(const Socket &Other) = delete;
         };
     }

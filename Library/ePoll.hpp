@@ -10,6 +10,7 @@ namespace Core
     class ePoll : public Descriptor
     {
     public:
+        using Event = uint32_t;
         struct Entry
         {
             uint32_t Events;
@@ -17,6 +18,12 @@ namespace Core
 
             template <typename TReturn>
             inline TReturn &DataAs()
+            {
+                return *(reinterpret_cast<TReturn *>(&Data));
+            }
+
+            template <typename TReturn>
+            inline std::remove_const_t<TReturn> const &DataAs() const
             {
                 return *(reinterpret_cast<TReturn *>(&Data));
             }
@@ -78,7 +85,12 @@ namespace Core
             OneShot = EPOLLONESHOT,
         };
 
-        ePoll(int Flags = 0)
+        ePoll() = default;
+
+        ePoll(ePoll const &) = delete;
+        ePoll(ePoll &&Other) noexcept : Descriptor(std::move(Other)) {}
+
+        ePoll(int Flags)
         {
             _INode = epoll_create1(Flags);
         }
@@ -132,15 +144,30 @@ namespace Core
 
         void operator()(List &Items, int Timeout = -1)
         {
-            int Count = epoll_wait(_INode, (struct epoll_event *)Items.Content(), static_cast<int>(Items.Capacity()), Timeout);
-            int Saved = errno;
+            int Count = 0;
+            int Saved = 0;
 
-            if (Count == -1 && Saved != EINTR)
+            do
+            {
+                Count = epoll_wait(_INode, (struct epoll_event *)Items.Content(), static_cast<int>(Items.Capacity()), Timeout);
+                Saved = errno;
+            } while (Count < 0 && Saved == EINTR);
+
+            if (Count == -1)
             {
                 throw std::system_error(Saved, std::generic_category());
             }
 
             Items.Length(Count);
+        }
+
+        ePoll &operator=(ePoll const &Other) = delete;
+
+        ePoll &operator=(ePoll &&Other) noexcept
+        {
+            Descriptor::operator=(std::move(Other));
+
+            return *this;
         }
     };
 }

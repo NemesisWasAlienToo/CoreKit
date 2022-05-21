@@ -52,6 +52,12 @@ namespace Core
         bool IsFinished() const { return _IsFinished; }
         void Terminate() { _IsFinished = true; }
 
+        void Reset()
+        {
+            _State = 0;
+            _IsFinished = false;
+        }
+
         template <size_t TNumber>
         constexpr TArgument<TNumber> &
         Argument()

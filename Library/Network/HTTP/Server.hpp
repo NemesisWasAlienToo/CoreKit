@@ -1,22 +1,21 @@
 #pragma once
 
-#include <iostream>
 #include <string>
-#include <sstream>
-#include <thread>
-#include <mutex>
 
 #include <Event.hpp>
 #include <Duration.hpp>
-#include <Iterable/Poll.hpp>
+#include <Poll.hpp>
+#include <ePoll.hpp>
 #include <Iterable/List.hpp>
-#include <Network/Socket.hpp>
 #include <Network/HTTP/HTTP.hpp>
 #include <Format/Serializer.hpp>
 #include <Network/HTTP/Response.hpp>
 #include <Network/HTTP/Request.hpp>
 #include <Network/HTTP/Router.hpp>
 #include <Network/HTTP/Parser.hpp>
+#include <Network/TCPServer.hpp>
+
+// @todo Use timout
 
 namespace Core
 {
@@ -26,89 +25,31 @@ namespace Core
         {
             class Server
             {
-            private:
-                enum class States : char
-                {
-                    Stopped = 0,
-                    Running,
-                };
-
-                std::mutex Lock;
-                Network::Socket Socket;
-                Event Interrupt;
-
-                Iterable::Poll Poll;
-
-                Network::EndPoint Host;
-                Duration TimeOut;
-                volatile States State;
-
-                Iterable::Span<std::thread> Pool;
-
-                HTTP::Router Router;
-
-                void HandleClient(Network::Socket Client, Network::EndPoint Info)
-                {
-                    HTTP::Parser parser;
-
-                    // @todo catch(const HTTP::Response& Response)
-
-                    // @todo Optimize the loop
-
-                    Client.Await(Network::Socket::In);
-
-                    parser.Start(Client);
-
-                    while (!parser.IsFinished())
-                    {
-                        Client.Await(Network::Socket::In);
-
-                        parser.Continue();
-                    }
-                    
-                    // Handle request and form response
-
-                    Network::HTTP::Response Res = OnRequest(Info, parser.Result);
-
-                    // Serialize response
-
-                    Iterable::Queue<char> Buffer = Res.ToBuffer();
-
-                    Format::Stringifier Ser(Buffer);
-
-                    // Send response
-
-                    while (!Buffer.IsEmpty())
-                    {
-                        Client << Ser;
-
-                        Client.Await(Core::Network::Socket::Out);
-                    }
-
-                    // Check if connection should be closed
-
-                    Client.Close();
-                }
-
-                HTTP::Response OnRequest(const Network::EndPoint &Target, Network::HTTP::Request &Request)
-                {
-                    // Search in routes for match
-
-                    auto [Route, Parameters] = Router.Match(Request.Type, Request.Path);
-
-                    return Route.Action(Target, Request, Parameters);
-                }
-
             public:
-                Server(const Network::EndPoint &Host, Duration Timout) : Socket(Network::Socket::IPv4, Network::Socket::TCP), Host(Host), TimeOut(Timout), State(States::Stopped)
+                Server() = default;
+                Server(EndPoint const &endPoint, Duration const &timeout, size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500))
+                    : TCP(
+                          endPoint, [this](auto &Loop)
+                          { return BuildClientHandler(Loop); },
+                          ThreadCount),
+                      Timeout(timeout)
                 {
-                    Socket.Bind(Host);
-
-                    Poll.Add(Socket, Network::Socket::In);
-                    Poll.Add(Interrupt, Event::In);
                 }
 
-                // Functions
+                void Run()
+                {
+                    TCP.Run();
+                }
+
+                void GetInPool()
+                {
+                    TCP.GetInPool();
+                }
+
+                void Stop()
+                {
+                    TCP.Stop();
+                }
 
                 inline void SetDefault(const std::string &Pattern, HTTP::Router::Handler Action)
                 {
@@ -201,73 +142,118 @@ namespace Core
                         std::move(Extension));
                 }
 
-                // Startup functions
-
-                HTTP::Server &Listen(int Max)
+                Async::EventLoop::CallbackType BuildClientHandler(Async::EventLoop &Loop)
                 {
-                    Socket.Listen(Max);
-                    return *this;
-                }
-
-                void GetInPool()
-                {
-                    while (true)
+                    return [&, ShouldClose = false](Async::EventLoop *Loop, ePoll::Entry &Item, Async::EventLoop::Entry &Self) mutable
                     {
-                        Lock.lock();
-
-                        Poll();
-
-                        if (Poll[0].HasEvent())
+                        if (Item.Happened(ePoll::In))
                         {
-                            auto [Client, Info] = Socket.Accept();
+                            // Read data
 
-                            Lock.unlock();
+                            Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
 
-                            HandleClient(Client, Info);
-                        }
-                        else if (Poll[1].HasEvent())
-                        {
-                            Lock.unlock();
-                            break;
-                        }
-                    }
-                }
-
-                HTTP::Server &Start(int Count = std::thread::hardware_concurrency())
-                {
-                    Pool = Iterable::Span<std::thread>(Count);
-
-                    State = States::Running;
-
-                    for (size_t i = 0; i < Pool.Length(); i++)
-                    {
-                        Pool[i] = std::thread(
-                            [this]
+                            if (!Client.Received())
                             {
-                                GetInPool();
-                            });
-                    }
+                                Loop->Remove(Self.Iterator);
+                                return;
+                            }
 
-                    return *this;
+                            if (Self.Parser.IsStarted())
+                            {
+                                Self.Parser.Continue();
+                            }
+                            else
+                            {
+                                Self.Parser.Start(&Client);
+                            }
+
+                            if (Self.Parser.IsFinished())
+                            {
+                                // Process request
+
+                                auto It = Self.Parser.Result.Headers.find("Connection");
+
+                                if (Self.Parser.Result.Version == HTTP::HTTP10 || (It != Self.Parser.Result.Headers.end() && It->second == "close"))
+                                {
+                                    ShouldClose = true;
+                                }
+
+                                try
+                                {
+                                    // @todo Optimize Info passing
+
+                                    Network::HTTP::Response Response = OnRequest(Client.Peer(), Self.Parser.Result);
+
+                                    // Append response to buffer
+
+                                    Response.AppendToBuffer(Self.Buffer);
+                                }
+                                catch (HTTP::Response const &Response)
+                                {
+                                    Response.AppendToBuffer(Self.Buffer);
+                                }
+
+                                // Modify events
+
+                                Loop->Modify(Self, ePoll::In | ePoll::Out);
+
+                                // Reset Parser
+
+                                Self.Parser.Reset();
+                            }
+                        }
+
+                        if (Item.Happened(ePoll::Out))
+                        {
+                            // Check if has data to send
+
+                            if (Self.Buffer.IsEmpty())
+                            {
+                                // If not stop listenning to out event
+
+                                if (ShouldClose)
+                                {
+                                    Loop->Remove(Self.Iterator);
+                                    return;
+                                }
+
+                                Self.Buffer.Free();
+
+                                Loop->Modify(Self, ePoll::In);
+
+                                return;
+                            }
+
+                            // Write data
+
+                            Format::Stringifier Ser(Self.Buffer);
+
+                            // Make socket non-blocking and improve this
+
+                            Self.File << Ser;
+                        }
+
+                        if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error))
+                        {
+                            Loop->Remove(Self.Iterator);
+                        }
+                    };
                 }
 
-                void Stop()
+            private:
+                TCPServer TCP;
+                HTTP::Router Router;
+                Duration Timeout;
+
+                HTTP::Response OnRequest(const Network::EndPoint &Target, Network::HTTP::Request &Request)
                 {
-                    State = States::Stopped;
+                    // Search in routes for match
 
-                    Interrupt.Emit(1);
+                    auto [Route, Parameters] = Router.Match(Request.Type, Request.Path);
 
-                    // Join threads in pool
-
-                    Pool.ForEach(
-                        [](std::thread &Thread)
-                        {
-                            Thread.join();
-                        });
-
-                    Interrupt.Listen();
+                    return Route.Action(Target, Request, Parameters);
                 }
             };
-        };
+        }
     }
 }

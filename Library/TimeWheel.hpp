@@ -15,16 +15,15 @@
 namespace Core
 {
     template <size_t Steps, size_t Stages>
-    class TimeWheel : public Timer
+    class TimeWheel
     {
     public:
         struct Wheel;
-        struct Bucket;
 
         struct Entry
         {
             // @todo Maybe execute task in desctructor?
-            
+
             using TCallback = std::function<void()>;
 
             TCallback Callback;
@@ -90,21 +89,44 @@ namespace Core
         {
             std::array<Bucket, Steps> Buckets;
             size_t Interval;
-
-            Wheel() = default;
-            Wheel(size_t interval) : Interval(interval) {}
         };
 
         TimeWheel() = default;
-        TimeWheel(Duration const &interval) : Timer(Timer::Monotonic, 0), Interval(interval.AsMilliseconds())
+        TimeWheel(TimeWheel const &Other) = delete;
+        TimeWheel(TimeWheel &&Other) noexcept : Wheels(std::move(Other.Wheels)), Indices(std::move(Other.Indices)), IntervalMS(Other.IntervalMS) {}
+
+        TimeWheel(Duration const &Interval) : IntervalMS(Interval.AsMilliseconds())
         {
-            size_t TempInterval = Interval;
+            size_t TempInterval = 1;
 
             for (size_t i = 0; i < Wheels.size(); i++)
             {
+                Indices[i] = 0;
+
                 Wheels[i].Interval = TempInterval;
                 TempInterval *= Steps;
             }
+        }
+
+        TimeWheel &operator=(TimeWheel const &Other) = delete;
+
+        TimeWheel &operator=(TimeWheel &&Other) noexcept
+        {
+            Wheels = std::move(Other.Wheels);
+            Indices = std::move(Other.Indices);
+            IntervalMS = std::move(Other.IntervalMS);
+
+            return *this;
+        }
+
+        inline void Interval(Duration const &Interval)
+        {
+            IntervalMS = Interval.AsMilliseconds();
+        }
+
+        inline Duration Interval() const
+        {
+            return Duration::FromMilliseconds(IntervalMS);
         }
 
         // constexpr size_t MaxSteps()  const noexcept
@@ -113,26 +135,16 @@ namespace Core
 
         // }
 
-        // Duration MaxDelay()
-        // {
-        // }
-
-        inline void Start()
-        {
-            auto _Interval = Duration::FromMilliseconds(Interval);
-            Timer::Set(_Interval, _Interval);
-        }
-
-        inline void Execute()
+        inline void Tick()
         {
             Increment();
 
             Current().Execute();
         }
 
-        Bucket::Iterator Add(Duration const &interval, Entry::TCallback callback)
+        Bucket::Iterator Add(size_t _Steps, Entry::TCallback callback)
         {
-            Entry entry{std::move(callback), Offset(interval), 0, 0};
+            Entry entry{std::move(callback), Offset(_Steps), 0, 0};
 
             size_t Level = 0;
 
@@ -146,8 +158,18 @@ namespace Core
             return At(entry.Wheel, entry.Bucket).Add(std::move(entry));
         }
 
+        Bucket::Iterator Add(Duration const &Interval, Entry::TCallback callback)
+        {
+            return Add(Interval.AsMilliseconds() / IntervalMS, std::move(callback));
+        }
+
         inline void Remove(Bucket::Iterator entry)
         {
+            if (At(0, 0).Entries.end() == entry)
+                return;
+
+            // if (entry._M_node != nullptr)
+            
             At(entry->Wheel, entry->Bucket).Remove(entry);
         }
 
@@ -162,13 +184,13 @@ namespace Core
         }
 
     private:
-        std::array<size_t, Stages> Offset(Duration const &duration)
+        std::array<size_t, Stages> Offset(size_t _Steps)
         {
             std::array<size_t, Stages> Result;
 
-            size_t _Steps = duration.AsMilliseconds(); // / Interval;
+            size_t Level = Wheels.size() - 1;
 
-            for (size_t Level = Wheels.size() - 1; _Steps && Level < Wheels.size(); --Level)
+            for (; _Steps && Level < Wheels.size(); --Level)
             {
                 auto &_Interval = Wheels[Level].Interval;
 
@@ -176,14 +198,16 @@ namespace Core
                 _Steps %= _Interval;
             }
 
+            for (; Level < Wheels.size(); --Level)
+            {
+                Result[Level] = 0;
+            }
+
             return Result;
         }
 
         void Increment(size_t Level = 0)
         {
-            if (Level >= (Wheels.size() - 1))
-                return;
-
             size_t &_Index = Indices[Level];
             Wheel &_Wheel = Wheels[Level];
 
@@ -191,16 +215,17 @@ namespace Core
             {
                 _Index = 0;
 
+                if (Level >= (Wheels.size() - 1))
+                    return;
+
                 Increment(++Level);
 
                 Current(Level).Cascade(_Wheel, Level - 1);
             }
         }
 
-        // @todo Change this to miliseconds
-
-        size_t Interval;
-        std::array<Wheel, Stages> Wheels{0};
-        std::array<size_t, Stages> Indices{0};
+        std::array<Wheel, Stages> Wheels;
+        std::array<size_t, Stages> Indices;
+        size_t IntervalMS;
     };
 }

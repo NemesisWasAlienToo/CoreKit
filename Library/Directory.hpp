@@ -63,9 +63,9 @@ namespace Core
 
             Entry(unsigned long _INode, std::string _Name, uint8_t _Type, off_t _Offset, unsigned short _Length) : INode(_INode), Name(_Name), Type(_Type), Offset(_Offset), Length(_Length) {}
 
-            Entry(Entry &&Other) : INode(Other.INode), Name(std::move(Other.Name)), Type(Other.Type), Offset(Other.Offset), Length(Other.Length) {}
+            Entry(Entry &&Other) noexcept : INode(Other.INode), Name(std::move(Other.Name)), Type(Other.Type), Offset(Other.Offset), Length(Other.Length) {}
 
-            Entry(const Entry &Other) : INode(Other.INode), Name(Other.Name), Type(Other.Type), Offset(Other.Offset), Length(Other.Length) {}
+            Entry(Entry const&Other) = delete;
 
             // Static functions
 
@@ -169,7 +169,8 @@ namespace Core
 
         Directory(int INode) : Descriptor(INode) {}
 
-        Directory(const Directory &Other) : Descriptor(Other) {}
+        Directory(Directory const &Other) = delete;
+        Directory(Directory &&Other) : Descriptor(std::move(Other)) {}
 
         // ### Static functions
 
@@ -284,5 +285,14 @@ namespace Core
 
             return entries;
         }
+
+        Directory &operator=(Directory &&Other) noexcept
+        {
+            Descriptor::operator=(std::move(Other));
+
+            return *this;
+        }
+
+        Directory &operator=(Directory const &Other) = delete;
     };
 }

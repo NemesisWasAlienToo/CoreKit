@@ -396,11 +396,33 @@ namespace Core
 
             friend Descriptor &operator<<(Descriptor &descriptor, Serializer &Serializer)
             {
-                Serializer.Queue.Free(descriptor.Write(&Serializer.Queue.First(), Serializer.Queue.Length()));
+                auto [Pointer, Size] = Serializer.Queue.Chunk();
+
+                Serializer.Queue.Free(descriptor.Write(Pointer, Size));
+                return descriptor;
+            }
+
+            friend Descriptor const &operator<<(Descriptor const &descriptor, Serializer &Serializer)
+            {
+                auto [Pointer, Size] = Serializer.Queue.Chunk();
+
+                Serializer.Queue.Free(descriptor.Write(Pointer, Size));
                 return descriptor;
             }
 
             friend Descriptor &operator>>(Descriptor &descriptor, Serializer &Serializer)
+            {
+                // @todo Optimize when NoWrap was implemented in iterable resize
+
+                size_t size = descriptor.Received();
+                char data[size];
+                descriptor.Read(data, size);
+                Serializer.Queue.Add(data, size);
+
+                return descriptor;
+            }
+
+            friend Descriptor const &operator>>(Descriptor const &descriptor, Serializer &Serializer)
             {
                 // @todo Optimize when NoWrap was implemented in iterable resize
 
