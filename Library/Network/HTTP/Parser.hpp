@@ -28,6 +28,7 @@ namespace Core
                 // @todo Change initial size
 
                 Iterable::Queue<char> Queue{1024};
+                // Iterable::Queue<char> Queue = Iterable::Queue<char>(1024);
 
                 size_t ContetLength = 0;
                 size_t lenPos = 0;

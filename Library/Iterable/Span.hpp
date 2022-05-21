@@ -1,5 +1,6 @@
 #pragma once
 
+#include <initializer_list>
 #include "Iterable/Iterable.hpp"
 
 namespace Core
@@ -56,11 +57,15 @@ namespace Core
                 }
             }
 
-            template <typename... TArgs>
-            Span(size_t Size, const TArgs &...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
-
-            template <typename... TArgs>
-            Span(size_t Size, TArgs &&...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
+            Span(std::initializer_list<T> list) : _Length(list.size()), _Content(new T[list.size()])
+            {
+                size_t i = 0;
+                for (auto &item : list)
+                {
+                    _Content[i] = item;
+                    i++;
+                }
+            }
 
             ~Span()
             {

@@ -53,11 +53,7 @@ namespace Core
                 Other._First = 0;
             }
 
-            template<typename ...TArgs>
-            Queue(size_t Size, const TArgs &...Args) : Iterable<T>(Size, std::forward<TArgs>(Args)...) {}
-
-            template<typename ...TArgs>
-            Queue(size_t Size, TArgs &&...Args) : Iterable<T>(Size, std::forward<TArgs>(Args)...) {}
+            Queue(std::initializer_list<T> list) : Iterable<T>(list), _First(0) {}
 
             // ### Destructor
 

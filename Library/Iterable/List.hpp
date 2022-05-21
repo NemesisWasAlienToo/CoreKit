@@ -39,12 +39,7 @@ namespace Core
 
             List(List &&Other) noexcept : Iterable<T>(std::move(Other)) {}
 
-            template<typename ...TArgs>
-            // List(size_t Size, const TArgs &...Args) : this->_Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
-            List(size_t Size, const TArgs &...Args) : Iterable<T>(Size, std::forward<TArgs>(Args)...) {}
-
-            template<typename ...TArgs>
-            List(size_t Size, TArgs &&...Args) : Iterable<T>(Size, std::forward<TArgs>(Args)...) {}
+            List(std::initializer_list<T> list) : Iterable<T>(list) {}
 
             // ### Destructor
 

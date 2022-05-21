@@ -83,15 +83,25 @@ namespace Core
                 Other._Growable = false;
             }
 
-            template <typename... TArgs>
-            Iterable(size_t Size, const TArgs &...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
+            // template <typename... TArgs>
+            // Iterable(size_t Size, const TArgs &...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
 
-            template <typename... TArgs>
-            Iterable(size_t Size, TArgs &&...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
+            // template <typename... TArgs>
+            // Iterable(size_t Size, TArgs &&...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
+
+            Iterable(std::initializer_list<T> list) : _Capacity(list.size()), _Length(list.size()), _Content(new T[list.size()]), _Growable(true)
+            {
+                size_t i = 0;
+                for (auto &item : list)
+                {
+                    _Content[i] = item;
+                    i++;
+                }
+            }
 
             // ### Destructor
 
-            ~Iterable()
+            virtual ~Iterable()
             {
                 delete[] _Content;
                 _Content = nullptr;
