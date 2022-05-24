@@ -23,9 +23,7 @@ namespace Core
             struct Parser : Machine<void(Network::Socket const *)>
             {
                 static constexpr auto HeaderLimit = 16 * 1024;
-                static constexpr auto ContentLimit = 16 * 1024;
-
-                // @todo Change initial size
+                static constexpr auto ContentLimit = 8 * 1024 * 1024;
 
                 // Iterable::Queue<char> Queue{1024};
                 Iterable::Queue<char> Queue = Iterable::Queue<char>(1024);
@@ -38,8 +36,6 @@ namespace Core
 
                 HTTP::Request Result;
                 std::unordered_map<std::string, std::string>::iterator Iterator;
-
-                // @todo Make this asynchronus
 
                 void Reset()
                 {
@@ -75,6 +71,8 @@ namespace Core
                     Result = HTTP::Request();
                     Iterator = Result.Headers.end();
                 }
+
+                // @todo Make this asynchronus
 
                 void Continue100()
                 {

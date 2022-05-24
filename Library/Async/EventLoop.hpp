@@ -2,6 +2,7 @@
 
 #include <string>
 #include <list>
+#include <thread>
 #include <mutex>
 
 #include <Event.hpp>
@@ -35,9 +36,18 @@ namespace Core
                 CallbackType Callback;
                 Container::iterator Iterator;
 
+                // @todo Remove Buffer and Parser from here and put it in the callback handler
+
                 Iterable::Queue<char> Buffer;
                 Network::HTTP::Parser Parser;
                 TimeWheelType::Bucket::Iterator Timer;
+            };
+
+            struct EnqueueEntry
+            {
+                Descriptor File;
+                CallbackType Callback;
+                Duration Interval;
             };
 
             EventLoop() = default;
@@ -61,10 +71,11 @@ namespace Core
                             {
                                 auto Des = This->Queue.Take();
 
-                                This->Insert(std::move(Des.File), std::move(Des.Callback));
+                                This->Insert(std::move(Des.File), std::move(Des.Callback), std::move(Des.Interval));
                             }
                         }
-                    });
+                    },
+                    {0, 0});
 
                 // Assgin interrupt event
 
@@ -83,19 +94,54 @@ namespace Core
 
                         Ev.Listen();
                         This->Wheel.Tick();
-                    });
+                    },
+                    {0, 0});
 
                 // Assign expire event
 
                 Expire = static_cast<Timer *>(&TIterator->File);
             }
 
-            // void Reschedual()
+            void Reschedual(Entry &Self, Duration const &Interval)
+            {
+                if (Runner.get_id() != std::this_thread::get_id())
+                    throw std::runtime_error("Invalid thread");
+
+                auto Callback = std::move(Self.Timer->Callback);
+
+                Wheel.Remove(Self.Timer);
+
+                Self.Timer = Wheel.Add(Interval, std::move(Callback));
+            }
 
             void Remove(Container::iterator Iterator)
             {
+                if (Runner.get_id() != std::this_thread::get_id())
+                    throw std::runtime_error("Invalid thread");
+
+                _Poll.Delete(Iterator->File);
+                Wheel.Remove(Iterator->Timer);
+                Handlers.erase(Iterator);
+            }
+
+            /**
+             * @brief Only removes the connection handler
+             * @param Iterator 
+             */
+            void RemoveHandler(Container::iterator Iterator)
+            {
+                if (Runner.get_id() != std::this_thread::get_id())
+                    throw std::runtime_error("Invalid thread");
+
                 _Poll.Delete(Iterator->File);
                 Handlers.erase(Iterator);
+            }
+
+            void RemoveTimer(Container::iterator Iterator)
+            {
+                if (Runner.get_id() != std::this_thread::get_id())
+                    throw std::runtime_error("Invalid thread");
+
                 Wheel.Remove(Iterator->Timer);
             }
 
@@ -104,25 +150,27 @@ namespace Core
                 _Poll.Modify(Self.File, Events, (size_t)&Self);
             }
 
-            Container::iterator Assign(Descriptor Client, CallbackType Callback)
+            void Assign(Descriptor Client, CallbackType Callback, Duration const &Interval = {0, 0})
             {
-                return Insert(std::move(Client), std::move(Callback));
+                if (Runner.get_id() == std::this_thread::get_id())
+                {
+                    Insert(std::move(Client), std::move(Callback), Interval);
+                }
+                else
+                {
+                    {
+                        std::unique_lock lock(QueueMutex);
+
+                        Queue.Add({std::move(Client), std::move(Callback), Interval});
+                    }
+
+                    Notify();
+                }
             }
 
             void Notify(uint64_t Value = 1)
             {
                 Interrupt->Emit(Value);
-            }
-
-            void Enqueue(Descriptor Client, CallbackType Callback)
-            {
-                {
-                    std::unique_lock lock(QueueMutex);
-
-                    Queue.Add({std::move(Client), std::move(Callback)});
-                }
-
-                Interrupt->Emit(1);
             }
 
             template <typename TCallback>
@@ -167,18 +215,43 @@ namespace Core
             }
 
         private:
-            Container::iterator Insert(Descriptor descriptor, CallbackType handler)
+            Container::iterator Insert(Descriptor descriptor, CallbackType handler, Duration const &Timeout)
             {
                 auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler)});
                 Iterator->Iterator = Iterator;
 
-                // @todo Add timeout timer and remove this
+                if (Timeout.AsMilliseconds() > 0)
+                {
+                    Iterator->Timer = Wheel.Add(
+                        Timeout,
+                        [this, Iterator]
+                        {
+                            // Remove(Iterator);
 
-                Iterator->Timer = Wheel.At(0, 0).Entries.end();
+                            /**
+                             * @brief Important note
+                             * Remove cannot be used here
+                             * because this function is called on time out
+                             * event in wich an iterator will loop through
+                             * the list's entries and clean it.
+                             * Calling normal Remove will cause the iterator itseld
+                             * to be removed in between iterating through that list
+                             * and will cause segmentation fault.
+                             * RemoveHandler in turn, will only remove the descriptor
+                             * and its handler but not the time-out entry inside our
+                             * time wheel object so after executing this callback,
+                             * the time wheel handles the task of cleaning the time-out
+                             * handler and iterator itself.
+                             */
+                            RemoveHandler(Iterator);
+                        });
+                }
+                else
+                {
+                    Iterator->Timer = Wheel.At(0, 0).Entries.end();
+                }
 
-                auto &Ent = *Iterator;
-
-                _Poll.Add(Iterator->File, ePoll::In, (size_t)&Ent);
+                _Poll.Add(Iterator->File, ePoll::In, (size_t) & *Iterator);
 
                 return Iterator;
             }
@@ -190,7 +263,10 @@ namespace Core
             Container Handlers;
 
             std::mutex QueueMutex;
-            Iterable::Queue<Entry> Queue;
+            Iterable::Queue<EnqueueEntry> Queue;
+
+        public:
+            std::thread Runner;
         };
     }
 }

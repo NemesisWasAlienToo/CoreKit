@@ -31,6 +31,7 @@ namespace Core
                     : TCP(
                           endPoint, [this](auto &Loop)
                           { return BuildClientHandler(Loop); },
+                          timeout,
                           ThreadCount),
                       Timeout(timeout)
                 {
@@ -220,6 +221,10 @@ namespace Core
                                 Self.Buffer.Free();
 
                                 Loop->Modify(Self, ePoll::In);
+
+                                // @todo Optimize this
+
+                                Loop->Reschedual(Self, Timeout);
 
                                 return;
                             }

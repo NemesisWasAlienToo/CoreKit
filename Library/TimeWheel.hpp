@@ -57,7 +57,9 @@ namespace Core
             void Execute()
             {
                 for (auto &entry : Entries)
+                {
                     entry.Callback();
+                }
 
                 Entries.clear();
             }
@@ -163,14 +165,14 @@ namespace Core
             return Add(Interval.AsMilliseconds() / IntervalMS, std::move(callback));
         }
 
-        inline void Remove(Bucket::Iterator entry)
+        inline void Remove(Bucket::Iterator Iterator)
         {
-            if (At(0, 0).Entries.end() == entry)
+            if (Iterator == end())
                 return;
 
             // if (entry._M_node != nullptr)
-            
-            At(entry->Wheel, entry->Bucket).Remove(entry);
+
+            At(Iterator->Wheel, Iterator->Bucket).Remove(Iterator);
         }
 
         inline Bucket &At(size_t _Wheel, size_t _Bucket)
@@ -181,6 +183,11 @@ namespace Core
         inline Bucket &Current(size_t Stage = 0)
         {
             return At(Stage, Indices[Stage]);
+        }
+
+        inline auto end()
+        {
+            return At(0, 0).Entries.end();
         }
 
     private:

@@ -33,9 +33,9 @@ namespace Core
                 Loops.Length(Count);
 
                 Loops.ForEach(
-                    [this](Entry &Item)
+                    [this](EventLoop &Item)
                     {
-                        Item.Loop = Async::EventLoop(Interval);
+                        Item = Async::EventLoop(Interval);
                     });
             }
 
@@ -47,10 +47,10 @@ namespace Core
             {
                 for (size_t i = 0; i < Loops.Capacity() - 1; ++i)
                 {
-                    Loops[i].Thread = std::thread(
+                    Loops[i].Runner = std::thread(
                         [this, Condition, i]
                         {
-                            Loops[i].Loop.Loop(Condition);
+                            Loops[i].Loop(Condition);
                         });
                 }
             }
@@ -62,18 +62,18 @@ namespace Core
                 {
                     Loops.Length(Loops.Capacity());
 
-                    Loops.Last().Loop = Async::EventLoop(Interval);
+                    Loops.Last() = Async::EventLoop(Interval);
                 }
 
-                Loops.Last().Loop.Loop(Condition);
+                Loops.Last().Loop(Condition);
             }
 
             void Stop()
             {
                 for (size_t i = 0; i < Loops.Capacity() - 1; ++i)
                 {
-                    Loops[i].Loop.Notify();
-                    Loops[i].Thread.join();
+                    Loops[i].Notify();
+                    Loops[i].Runner.join();
                 }
             }
 
@@ -82,13 +82,15 @@ namespace Core
                 return Loops.Length();
             }
 
+            // void Enqueue()
+
             inline EventLoop &operator[](size_t Index)
             {
-                return Loops[Index].Loop;
+                return Loops[Index];
             }
 
         private:
-            Iterable::List<Entry> Loops;
+            Iterable::List<EventLoop> Loops;
             Duration Interval;
         };
     }
