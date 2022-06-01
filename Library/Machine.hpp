@@ -65,32 +65,18 @@ namespace Core
             return std::get<TNumber>(_Args);
         }
 
-        inline TReturn Start(TArgs... Args)
+        inline decltype(auto) Start(TArgs... Args)
         {
             _State = 0;
-            _Args = ArgsContainer(std::forward<TArgs &&>(Args)...);
+            _Args = ArgsContainer(std::forward<TArgs>(Args)...);
             _IsFinished = false;
 
-            if constexpr (std::is_same_v<void, TReturn>)
-            {
-                this->operator()();
-            }
-            else
-            {
-                return this->operator()();
-            }
+            return this->operator()();
         }
 
-        inline TReturn Continue()
+        inline decltype(auto) Continue()
         {
-            if constexpr (std::is_same_v<void, TReturn>)
-            {
-                this->operator()();
-            }
-            else
-            {
-                return this->operator()();
-            }
+            return this->operator()();
         }
 
         virtual TReturn operator()() = 0;

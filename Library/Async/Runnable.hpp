@@ -9,7 +9,6 @@ protected:
 
     volatile States State = States::Stopped;
 
-// public:
     inline void Run()
     {
         State = States::Running;

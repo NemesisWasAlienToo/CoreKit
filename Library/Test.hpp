@@ -1,14 +1,14 @@
 #pragma once
 
 #include <iostream>
-#include <ctime>
-
-#include "DateTime.hpp"
+#include <DateTime.hpp>
+#include <File.hpp>
 
 namespace Core
 {
     namespace Test
     {
+        constexpr char *Reset = (char *)"\033[0m";
         constexpr char *Black = (char *)"\033[30m";
         constexpr char *Red = (char *)"\033[31m";
         constexpr char *Green = (char *)"\033[32m";
@@ -17,61 +17,72 @@ namespace Core
         constexpr char *Magenta = (char *)"\033[35m";
         constexpr char *Cyan = (char *)"\033[36m";
         constexpr char *White = (char *)"\033[37m";
-        constexpr char *Reset = (char *)"\033[0m";
 
-        void Assert(bool Condition, const std::string &Message)
+        template <typename... TPrintables>
+        std::ostream &Print(std::ostream &Output, TPrintables const &...Printables) { return Output; }
+
+        template <typename TPrintable, typename... TPrintables>
+        std::ostream &Print(std::ostream &Output, TPrintable const &Printable, const TPrintables &...Printables)
         {
-            if (Condition)
-                std::cout << Green << "Passed" << Reset  << " : " << Message << std::endl;
-            else
-                std::cout << Red << "Failed" << Reset  << " : " << Message << std::endl;
+            Output << Printable;
+            Print(Output, Printables...);
+            return Output;
         }
 
-        std::string DateTime()
+        inline void Assert(bool condition, const std::string &message)
         {
-            time_t rawtime;
-            struct tm *timeinfo;
-            char buffer[40];
-
-            time(&rawtime);
-            timeinfo = localtime(&rawtime);
-
-            strftime(buffer, 40, "%F %T", timeinfo);
-
-            return buffer;
+            if (!condition)
+                throw std::invalid_argument(message);
         }
 
-        std::ostream &Colored(const char *Color, const std::string &Title)
+        template <typename TTest>
+        inline void Test(const std::string &Name, TTest Test)
         {
-            std::cout << Color
-                      << "["
-                      << DateTime::Now() << "] "
-                      << Title << " : "
-                      << Reset;
+            try
+            {
+                Assert(Test(), Name + " failed");
+                std::cout << Green << "Passed : " << Reset << Name << std::endl;
+            }
+            catch (const std::exception &e)
+            {
+                std::cout << Name << Red << " Failed with : " << Reset << e.what() << std::endl;
+            }
+        }
+
+        template <typename... TPrintables>
+        std::ostream &Colored(std::ostream &Output, const char *Color, const TPrintables &...Printables)
+        {
+            Output << Color << "[" << DateTime::Now() << "]" << Reset << " : ";
+
+            Print(Output, Printables...);
 
             std::cout.flush();
 
+            return Output;
+        }
+
+        template <typename... TPrintables>
+        inline std::ostream &Log(TPrintables const &...Printables)
+        {
+            Colored(std::cout, Green, Printables...);
+            std::cout << std::endl;
             return std::cout;
         }
 
-        inline std::ostream &Error(const std::string &Title, std::ostream &os)
+        template <typename... TPrintables>
+        inline std::ostream &Warn(TPrintables const &...Printables)
         {
-            return Colored(Red, Title);
+            Colored(std::cout, Yellow, Printables...);
+            std::cout << std::endl;
+            return std::cout;
         }
 
-        inline std::ostream &Error(const std::string &Title)
+        template <typename... TPrintables>
+        inline std::ostream &Error(TPrintables const &...Printables)
         {
-            return Colored(Red, Title);
-        }
-
-        inline std::ostream &Warn(const std::string & Title)
-        {
-            return Colored(Yellow, Title);
-        }
-
-        inline std::ostream &Log(const std::string & Title)
-        {
-            return Colored(Green, Title);
+            Colored(std::cerr, Red, Printables...);
+            std::cout << std::endl;
+            return std::cerr;
         }
     };
 }

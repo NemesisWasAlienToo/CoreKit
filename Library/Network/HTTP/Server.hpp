@@ -159,28 +159,28 @@ namespace Core
                                 return;
                             }
 
-                            if (Self.Parser.IsStarted())
+                            try
                             {
-                                Self.Parser.Continue();
-                            }
-                            else
-                            {
-                                Self.Parser.Start(&Client);
-                            }
-
-                            if (Self.Parser.IsFinished())
-                            {
-                                // Process request
-
-                                auto It = Self.Parser.Result.Headers.find("Connection");
-
-                                if (Self.Parser.Result.Version == HTTP::HTTP10 || (It != Self.Parser.Result.Headers.end() && It->second == "close"))
+                                if (Self.Parser.IsStarted())
                                 {
-                                    ShouldClose = true;
+                                    Self.Parser.Continue();
+                                }
+                                else
+                                {
+                                    Self.Parser.Start(&Client);
                                 }
 
-                                try
+                                if (Self.Parser.IsFinished())
                                 {
+                                    // Process request
+
+                                    auto It = Self.Parser.Result.Headers.find("Connection");
+
+                                    if (Self.Parser.Result.Version == HTTP::HTTP10 || (It != Self.Parser.Result.Headers.end() && It->second == "close"))
+                                    {
+                                        ShouldClose = true;
+                                    }
+
                                     // @todo Optimize Info passing
 
                                     Network::HTTP::Response Response = OnRequest(Client.Peer(), Self.Parser.Result);
@@ -188,19 +188,21 @@ namespace Core
                                     // Append response to buffer
 
                                     Response.AppendToBuffer(Self.Buffer);
+
+                                    // Modify events
+
+                                    Loop->Modify(Self, ePoll::In | ePoll::Out);
+
+                                    // Reset Parser
+
+                                    Self.Parser.Reset();
                                 }
-                                catch (HTTP::Response const &Response)
-                                {
-                                    Response.AppendToBuffer(Self.Buffer);
-                                }
+                            }
+                            catch (HTTP::Response const &Response)
+                            {
+                                Response.AppendToBuffer(Self.Buffer);
 
-                                // Modify events
-
-                                Loop->Modify(Self, ePoll::In | ePoll::Out);
-
-                                // Reset Parser
-
-                                Self.Parser.Reset();
+                                ShouldClose = true;
                             }
                         }
 
@@ -250,7 +252,7 @@ namespace Core
                 HTTP::Router Router;
                 Duration Timeout;
 
-                HTTP::Response OnRequest(const Network::EndPoint &Target, Network::HTTP::Request &Request)
+                HTTP::Response OnRequest(Network::EndPoint const &Target, Network::HTTP::Request &Request)
                 {
                     // Search in routes for match
 

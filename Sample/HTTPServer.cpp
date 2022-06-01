@@ -9,7 +9,7 @@ using namespace Core::Network;
 
 int main(int argc, char const *argv[])
 {
-    HTTP::Server Server({"0.0.0.0:8888"}, {5, 0}, 2);
+    HTTP::Server Server({"0.0.0.0:8888"}, {5, 0}, 1);
 
     Server.SetDefault(
         "/",
@@ -84,17 +84,14 @@ int main(int argc, char const *argv[])
 
     Server.GetInPool();
 
-    while (true)
-    {
-        std::string input;
+    // while (true)
+    // {
+    //     std::string input;
 
-        std::cin >> input;
+    //     std::cin >> input;
+    // }
 
-        if (input == "exit")
-            break;
-    }
-
-    Server.Stop();
+    // Server.Stop();
 
     return 0;
 }
