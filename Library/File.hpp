@@ -296,6 +296,8 @@ namespace Core
             return *this;
         }
 
+        // @todo Remove these
+
         File &operator>>(std::string &Message)
         {
             int Result = 0;

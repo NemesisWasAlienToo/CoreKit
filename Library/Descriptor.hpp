@@ -8,6 +8,11 @@
 #include <sys/eventfd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/sendfile.h>
+#include <sys/uio.h>
+#include <algorithm>
+
+#include <Iterable/Span.hpp>
 
 namespace Core
 {
@@ -37,9 +42,11 @@ namespace Core
         Descriptor(int Handler) : _INode(Handler) {}
 
         Descriptor(Descriptor const &) = delete;
-        Descriptor(Descriptor &&Other) noexcept : _INode(Other._INode)
+        Descriptor(Descriptor &&Other) noexcept
         {
-            Other._INode = -1;
+            std::swap(_INode, Other._INode);
+
+            Other.Close();
         }
 
         virtual ~Descriptor()
@@ -68,13 +75,64 @@ namespace Core
             return Count;
         }
 
+        ssize_t Write(struct iovec *Vector, size_t Count)
+        {
+            ssize_t Result = writev(_INode, Vector, Count);
+
+            if (Result < 0)
+            {
+                throw std::system_error(errno, std::generic_category());
+            }
+
+            return Result;
+        }
+
         ssize_t Write(const void *Data, size_t Size) const
         {
             ssize_t Result = write(_INode, Data, Size);
 
             if (Result < 0)
             {
-                throw std::system_error(errno, std::generic_category());
+                auto EB = errno;
+
+                if (EB == EAGAIN)
+                    return 0;
+
+                throw std::system_error(EB, std::generic_category());
+            }
+
+            return Result;
+        }
+
+        ssize_t Write(Iterable::Span<char> const &Data) const
+        {
+            ssize_t Result = write(_INode, Data.Content(), Data.Length());
+
+            if (Result < 0)
+            {
+                auto EB = errno;
+
+                if (EB == EAGAIN)
+                    return 0;
+
+                throw std::system_error(EB, std::generic_category());
+            }
+
+            return Result;
+        }
+
+        ssize_t Read(struct iovec *Vector, size_t Count) const
+        {
+            ssize_t Result = readv(_INode, Vector, Count);
+
+            if (Result < 0)
+            {
+                auto EB = errno;
+
+                if (EB == EAGAIN)
+                    return 0;
+
+                throw std::system_error(EB, std::generic_category());
             }
 
             return Result;
@@ -86,10 +144,56 @@ namespace Core
 
             if (Result < 0)
             {
-                throw std::system_error(errno, std::generic_category());
+                auto EB = errno;
+
+                if (EB == EAGAIN)
+                    return 0;
+
+                throw std::system_error(EB, std::generic_category());
             }
 
             return Result;
+        }
+
+        ssize_t Read(Iterable::Span<char> &Data) const
+        {
+            ssize_t Result = read(_INode, Data.Content(), Data.Length());
+
+            if (Result < 0)
+            {
+                auto EB = errno;
+
+                if (EB == EAGAIN)
+                    return 0;
+
+                throw std::system_error(EB, std::generic_category());
+            }
+
+            return Result;
+        }
+
+        Iterable::Span<char> Read() const
+        {
+            Iterable::Span<char> Data(Received());
+
+            ssize_t Result = read(_INode, Data.Content(), Data.Length());
+
+            if (Result < 0)
+            {
+                auto EB = errno;
+
+                if (EB == EAGAIN)
+                    Iterable::Span<char>();
+
+                throw std::system_error(EB, std::generic_category());
+            }
+
+            if (static_cast<size_t>(Result) != Data.Length())
+            {
+                Data.Resize(Result);
+            }
+
+            return Data;
         }
 
         void Blocking(bool Value)
@@ -151,6 +255,44 @@ namespace Core
             _INode = -1;
         }
 
+        ssize_t SendFile(Descriptor const &Other, size_t Size, off_t Offset) const
+        {
+            int Result = sendfile(Other._INode, _INode, &Offset, Size);
+
+            // Error handling here
+
+            if (Result < 0)
+            {
+                auto EB = errno;
+
+                if (EB == EAGAIN)
+                    return 0;
+
+                throw std::system_error(EB, std::generic_category());
+            }
+
+            return Result;
+        }
+
+        ssize_t SendFile(Descriptor const &Other, size_t Size) const
+        {
+            int Result = sendfile(Other._INode, _INode, nullptr, Size);
+
+            // Error handling here
+
+            if (Result < 0)
+            {
+                auto EB = errno;
+
+                if (EB == EAGAIN)
+                    return 0;
+
+                throw std::system_error(EB, std::generic_category());
+            }
+
+            return Result;
+        }
+
         // ### Peroperties
 
         inline int INode() const { return _INode; }
@@ -159,8 +301,8 @@ namespace Core
         {
             if (this != &Other)
             {
-                _INode = Other._INode;
-                Other._INode = -1;
+                std::swap(_INode, Other._INode);
+                Other.Close();
             }
 
             return *this;
@@ -189,6 +331,8 @@ namespace Core
         {
             return _INode < Other._INode;
         }
+
+        // Stream operators
     };
 }
 

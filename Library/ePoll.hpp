@@ -19,7 +19,14 @@ namespace Core
             template <typename TReturn>
             inline TReturn &DataAs()
             {
-                return *(reinterpret_cast<TReturn *>(&Data));
+                if constexpr (sizeof(TReturn) > sizeof(uint64_t))
+                {
+                    throw std::invalid_argument("Invalid type conversion");
+                }
+                else
+                {
+                    return *reinterpret_cast<TReturn *>(&Data);
+                }
             }
 
             template <typename TReturn>

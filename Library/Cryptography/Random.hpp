@@ -10,6 +10,8 @@
 #include <openssl/err.h>
 #include <openssl/engine.h>
 
+#include <Iterable/Span.hpp>
+
 namespace Core
 {
     namespace Cryptography
@@ -18,15 +20,15 @@ namespace Core
         {
             // ## Enums
 
-            constexpr static char *urandom = (char *) "/dev/urandom";
-            constexpr static char *arandom = (char *) "/dev/arandom";
-            constexpr static char *random = (char *) "/dev/random";
+            constexpr static char *urandom = (char *)"/dev/urandom";
+            constexpr static char *arandom = (char *)"/dev/arandom";
+            constexpr static char *random = (char *)"/dev/random";
 
             // ## static functions
 
             // static void Engine(); // Set engine mode to hardware or software
 
-            int InitEntropy(){ return 32; } //ENTROPY_NEEDED
+            int InitEntropy() { return 32; } // ENTROPY_NEEDED
 
             // int RAND_bytes_ex(OSSL_LIB_CTX *ctx, unsigned char *buf, size_t num, unsigned int strength);
 
@@ -85,18 +87,26 @@ namespace Core
 
                 if (Result <= 0)
                 {
-                    unsigned long Error = ERR_get_error();
-                    std::cout << "Random Bytes : " << ERR_reason_error_string(Error) << std::endl;
-                    exit(-1);
+                    throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
+                }
+            }
+
+            void Bytes(Iterable::Span<unsigned char> &Data)
+            {
+                int Result = RAND_bytes(Data.Content(), Data.Length());
+
+                if (Result <= 0)
+                {
+                    throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
                 }
             }
 
             std::string Hex(int Size)
             {
-                unsigned char Data[Size];
+                Iterable::Span<unsigned char> Data(Size);
                 std::stringstream ss;
 
-                Bytes(Data, Size);
+                Bytes(Data);
 
                 for (int i = 0; i < Size; i++)
                 {

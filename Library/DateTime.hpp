@@ -1,6 +1,6 @@
 #pragma once
 
-#include <iostream>
+#include <string>
 #include <time.h>
 
 #include <Duration.hpp>
@@ -211,18 +211,19 @@ namespace Core
 
         // @todo Fix this
 
-        std::string Format(size_t Size, const std::string &Format) const
+        std::string Format(const std::string &Format, size_t Size) const
         {
-            char buffer[Size];
+            std::string buffer(Size, ' ');
 
-            strftime(buffer, 40, Format.c_str(), &State);
+            Size = strftime(&*buffer.begin(), buffer.length(), Format.c_str(), &State);
+
+            buffer.resize(Size);
 
             return buffer;
         }
 
         DateTime ToGMT() const
         {
-            // struct timespec _Spec;
             struct tm _State;
 
             gmtime_r(&Spec.tv_sec, &_State);

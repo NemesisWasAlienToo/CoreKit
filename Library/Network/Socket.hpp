@@ -194,22 +194,47 @@ namespace Core
 
             // @todo Implement these
 
-            // NoDelay option
+            void SetOptions(int Level, int Option, const void *Value, socklen_t Length) const
+            {
+                int Result = setsockopt(_INode, Level, Option, Value, Length);
 
-            // int SetOptions()
-            // int GetOptions()
-            // {
-            //     int error = 0;
-            //     socklen_t len = sizeof(error);
-            // int retval = getsockopt(_INode, SOL_SOCKET, SO_ERROR, &error, &len);
+                // Error handling here
 
-            //     if (retval != 0)
-            //     {
-            //         throw std::system_error(errno, std::generic_category());
-            //     }
+                if (Result != 0)
+                {
+                    throw std::system_error(errno, std::generic_category());
+                }
+            }
 
-            //     return error;
-            // }
+            template <typename T>
+            void SetOptions(int Level, int Option, T const &Value) const
+            {
+                int Result = setsockopt(_INode, Level, Option, reinterpret_cast<const void *>(&Value), sizeof(T));
+
+                // Error handling here
+
+                if (Result != 0)
+                {
+                    throw std::system_error(errno, std::generic_category());
+                }
+            }
+
+            template <typename T>
+            decltype(auto) GetOptions(int Level, int Option) const
+            {
+                T Value;
+                socklen_t len = sizeof(T);
+                int Result = getsockopt(_INode, Level, Option, reinterpret_cast<const void *>(&Value), &len);
+
+                // Error handling here
+
+                if (Result != 0)
+                {
+                    throw std::system_error(errno, std::generic_category());
+                }
+
+                return Value;
+            }
 
             int Errors() const
             {

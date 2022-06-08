@@ -13,11 +13,11 @@ namespace Core
         time_t Seconds = 0;
         time_t Nanoseconds = 0;
 
-        Duration() = default;
+        constexpr Duration() = default;
 
-        Duration(time_t seconds, time_t nanoseconds = 0) : Seconds(seconds), Nanoseconds(nanoseconds) {}
+        constexpr Duration(time_t seconds, time_t nanoseconds = 0) : Seconds(seconds), Nanoseconds(nanoseconds) {}
 
-        Duration(itimerspec ITimeSpec)
+        constexpr Duration(itimerspec ITimeSpec)
         {
             if (ITimeSpec.it_interval.tv_sec == 0 && ITimeSpec.it_interval.tv_nsec == 0)
             {
@@ -33,26 +33,26 @@ namespace Core
             }
         }
 
-        Duration(timespec TimeSpec)
+        constexpr Duration(timespec TimeSpec)
         {
             Seconds = TimeSpec.tv_sec + (TimeSpec.tv_nsec / (long)1e9);
 
             Nanoseconds = TimeSpec.tv_nsec % (long)1e9;
         }
 
-        Duration(time_t nanoseconds)
+        constexpr Duration(time_t nanoseconds)
         {
             Seconds = nanoseconds / (long)1e9;
 
             Nanoseconds = nanoseconds % (long)1e9;
         }
 
-        static Duration FromMilliseconds(size_t milliseconds)
+        static constexpr Duration FromMilliseconds(size_t milliseconds)
         {
             return Duration(milliseconds / 1000, (milliseconds % 1000) * 1e6);
         }
 
-        static Duration FromMicroseconds(size_t microseconds)
+        static constexpr Duration FromMicroseconds(size_t microseconds)
         {
             return Duration(microseconds / 1000'000, (microseconds % 1000) * 1e3);
         }
@@ -95,7 +95,7 @@ namespace Core
 
         time_t AsNanoseconds() const
         {
-            return (Seconds * (long)1e9 ) +  Nanoseconds;
+            return (Seconds * (long)1e9) + Nanoseconds;
         }
 
         bool IsZero() { return Seconds == 0 && Nanoseconds == 00; }
@@ -150,4 +150,4 @@ namespace Core
             return os << duration.ToString();
         }
     };
-    }
+}
