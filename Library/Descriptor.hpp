@@ -172,9 +172,9 @@ namespace Core
             return Result;
         }
 
-        Iterable::Span<char> Read() const
+        Iterable::Span<char> Read(size_t Size) const
         {
-            Iterable::Span<char> Data(Received());
+            Iterable::Span<char> Data(Size);
 
             ssize_t Result = read(_INode, Data.Content(), Data.Length());
 
@@ -222,7 +222,7 @@ namespace Core
 
         Event Await(Event Events, int TimeoutMS = -1) const
         {
-            _POLLFD PollStruct = {.fd = _INode, .events = Events};
+            _POLLFD PollStruct = {.fd = _INode, .events = Events, .revents = 0};
 
             int Result = poll(&PollStruct, 1, TimeoutMS);
 

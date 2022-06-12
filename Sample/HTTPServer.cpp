@@ -2,14 +2,14 @@
 #include <string>
 #include <unordered_map>
 
-#include <Format/Stringifier.hpp>
+#include <Format/Stream.hpp>
 #include <Network/HTTP/Server.hpp>
 
 using namespace Core::Network;
 
 int main(int argc, char const *argv[])
 {
-    HTTP::Server Server({"0.0.0.0:8888"}, {5, 0}, 1);
+    HTTP::Server Server({"0.0.0.0:8888"}, {5, 0}, 7);
 
     Server.SetDefault(
         "/",
@@ -33,12 +33,12 @@ int main(int argc, char const *argv[])
         [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
         {
             Iterable::Queue<char> Queue;
-            Format::Stringifier Stringifier(Queue);
+            Format::Stream Stream(Queue);
 
-            Stringifier << "<h1>Folder = " << Parameters["Folder"] << "</h1>"
+            Stream << "<h1>Folder = " << Parameters["Folder"] << "</h1>"
                         << "<h1>Extension = " << Parameters["Ext"] << "</h1>";
 
-            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Stringifier.ToString());
+            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Stream.ToString());
         },
         "Ext");
 
@@ -63,11 +63,11 @@ int main(int argc, char const *argv[])
         [&](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
         {
             Iterable::Queue<char> Queue;
-            Format::Stringifier Stringifier(Queue);
+            Format::Stream Stream(Queue);
 
-            Stringifier << "<h1>Index = " << Parameters["Index"] << "</h1>";
+            Stream << "<h1>Index = " << Parameters["Index"] << "</h1>";
 
-            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Stringifier.ToString())
+            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Stream.ToString())
                 .SetCookie("Name", "TestName", DateTime::FromNow(Duration(60, 0)))
                 .SetCookie("Family", "TestFamily", 60)
                 .SetCookie("Id", "TestFamily");

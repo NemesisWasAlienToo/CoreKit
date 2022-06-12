@@ -229,13 +229,6 @@ namespace Core
                 return *this << Value.Id << Value.EndPoint;
             }
 
-            Serializer &operator<<(Serializer &Value)
-            {
-                Queue.Add(Value.Queue);
-
-                return *this;
-            }
-
             // Output operators
 
             template <typename T>
@@ -414,10 +407,9 @@ namespace Core
             {
                 // @todo Optimize when NoWrap was implemented in iterable resize
 
-                size_t size = descriptor.Received();
-                char data[size];
-                descriptor.Read(data, size);
-                Serializer.Queue.Add(data, size);
+                auto Data = descriptor.Read();
+                Serializer.Queue.Add(Data.Content(), Data.Length());
+                // Serializer.Queue.Add(Data);
 
                 return descriptor;
             }
@@ -426,10 +418,9 @@ namespace Core
             {
                 // @todo Optimize when NoWrap was implemented in iterable resize
 
-                size_t size = descriptor.Received();
-                char data[size];
-                descriptor.Read(data, size);
-                Serializer.Queue.Add(data, size);
+                auto Data = descriptor.Read();
+                Serializer.Queue.Add(Data.Content(), Data.Length());
+                // Serializer.Queue.Add(Data);
 
                 return descriptor;
             }

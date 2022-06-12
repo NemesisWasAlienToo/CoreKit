@@ -19,7 +19,7 @@ namespace Core
         constexpr char *White = (char *)"\033[37m";
 
         template <typename... TPrintables>
-        std::ostream &Print(std::ostream &Output, TPrintables const &...Printables) { return Output; }
+        std::ostream &Print(std::ostream &Output, TPrintables const &...) { return Output; }
 
         template <typename TPrintable, typename... TPrintables>
         std::ostream &Print(std::ostream &Output, TPrintable const &Printable, const TPrintables &...Printables)

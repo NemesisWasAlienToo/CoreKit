@@ -16,36 +16,17 @@ namespace Core
             uint32_t Events;
             uint64_t Data;
 
-            template <typename TReturn>
-            inline TReturn &DataAs()
-            {
-                if constexpr (sizeof(TReturn) > sizeof(uint64_t))
-                {
-                    throw std::invalid_argument("Invalid type conversion");
-                }
-                else
-                {
-                    return *reinterpret_cast<TReturn *>(&Data);
-                }
-            }
-
-            template <typename TReturn>
-            inline std::remove_const_t<TReturn> const &DataAs() const
-            {
-                return *(reinterpret_cast<TReturn *>(&Data));
-            }
-
-            _FORCE_INLINE bool Happened(uint32_t Masks) const
+            inline bool Happened(uint32_t Masks) const
             {
                 return (Events & Masks) != 0;
             }
 
-            _FORCE_INLINE void Set(uint32_t Masks)
+            inline void Set(uint32_t Masks)
             {
                 Events |= Masks;
             }
 
-            _FORCE_INLINE void Reset(uint32_t Masks)
+            inline void Reset(uint32_t Masks)
             {
                 Events &= ~Masks;
             }
@@ -53,7 +34,7 @@ namespace Core
             static Entry From(const Descriptor &descriptor, uint32_t Events)
             {
                 Entry Result;
-                Result.DataAs<int>() = descriptor.INode();
+                Result.Data = static_cast<uint64_t>(descriptor.INode());
                 Result.Events = Events;
                 return Result;
             }

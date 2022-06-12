@@ -29,8 +29,10 @@ namespace Core
                 Server() = default;
                 Server(EndPoint const &endPoint, Duration const &timeout, size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500))
                     : TCP(
-                          endPoint, [this](auto &Loop)
-                          { return BuildClientHandler(Loop); },
+                        //   endPoint, [this](auto &Loop)
+                        //   { return BuildClientHandler(Loop); },
+                          endPoint, [this]()
+                          { return BuildClientHandler(); },
                           timeout,
                           ThreadCount),
                       Timeout(timeout)
@@ -143,7 +145,7 @@ namespace Core
                         std::move(Extension));
                 }
 
-                Async::EventLoop::CallbackType BuildClientHandler(Async::EventLoop &Loop)
+                Async::EventLoop::CallbackType BuildClientHandler()
                 {
                     return [&, ShouldClose = false](Async::EventLoop *Loop, ePoll::Entry &Item, Async::EventLoop::Entry &Self) mutable
                     {
@@ -173,17 +175,32 @@ namespace Core
                                 if (Self.Parser.IsFinished())
                                 {
                                     // Process request
-
-                                    auto It = Self.Parser.Result.Headers.find("Connection");
-
-                                    if (Self.Parser.Result.Version == HTTP::HTTP10 || (It != Self.Parser.Result.Headers.end() && It->second == "close"))
-                                    {
-                                        ShouldClose = true;
-                                    }
-
+                                    
                                     // @todo Optimize Info passing
 
                                     Network::HTTP::Response Response = OnRequest(Client.Peer(), Self.Parser.Result);
+
+                                    auto It = Self.Parser.Result.Headers.find("Connection");
+                                    auto End = Self.Parser.Result.Headers.end();
+
+                                    // @todo Fix case sensitivity of header values
+
+                                    if (Self.Parser.Result.Version == HTTP::HTTP10)
+                                    {
+                                        if ((It != End && It->second == "Keep-Alive"))
+                                        {
+
+                                            Response.Headers.insert(std::make_pair("Connection", "Keep-Alive"));
+                                        }
+                                        else
+                                        {
+                                            ShouldClose = true;
+                                        }
+                                    }
+                                    else if (Self.Parser.Result.Version == HTTP::HTTP11 && It != End && It->second == "close")
+                                    {
+                                        ShouldClose = true;
+                                    }
 
                                     // Append response to buffer
 
@@ -233,7 +250,7 @@ namespace Core
 
                             // Write data
 
-                            Format::Stringifier Ser(Self.Buffer);
+                            Format::Stream Ser(Self.Buffer);
 
                             // Make socket non-blocking and improve this
 

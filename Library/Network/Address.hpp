@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <cstring>
 #include <string>
 #include <cstring>
 #include <netdb.h>
@@ -18,11 +19,11 @@ namespace Core
             enum AddressFamily
             {
                 Unspecified = AF_UNSPEC,
-                Local = AF_LOCAL,
-                Bluetooth = AF_BLUETOOTH,
-                NFC = AF_NFC,
-                CAN = AF_CAN,
-                Unix = AF_UNIX,
+                // Local = AF_LOCAL,
+                // Bluetooth = AF_BLUETOOTH,
+                // NFC = AF_NFC,
+                // CAN = AF_CAN,
+                // Unix = AF_UNIX,
                 IPv4 = AF_INET,
                 IPv6 = AF_INET6,
             };
@@ -96,12 +97,6 @@ namespace Core
                 {
                     throw std::invalid_argument("Provided address is not valid");
                 }
-            }
-
-            Address(const Address &Other) noexcept
-            {
-                _Family = Other._Family;
-                std::memcpy(_Content, Other._Content, sizeof _Content);
             }
 
             // Functions :
@@ -279,9 +274,9 @@ namespace Core
             static Address Any(AddressFamily Family = IPv4)
             {
                 if (Family == IPv4)
-                    return (uint32_t)INADDR_ANY;
+                    return _IN_ADDR{INADDR_ANY};
                 else if (Family == IPv6)
-                    return (_IN6_ADDR)IN6ADDR_ANY_INIT;
+                    return _IN6_ADDR(IN6ADDR_ANY_INIT);
                 else
                     throw std::invalid_argument(""); // For future uses
             }
@@ -289,9 +284,9 @@ namespace Core
             static Address Loop(AddressFamily Family = IPv4)
             {
                 if (Family == IPv4)
-                    return (uint32_t)INADDR_LOOPBACK;
+                    return _IN_ADDR{INADDR_LOOPBACK};
                 else if (Family == IPv6)
-                    return (_IN6_ADDR)IN6ADDR_LOOPBACK_INIT;
+                    return _IN6_ADDR(IN6ADDR_LOOPBACK_INIT);
                 else
                     throw std::invalid_argument(""); // For future uses
             }

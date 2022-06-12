@@ -6,8 +6,7 @@
 #include <map>
 
 #include <Machine.hpp>
-#include <Format/Stringifier.hpp>
-#include <Format/Serializer.hpp>
+#include <Format/Stream.hpp>
 #include <Iterable/Queue.hpp>
 #include <Network/Socket.hpp>
 #include <Network/HTTP/Request.hpp>
@@ -25,7 +24,6 @@ namespace Core
                 static constexpr auto HeaderLimit = 16 * 1024;
                 static constexpr auto ContentLimit = 8 * 1024 * 1024;
 
-                // Iterable::Queue<char> Queue{1024};
                 Iterable::Queue<char> Queue = Iterable::Queue<char>(1024);
 
                 size_t ContetLength = 0;
@@ -44,7 +42,9 @@ namespace Core
                     Machine::Reset();
                     Queue.Free(bodyPos + ContetLength);
 
-                    if (Queue.Length() > 0)
+                    // @todo Optimize Resize
+
+                    if (Queue.Length())
                         Queue.Resize(Queue.Capacity());
 
                     ContetLength = 0;
@@ -53,7 +53,14 @@ namespace Core
                     bodyPos = 0;
                     bodyPosTmp = 0;
 
-                    Result = HTTP::Request();
+                    // Clean request
+
+                    // Result = HTTP::Request();
+
+                    {
+                        Result.Headers.clear();
+                    }
+
                     Iterator = Result.Headers.end();
                 }
 
@@ -101,7 +108,7 @@ namespace Core
                         constexpr auto ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
 
                         Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
-                        Format::Stringifier ContinueStream(Temp);
+                        Format::Stream ContinueStream(Temp);
 
                         Temp.Add(ContinueResponse, sizeof(ContinueResponse));
 
@@ -119,20 +126,9 @@ namespace Core
                     const auto &Client = *Argument<0>();
 
                     {
-                        Format::Stringifier Stream(Queue);
+                        Format::Stream Stream(Queue);
 
-                        size_t Received = Client.Received();
-
-                        if (Received == 0)
-                            Terminate();
-
-                        // Read received data
-
-                        char RequestBuffer[Received];
-
-                        Client.Receive(RequestBuffer, Received);
-
-                        Stream.Add(RequestBuffer, Received);
+                        Client >> Stream;
                     }
 
                     auto [Pointer, Size] = Queue.Chunk();
@@ -170,6 +166,8 @@ namespace Core
 
                     {
                         size_t TempIndex = 0;
+
+                        // @todo Remove try catch
 
                         try
                         {
@@ -228,10 +226,6 @@ namespace Core
                         // fill the content
 
                         Result.Content = Message.substr(bodyPos, ContetLength);
-
-                        // @todo Maybe crop the used chunk of data and leave the rest to be parsed as a seperate request?
-
-                        // Message = Message.substr(bodyPos + ContetLength);
                     }
                     else
                     {

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <string_view>
+#include <map>
 #include <unordered_map>
 
 #include <Duration.hpp>
@@ -146,6 +148,38 @@ namespace Core
 
             std::string const MethodStrings[]{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH", ""};
 
+            enum class Methods : unsigned short
+            {
+                GET = 0,
+                POST,
+                PUT,
+                DELETE,
+                HEAD,
+                OPTIONS,
+                PATCH,
+                Any
+            };
+
+            // @todo Optimize this by maybe std::unordered_map?
+            Methods FromString(std::string_view method)
+            {
+                if (method == "GET")
+                    return Methods::GET;
+                if (method == "POST")
+                    return Methods::POST;
+                if (method == "PUT")
+                    return Methods::PUT;
+                if (method == "DELETE")
+                    return Methods::DELETE;
+                if (method == "HEAD")
+                    return Methods::HEAD;
+                if (method == "OPTIONS")
+                    return Methods::OPTIONS;
+                if (method == "PATCH")
+                    return Methods::PATCH;
+                return Methods::Any;
+            }
+
             class Message
             {
             public:
@@ -154,8 +188,8 @@ namespace Core
                 std::string Content;
 
                 // virtual bool IsValid() = 0;
-                virtual std::string ToString() const = 0;
-                virtual size_t ParseFirstLine(std::string_view const &Text) = 0;
+                // virtual std::string ToString() const = 0;
+                // virtual size_t ParseFirstLine(std::string_view const &Text) = 0;
 
                 size_t ParseHeaders(std::string_view const &Text, size_t Start, size_t End = 0)
                 {

@@ -43,15 +43,21 @@ namespace Core
             ThreadPool &operator=(ThreadPool const &Other) = delete;
 
             template <typename TCallback>
-            void Run(TCallback Condition)
+            void Run(TCallback &&Condition)
             {
                 for (size_t i = 0; i < Loops.Capacity() - 1; ++i)
                 {
-                    Loops[i].Runner = std::thread(
-                        [this, Condition, i]
+                    auto &Loop = Loops[i];
+
+                    Loop.Runner = std::thread(
+                        [this, Condition, i]() mutable
                         {
-                            Loops[i].Loop(Condition);
+                            auto &Loop = Loops[i];
+
+                            Loop.Loop(std::forward<TCallback>(Condition));
                         });
+
+                    Loop.RunnerId = Loop.Runner.get_id();
                 }
             }
 
@@ -65,7 +71,9 @@ namespace Core
                     Loops.Last() = Async::EventLoop(Interval);
                 }
 
-                Loops.Last().Loop(Condition);
+                Loops.Last().RunnerId = std::this_thread::get_id();
+                
+                Loops.Last().Loop(std::forward<TCallback>(Condition));
             }
 
             void Stop()

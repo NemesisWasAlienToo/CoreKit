@@ -55,7 +55,7 @@ namespace Core
 
         int Await(int TimeoutMS = -1) const
         {
-            _POLLFD PollStruct = {.fd = _INode, .events = In};
+            _POLLFD PollStruct = {.fd = _INode, .events = In, .revents = 0};
 
             int Result =  poll(&PollStruct, 1, TimeoutMS);
 

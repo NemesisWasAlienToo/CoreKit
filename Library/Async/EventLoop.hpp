@@ -26,7 +26,7 @@ namespace Core
         public:
             struct Entry;
 
-            using TimeWheelType = TimeWheel<64, 5>;
+            using TimeWheelType = TimeWheel<32, 5>;
             using Container = std::list<Entry>;
             using CallbackType = std::function<void(EventLoop *, ePoll::Entry &, Entry &)>;
 
@@ -58,7 +58,7 @@ namespace Core
             {
                 auto IIterator = Insert(
                     Event(0, 0),
-                    [](EventLoop *This, ePoll::Entry &Item, Entry &Self)
+                    [](EventLoop *This, ePoll::Entry &, Entry &Self)
                     {
                         Event &ev = *static_cast<Event *>(&Self.File);
 
@@ -85,12 +85,9 @@ namespace Core
 
                 auto TIterator = Insert(
                     Timer(Timer::Monotonic, 0),
-                    [](EventLoop *This, auto &Item, auto &Self)
+                    [](EventLoop *This, ePoll::Entry &, auto &Self)
                     {
                         auto &Ev = *static_cast<Event *>(&Self.File);
-
-                        // @todo Fix bug
-                        // How does it get here witout event?
 
                         Ev.Listen();
                         This->Wheel.Tick();
@@ -102,10 +99,21 @@ namespace Core
                 Expire = static_cast<Timer *>(&TIterator->File);
             }
 
+            inline bool HasPermission()
+            {
+                // return Runner.get_id() == std::this_thread::get_id();
+                return RunnerId == std::this_thread::get_id();
+            }
+
+            inline void AssertPersmission()
+            {
+                if (!HasPermission())
+                    throw std::runtime_error("Invalid thread");
+            }
+
             void Reschedual(Entry &Self, Duration const &Interval)
             {
-                if (Runner.get_id() != std::this_thread::get_id())
-                    throw std::runtime_error("Invalid thread");
+                AssertPersmission();
 
                 auto Callback = std::move(Self.Timer->Callback);
 
@@ -116,8 +124,7 @@ namespace Core
 
             void Remove(Container::iterator Iterator)
             {
-                if (Runner.get_id() != std::this_thread::get_id())
-                    throw std::runtime_error("Invalid thread");
+                AssertPersmission();
 
                 _Poll.Delete(Iterator->File);
                 Wheel.Remove(Iterator->Timer);
@@ -126,12 +133,11 @@ namespace Core
 
             /**
              * @brief Only removes the connection handler
-             * @param Iterator 
+             * @param Iterator
              */
             void RemoveHandler(Container::iterator Iterator)
             {
-                if (Runner.get_id() != std::this_thread::get_id())
-                    throw std::runtime_error("Invalid thread");
+                AssertPersmission();
 
                 _Poll.Delete(Iterator->File);
                 Handlers.erase(Iterator);
@@ -139,8 +145,7 @@ namespace Core
 
             void RemoveTimer(Container::iterator Iterator)
             {
-                if (Runner.get_id() != std::this_thread::get_id())
-                    throw std::runtime_error("Invalid thread");
+                AssertPersmission();
 
                 Wheel.Remove(Iterator->Timer);
             }
@@ -150,18 +155,29 @@ namespace Core
                 _Poll.Modify(Self.File, Events, (size_t)&Self);
             }
 
-            void Assign(Descriptor Client, CallbackType Callback, Duration const &Interval = {0, 0})
+            void Assign(Descriptor &&Client, CallbackType &&Callback, Duration const &Interval = {0, 0})
             {
-                if (Runner.get_id() == std::this_thread::get_id())
+                if (HasPermission())
                 {
                     Insert(std::move(Client), std::move(Callback), Interval);
                 }
                 else
                 {
+                    // @todo maybe use lock free queue?
+
                     {
                         std::unique_lock lock(QueueMutex);
 
+                        if (Client.INode() < 0)
+                            throw std::runtime_error("Invalid file descriptor");
+
                         Queue.Add({std::move(Client), std::move(Callback), Interval});
+
+                        // if (Queue.First().File.INode() < 0 || (Queue.Content() != &Queue.First() && Queue.Content()[0].File.INode() > 0))
+                        // {
+                        //     auto &Entry = Queue.First();
+                        //     int a = Entry.File.INode();
+                        // }
                     }
 
                     Notify();
@@ -189,7 +205,7 @@ namespace Core
                     Events.ForEach(
                         [&](ePoll::Entry &Item)
                         {
-                            auto &Ent = *Item.DataAs<Entry *>();
+                            auto &Ent = *reinterpret_cast<Entry *>(Item.Data);
 
                             Ent.Callback(this, Item, Ent);
                         });
@@ -201,23 +217,25 @@ namespace Core
             EventLoop &operator=(EventLoop const &Other) = delete;
             EventLoop &operator=(EventLoop &&Other) noexcept
             {
-                if (this == &Other)
-                    return *this;
-
-                _Poll = std::move(Other._Poll);
-                Expire = std::move(Other.Expire);
-                Interrupt = std::move(Other.Interrupt);
-                Wheel = std::move(Other.Wheel);
-                Handlers = std::move(Other.Handlers);
-                Queue = std::move(Other.Queue);
+                if (this != &Other)
+                {
+                    _Poll = std::move(Other._Poll);
+                    Expire = std::move(Other.Expire);
+                    Interrupt = std::move(Other.Interrupt);
+                    Wheel = std::move(Other.Wheel);
+                    Handlers = std::move(Other.Handlers);
+                    Queue = std::move(Other.Queue);
+                }
 
                 return *this;
             }
 
         private:
-            Container::iterator Insert(Descriptor descriptor, CallbackType handler, Duration const &Timeout)
+            Container::iterator Insert(Descriptor &&descriptor, CallbackType &&handler, Duration const &Timeout)
             {
-                auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler)});
+                auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), {}, {}, {}, {}});
+                // auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler)});
+                // auto Iterator = Handlers.emplace_back(std::move(descriptor), std::move(handler), nullptr);
                 Iterator->Iterator = Iterator;
 
                 if (Timeout.AsMilliseconds() > 0)
@@ -267,6 +285,7 @@ namespace Core
 
         public:
             std::thread Runner;
+            std::thread::id RunnerId;
         };
     }
 }

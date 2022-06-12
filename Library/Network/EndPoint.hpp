@@ -79,7 +79,7 @@ namespace Core
                 _Port = htons(Port);
             }
 
-            EndPoint(const EndPoint &Othere) : _Address(Othere._Address), _Port(Othere._Port), _Flow(Othere._Flow), _Scope(Othere._Scope) {}
+            // EndPoint(const EndPoint &Othere) : _Address(Othere._Address), _Port(Othere._Port), _Flow(Othere._Flow), _Scope(Othere._Scope) {}
 
             EndPoint(const std::string &address, unsigned short Port)
             {

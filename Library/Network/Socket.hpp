@@ -224,7 +224,7 @@ namespace Core
             {
                 T Value;
                 socklen_t len = sizeof(T);
-                int Result = getsockopt(_INode, Level, Option, reinterpret_cast<const void *>(&Value), &len);
+                int Result = getsockopt(_INode, Level, Option, reinterpret_cast<void *>(&Value), &len);
 
                 // Error handling here
 
@@ -271,7 +271,8 @@ namespace Core
                     throw std::system_error(errno, std::generic_category());
                 }
 
-                return (struct sockaddr *)&addr;
+                // return (struct sockaddr *)&addr;
+                return &addr;
             }
 
             size_t Received() const
@@ -435,7 +436,7 @@ namespace Core
 
             ssize_t SendTo(const char *Data, size_t Length, const EndPoint &Target, int Flags = 0) const
             {
-                struct sockaddr_storage Client = {0};
+                struct sockaddr_storage Client;
                 socklen_t len = Target.sockaddr((struct sockaddr *)&Client);
 
                 Network::EndPoint a((struct sockaddr *)&Client);
@@ -461,7 +462,7 @@ namespace Core
 
             ssize_t SendTo(const Iterable::Span<char> &Data, const EndPoint &Target, int Flags = 0) const
             {
-                struct sockaddr_storage Client = {0};
+                struct sockaddr_storage Client;
                 socklen_t len = Target.sockaddr((struct sockaddr *)&Client);
 
                 Network::EndPoint a((struct sockaddr *)&Client);

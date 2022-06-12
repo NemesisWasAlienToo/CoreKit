@@ -35,7 +35,7 @@ namespace Core
         struct Bucket
         {
             using Container = std::list<Entry>;
-            using Iterator = Container::iterator;
+            using Iterator = typename Container::iterator;
 
             Container Entries;
 
@@ -159,7 +159,7 @@ namespace Core
             Current().Execute();
         }
 
-        Bucket::Iterator Add(size_t _Steps, Entry::TCallback callback)
+        typename Bucket::Iterator Add(size_t _Steps, typename Entry::TCallback callback)
         {
             Entry entry{std::move(callback), Offset(_Steps), 0, 0};
 
@@ -175,12 +175,12 @@ namespace Core
             return At(entry.Wheel, entry.Bucket).Add(std::move(entry));
         }
 
-        Bucket::Iterator Add(Duration const &Interval, Entry::TCallback callback)
+        typename Bucket::Iterator Add(Duration const &Interval, typename Entry::TCallback callback)
         {
             return Add(Interval.AsMilliseconds() / IntervalMS, std::move(callback));
         }
 
-        inline void Remove(Bucket::Iterator Iterator)
+        inline void Remove(typename Bucket::Iterator Iterator)
         {
             if (Iterator == end())
                 return;

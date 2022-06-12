@@ -83,12 +83,6 @@ namespace Core
                 Other._Growable = false;
             }
 
-            // template <typename... TArgs>
-            // Iterable(size_t Size, const TArgs &...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
-
-            // template <typename... TArgs>
-            // Iterable(size_t Size, TArgs &&...Args) : _Length(Size), _Content(new T[Size](std::forward<TArgs>(Args)...)) {}
-
             Iterable(std::initializer_list<T> list) : _Capacity(list.size()), _Length(list.size()), _Content(new T[list.size()]), _Growable(true)
             {
                 size_t i = 0;
@@ -105,21 +99,6 @@ namespace Core
             {
                 delete[] _Content;
                 _Content = nullptr;
-            }
-
-            // ### Statics
-
-            template <typename TBuilder>
-            static Iterable<T> Build(size_t Start, size_t End, TBuilder Builder)
-            {
-                Iterable<T> result((End - Start) + 1);
-
-                for (size_t i = Start; i <= End; i++)
-                {
-                    result.Add(Builder(i));
-                }
-
-                return result;
             }
 
             // ### Properties
@@ -187,12 +166,17 @@ namespace Core
 
             // Functions
 
-            void Resize(size_t Size)
+            inline void IncreaseCapacity(size_t Minimum = 1)
             {
-                // if(Size != _Capacity)
-                // {
+                _IncreaseCapacity(Minimum);
+            }
 
-                // }
+            virtual void Resize(size_t Size)
+            {
+                if (Size == _Capacity)
+                {
+                    return;
+                }
 
                 T *_New = new T[Size];
 
@@ -210,11 +194,21 @@ namespace Core
 
             // @todo If NoWrap was true, the new size must be continues
 
-            void Reserve(size_t Count, bool NoWrap = false)
+            void Reserve(size_t Count /*, bool NoWrap = false*/)
             {
                 this->_IncreaseCapacity(Count);
 
                 this->_Length += Count;
+            }
+
+            template<typename ...TArgs>
+            void Construct(TArgs &&...Args)
+            {
+                if (this->_Length == this->_Capacity)
+                    _IncreaseCapacity();
+
+                std::construct_at(&_ElementAt(this->_Length), std::forward<TArgs>(Args)...);
+                this->_Length++;
             }
 
             void Add(T &&Item)
@@ -231,18 +225,6 @@ namespace Core
 
                 _ElementAt(this->_Length) = Item;
                 (this->_Length)++;
-            }
-
-            void Add(const T &Item, size_t Count)
-            {
-                this->_IncreaseCapacity(Count);
-
-                for (size_t i = 0; i < Count; i++)
-                {
-                    _ElementAt(this->_Length + i) = Item;
-                }
-
-                this->_Length += Count;
             }
 
             void Add(T *Items, size_t Count)
@@ -274,73 +256,6 @@ namespace Core
                 for (size_t i = 0; i < Other._Length; i++)
                 {
                     Add(Other[i]);
-                }
-            }
-
-            void Squeeze(T &&Item, size_t Index)
-            {
-                if (this->_Length <= Index)
-                    throw std::out_of_range("");
-
-                this->_IncreaseCapacity();
-
-                for (size_t i = this->_Length; i > Index; i--)
-                {
-                    _ElementAt(i) = std::move(_ElementAt(i - 1));
-                }
-
-                _ElementAt(Index) = std::move(Item);
-
-                (this->_Length)++;
-            }
-
-            void Squeeze(const T &Item, size_t Index)
-            {
-                if (this->_Length <= Index)
-                    throw std::out_of_range("");
-
-                this->_IncreaseCapacity();
-
-                for (size_t i = this->_Length; i > Index; i--)
-                {
-                    _ElementAt(i) = std::move(_ElementAt(i - 1));
-                }
-
-                _ElementAt(Index) = Item;
-
-                (this->_Length)++;
-            }
-
-            void Remove(size_t Index)
-            {
-                if (Index >= this->_Length)
-                    throw std::out_of_range("");
-
-                this->_Length--;
-
-                if constexpr (std::is_arithmetic<T>::value)
-                {
-                    if (Index != this->_Length)
-                    {
-                        for (size_t i = Index; i < this->_Length; i++)
-                        {
-                            _ElementAt(i) = _ElementAt(i + 1);
-                        }
-                    }
-                }
-                else
-                {
-                    if (Index == this->_Length)
-                    {
-                        _ElementAt(Index).~T();
-                    }
-                    else
-                    {
-                        for (size_t i = Index; i < this->_Length; i++)
-                        {
-                            _ElementAt(i) = std::move(_ElementAt(i + 1));
-                        }
-                    }
                 }
             }
 
@@ -567,17 +482,10 @@ namespace Core
             {
                 if (this != &Other)
                 {
-                    delete[] _Content;
-
-                    _Content = Other._Content;
-                    _Capacity = Other._Capacity;
-                    _Length = Other._Length;
-                    _Growable = Other._Growable;
-
-                    Other._Content = nullptr;
-                    Other._Capacity = 0;
-                    Other._Length = 0;
-                    Other._Growable = false;
+                    std::swap(_Content, Other._Content);
+                    std::swap(_Capacity, Other._Capacity);
+                    std::swap(_Length, Other._Length);
+                    std::swap(_Growable, Other._Growable);
                 }
 
                 return *this;

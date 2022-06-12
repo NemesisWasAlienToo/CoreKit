@@ -1,7 +1,6 @@
 #pragma once
 
 #include <initializer_list>
-#include "Iterable/Iterable.hpp"
 
 namespace Core
 {
@@ -14,12 +13,12 @@ namespace Core
             size_t _Length = 0;
             T *_Content = nullptr;
 
-            _FORCE_INLINE inline T &_ElementAt(size_t Index)
+            inline T &_ElementAt(size_t Index)
             {
                 return this->_Content[Index];
             }
 
-            _FORCE_INLINE inline const T &_ElementAt(size_t Index) const
+            inline const T &_ElementAt(size_t Index) const
             {
                 return this->_Content[Index];
             }
@@ -27,11 +26,6 @@ namespace Core
         public:
             Span() = default;
             Span(size_t Size) : _Length(Size), _Content(new T[Size]) {}
-            Span(Span &&Other) : _Length(Other._Length), _Content(Other._Content)
-            {
-                Other._Content = nullptr;
-                Other._Length = 0;
-            }
 
             Span(size_t Size, const T &Value) : _Length(Size), _Content(new T[Size])
             {
@@ -39,6 +33,12 @@ namespace Core
                 {
                     _Content[i] = Value;
                 }
+            }
+
+            Span(Span &&Other) : _Length(Other._Length), _Content(Other._Content)
+            {
+                Other._Content = nullptr;
+                Other._Length = 0;
             }
 
             Span(const Span &Other) : _Length(Other._Length), _Content(new T[Other._Length])
@@ -123,7 +123,7 @@ namespace Core
                     NewData[i] = _Content[i];
                 }
 
-                free(_Content);
+                delete[] _Content;
 
                 _Length = NewSize;
 
@@ -191,19 +191,17 @@ namespace Core
 
             Span &operator=(const Span &Other)
             {
-                if (this == &Other)
+                if (this != &Other)
                 {
-                    return *this;
-                }
+                    _Length = Other._Length;
 
-                _Length = Other._Length;
+                    delete[] _Content;
+                    _Content = new T[_Length];
 
-                delete[] _Content;
-                _Content = new T[_Length];
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    _Content[i] = Other._Content[i];
+                    for (size_t i = 0; i < _Length; i++)
+                    {
+                        _Content[i] = Other._Content[i];
+                    }
                 }
 
                 return *this;
@@ -211,18 +209,16 @@ namespace Core
 
             Span &operator=(Span &&Other)
             {
-                if (this == &Other)
+                if (this != &Other)
                 {
-                    return *this;
+                    delete[] _Content;
+
+                    _Content = Other._Content;
+                    _Length = Other._Length;
+
+                    Other._Content = nullptr;
+                    Other._Length = 0;
                 }
-
-                delete[] _Content;
-
-                _Content = Other._Content;
-                _Length = Other._Length;
-
-                Other._Content = nullptr;
-                Other._Length = 0;
 
                 return *this;
             }
