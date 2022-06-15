@@ -130,7 +130,7 @@ namespace Core
                         std::forward<TAction>(Action));
                 }
 
-                using TFilter = std::function<HTTP::Response(Network::EndPoint const &Target, Network::HTTP::Request &)>;
+                using TFilter = std::function<HTTP::Response(Network::EndPoint const &Target, Network::HTTP::Request &, std::shared_ptr<void>)>;
 
                 template <typename TBuildCallback>
                 inline void FilterFrom(TBuildCallback &&Builder)
@@ -138,9 +138,9 @@ namespace Core
                     if (!Filters)
                     {
                         Filters = Builder(
-                            [this](Network::EndPoint const &Target, Network::HTTP::Request &Request)
+                            [this](Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> DataPtr)
                             {
-                                return _Router.Match(Request.Method, Request.Path, Target, Request);
+                                return _Router.Match(Request.Method, Request.Path, Target, Request, DataPtr);
                             });
 
                         return;
@@ -151,7 +151,7 @@ namespace Core
 
             private:
                 TCPServer TCP;
-                Router<HTTP::Response(Network::EndPoint const &, Network::HTTP::Request const &)> _Router;
+                Router<HTTP::Response(Network::EndPoint const &, Network::HTTP::Request const &, std::shared_ptr<void>)> _Router;
                 Duration Timeout;
 
                 TFilter Filters = nullptr;
@@ -160,9 +160,9 @@ namespace Core
                 inline HTTP::Response OnRequest(Network::EndPoint const &Target, Network::HTTP::Request &Request) const
                 {
                     if (!Filters)
-                        return _Router.Match(Request.Method, Request.Path, Target, Request);
+                        return _Router.Match(Request.Method, Request.Path, Target, Request, nullptr);
 
-                    return Filters(Target, Request);
+                    return Filters(Target, Request, nullptr);
                 }
             };
         }

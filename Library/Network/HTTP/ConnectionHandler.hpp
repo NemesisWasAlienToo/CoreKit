@@ -182,7 +182,7 @@ namespace Core
 
                     Format::Stream Ser(std::get<0>(CurBuf));
 
-                    // Make socket non-blocking and improve this
+                    // @todo Make socket non-blocking and improve this
 
                     Self.File << Ser;
 
@@ -192,8 +192,14 @@ namespace Core
                         {
                             // @todo Optimize getting size
 
+                            auto Size = std::get<1>(CurBuf)->Size();
+
+                            // @todo Implement size limitation for file
+
+                            // if(Size > MaxFileSize)
+
                             std::get<1>(CurBuf)->Seek();
-                            Client.SendFile(*std::get<1>(CurBuf), std::get<1>(CurBuf)->Size());
+                            Client.SendFile(*std::get<1>(CurBuf), Size);
                         }
 
                         OBuffer.Take();

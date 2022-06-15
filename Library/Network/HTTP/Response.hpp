@@ -26,6 +26,7 @@ namespace Core
                 Iterable::List<std::string> SetCookies;
                 std::variant<std::string, std::shared_ptr<File>> Content;
 
+                // friend Format::Stream &operator>>(Format::Stream &Ser, Response const &R)
                 friend Format::Stream &operator<<(Format::Stream &Ser, Response const &R)
                 {
                     Ser << "HTTP/" << R.Version << ' ' << std::to_string(static_cast<unsigned short>(R.Status)) << ' ' << R.Brief << "\r\n";
