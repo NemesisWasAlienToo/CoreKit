@@ -2,8 +2,8 @@
 
 #include <string>
 #include <string_view>
-#include <map>
 #include <unordered_map>
+#include <map>
 
 #include <Duration.hpp>
 #include <Iterable/Queue.hpp>
@@ -187,10 +187,6 @@ namespace Core
                 std::unordered_map<std::string, std::string> Headers;
                 std::string Content;
 
-                // virtual bool IsValid() = 0;
-                // virtual std::string ToString() const = 0;
-                // virtual size_t ParseFirstLine(std::string_view const &Text) = 0;
-
                 size_t ParseHeaders(std::string_view const &Text, size_t Start, size_t End = 0)
                 {
                     size_t Cursor = Start;
@@ -216,8 +212,10 @@ namespace Core
 
                         if (CursorTmp == std::string::npos)
                         {
+                            // @todo Insert or append
+
                             std::string HeaderValue(Text.substr(Cursor));
-                            Headers.insert_or_assign(std::move(HeaderKey), HeaderValue);
+                            Headers.insert_or_assign(std::move(HeaderKey), std::move(HeaderValue));
 
                             break;
                         }
@@ -234,6 +232,12 @@ namespace Core
                 void ParseContent(const std::string_view &Text, size_t BodyIndex)
                 {
                     Content = std::string{Text.substr(BodyIndex)};
+                }
+
+                void SetContent(std::string NewContent)
+                {
+                    Content = std::move(NewContent);
+                    Headers.insert_or_assign("Content-Length", std::to_string(Content.length()));
                 }
             };
         }

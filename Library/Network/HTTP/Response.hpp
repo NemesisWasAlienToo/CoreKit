@@ -2,13 +2,13 @@
 
 #include <iostream>
 #include <string>
-#include <unordered_map>
+#include <map>
 
 #include <Duration.hpp>
 #include <DateTime.hpp>
 #include <Network/HTTP/HTTP.hpp>
 #include <Iterable/List.hpp>
-#include <Format/Stringifier.hpp>
+#include <Format/Stream.hpp>
 
 namespace Core
 {
@@ -23,38 +23,30 @@ namespace Core
                 std::string Brief;
                 Iterable::List<std::string> SetCookies;
 
-                void AppendToBuffer(Iterable::Queue<char>& Result) const
+                void AppendToBuffer(Iterable::Queue<char> &Result) const
                 {
-                    Format::Stringifier Ser(Result);
+                    Format::Stream Ser(Result);
 
                     Ser << "HTTP/" << Version << ' ' << std::to_string(static_cast<unsigned short>(Status)) << ' ' << Brief << "\r\n";
 
                     for (auto const &[k, v] : Headers)
-                        Ser << k + ": " << v << "\r\n";
+                        Ser << k << ": " << v << "\r\n";
 
-                    SetCookies.ForEach([&Ser](std::string const &Cookie)
-                                       { Ser << "Set-Cookie: " << Cookie << "\r\n"; });
+                    SetCookies.ForEach(
+                        [&Ser](std::string const &Cookie)
+                        {
+                            Ser << "Set-Cookie: " << Cookie << "\r\n";
+                        });
 
                     Ser << "\r\n"
                         << Content;
                 }
 
-                Iterable::Queue<char> ToBuffer() const
+                Iterable::Queue<char> ToBuffer(size_t InitSize = 1024) const
                 {
-                    Iterable::Queue<char> Result(20);
+                    Iterable::Queue<char> Result(InitSize);
 
-                    Format::Stringifier Ser(Result);
-
-                    Ser << "HTTP/" << Version << ' ' << std::to_string(static_cast<unsigned short>(Status)) << ' ' << Brief << "\r\n";
-
-                    for (auto const &[k, v] : Headers)
-                        Ser << k + ": " << v << "\r\n";
-
-                    SetCookies.ForEach([&Ser](std::string const &Cookie)
-                                       { Ser << "Set-Cookie: " << Cookie << "\r\n"; });
-
-                    Ser << "\r\n"
-                        << Content;
+                    AppendToBuffer(Result);
 
                     return Result;
                 }
@@ -81,6 +73,8 @@ namespace Core
                                     const std::string &Path = "", const std::string &Domain = "",
                                     bool Secure = false, bool HttpOnly = false)
                 {
+                    // @todo Change stringsream to Format::Stream
+
                     std::stringstream ResultStream;
 
                     ResultStream << Name << "=" << Value;
@@ -190,7 +184,7 @@ namespace Core
 
                     ResultStream << Name << "=" << Value;
 
-                    ResultStream << "; Expires=" << Expires.ToGMT().Format(29, "%a, %d %b %Y %T %X GMT");
+                    ResultStream << "; Expires=" << Expires.ToGMT().Format("%a, %d %b %Y %T %X GMT", 29);
 
                     if (!Path.empty())
                     {
@@ -230,7 +224,7 @@ namespace Core
                     return *this;
                 }
 
-                size_t ParseFirstLine(std::string_view const &Text) override
+                size_t ParseFirstLine(std::string_view const &Text)
                 {
                     // @todo Hanlde null case
 
@@ -241,11 +235,11 @@ namespace Core
 
                     // @todo Maybe check the version's length?
 
-                    if((CursorTmp = Text.find(' ', Cursor)) == std::string::npos)
+                    if ((CursorTmp = Text.find(' ', Cursor)) == std::string::npos)
                     {
                         throw std::invalid_argument("Invalid version");
                     }
-                    
+
                     Version = Text.substr(Cursor, CursorTmp - Cursor);
                     Cursor = CursorTmp + 1;
 
@@ -253,25 +247,25 @@ namespace Core
 
                     // @todo Maybe check the code's length?
 
-                    if((CursorTmp = Text.find(' ', Cursor)) == std::string::npos)
+                    if ((CursorTmp = Text.find(' ', Cursor)) == std::string::npos)
                     {
                         // @todo Optimize this
-                        
+
                         throw std::invalid_argument("Invalid status code");
                     }
 
                     // @todo Optimize this
-                    
+
                     Status = HTTP::Status(std::stoul(std::string(Text.substr(Cursor, CursorTmp - Cursor))));
                     Cursor = CursorTmp + 1;
 
                     // Parse breif
 
-                    if((CursorTmp = Text.find('\r', Cursor)) == std::string::npos)
+                    if ((CursorTmp = Text.find('\r', Cursor)) == std::string::npos)
                     {
                         throw std::invalid_argument("Invalid breif");
                     }
-                    
+
                     Brief = Text.substr(Cursor, CursorTmp - Cursor);
 
                     return CursorTmp + 2;
@@ -291,36 +285,36 @@ namespace Core
 
                 // @todo Optimize rvalue
 
-                static Response From(std::string Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, std::string Content = "")
+                static Response From(std::string_view const &Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, std::string_view const &Content = "")
                 {
                     Response response;
                     response.Status = Status;
-                    response.Version = std::move(Version);
+                    response.Version = Version;
                     response.Headers = std::move(Headers);
-                    response.Content = std::move(Content);
+                    response.Content = Content;
                     response.Brief = StatusMessage.at(Status);
                     return response;
                 }
 
-                static Response Text(std::string Version, HTTP::Status Status, std::string Content)
+                static Response Text(std::string_view const &Version, HTTP::Status Status, std::string_view const &Content)
                 {
                     auto size = Content.size();
-                    return From(std::move(Version), Status, {{"Content-Type", "text/plain"}, {"Content-Length", std::to_string(size)}}, std::move(Content));
+                    return From(Version, Status, {{"Content-Type", "text/plain"}, {"Content-Length", std::to_string(size)}}, Content);
                 }
 
-                static Response HTML(std::string Version, HTTP::Status Status, std::string Content)
+                static Response HTML(std::string_view const &Version, HTTP::Status Status, std::string_view const &Content)
                 {
                     auto size = Content.size();
-                    return From(std::move(Version), Status, {{"Content-Type", "text/html"}, {"Content-Length", std::to_string(size)}}, std::move(Content));
+                    return From(Version, Status, {{"Content-Type", "text/html"}, {"Content-Length", std::to_string(size)}}, Content);
                 }
 
-                static Response Json(std::string Version, HTTP::Status Status, std::string Content)
+                static Response Json(std::string_view const &Version, HTTP::Status Status, std::string_view const &Content)
                 {
                     auto size = Content.size();
-                    return From(std::move(Version), Status, {{"Content-Type", "application/json"}, {"Content-Length", std::to_string(size)}}, std::move(Content));
+                    return From(Version, Status, {{"Content-Type", "application/json"}, {"Content-Length", std::to_string(size)}}, Content);
                 }
 
-                static inline Response Redirect(std::string Version, HTTP::Status Status, std::string Location, std::unordered_map<std::string, std::string> Parameters = {})
+                static inline Response Redirect(std::string_view const &Version, HTTP::Status Status, std::string_view const &Location, std::unordered_map<std::string, std::string> Parameters = {})
                 {
                     std::stringstream str;
 
@@ -334,13 +328,19 @@ namespace Core
                     Parameters.insert_or_assign("Location", str.str());
                     Parameters.insert_or_assign("Content-Length", "0");
 
-                    return From(std::move(Version), Status, std::move(Parameters), "");
+                    return From(Version, Status, std::move(Parameters), "");
                 }
 
-                static inline Response Redirect(std::string Version, std::string Location, std::unordered_map<std::string, std::string> Parameters = {})
+                static inline Response Redirect(std::string_view const &Version, std::string_view const &Location, std::unordered_map<std::string, std::string> Parameters = {})
                 {
-                    return Redirect(std::move(Version), HTTP::Status::Found, std::move(Location), std::move(Parameters));
+                    return Redirect(Version, HTTP::Status::Found, std::move(Location), std::move(Parameters));
                 }
+
+                // static Response File(std::string_view const &Version, HTTP::Status Status, std::string_view const &FilePath, std::unordered_map<std::string, std::string> Parameters = {})
+                // {
+                //     Response res;
+                //     res.
+                // }
             };
         }
     }

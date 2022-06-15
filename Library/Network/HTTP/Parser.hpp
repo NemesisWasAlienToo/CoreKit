@@ -59,6 +59,7 @@ namespace Core
 
                     {
                         Result.Headers.clear();
+                        Queue.Resize(1024);
                     }
 
                     Iterator = Result.Headers.end();

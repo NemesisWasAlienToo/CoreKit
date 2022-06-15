@@ -2,12 +2,15 @@
 
 #include <string>
 #include <mutex>
+#include <future>
+#include <atomic>
+#include <mutex>
 
 #include <Event.hpp>
 #include <Duration.hpp>
 #include <TimeWheel.hpp>
 #include <ePoll.hpp>
-#include <Iterable/List.hpp>
+#include <Iterable/Span.hpp>
 #include <Network/Socket.hpp>
 #include <Network/HTTP/Response.hpp>
 #include <Network/HTTP/Request.hpp>
@@ -28,15 +31,15 @@ namespace Core
             };
 
             ThreadPool() = default;
-            ThreadPool(Duration const &interval, size_t Count) : Loops(Count + 1, false), Interval(interval)
+            ThreadPool(Duration const &interval, size_t Count) : Loops(Count + 1), Interval(interval)
             {
-                Loops.Length(Count);
-
                 Loops.ForEach(
                     [this](EventLoop &Item)
                     {
                         Item = Async::EventLoop(Interval);
                     });
+
+                Loops.Last().RunnerId = std::this_thread::get_id();
             }
 
             ThreadPool(ThreadPool const &Other) = delete;
@@ -45,7 +48,7 @@ namespace Core
             template <typename TCallback>
             void Run(TCallback &&Condition)
             {
-                for (size_t i = 0; i < Loops.Capacity() - 1; ++i)
+                for (size_t i = 0; i < Loops.Length() - 1; ++i)
                 {
                     auto &Loop = Loops[i];
 
@@ -54,31 +57,32 @@ namespace Core
                         {
                             auto &Loop = Loops[i];
 
+                            AwaitGo();
+
                             Loop.Loop(std::forward<TCallback>(Condition));
                         });
 
                     Loop.RunnerId = Loop.Runner.get_id();
                 }
+
+                SignalGo();
             }
 
             template <typename TCallback>
             void GetInPool(TCallback Condition)
             {
-                if (!Loops.IsFull())
-                {
-                    Loops.Length(Loops.Capacity());
+                HasJoined.store(true);
 
-                    Loops.Last() = Async::EventLoop(Interval);
-                }
+                AwaitGo();
 
-                Loops.Last().RunnerId = std::this_thread::get_id();
-                
                 Loops.Last().Loop(std::forward<TCallback>(Condition));
+
+                HasJoined.store(false);
             }
 
             void Stop()
             {
-                for (size_t i = 0; i < Loops.Capacity() - 1; ++i)
+                for (size_t i = 0; i < Loops.Length() - 1; ++i)
                 {
                     Loops[i].Notify();
                     Loops[i].Runner.join();
@@ -87,10 +91,10 @@ namespace Core
 
             inline size_t Length()
             {
-                return Loops.Length();
-            }
+                // @todo Potential buttle neck
 
-            // void Enqueue()
+                return HasJoined.load(std::memory_order_relaxed) ? Loops.Length() : Loops.Length() - 1;
+            }
 
             inline EventLoop &operator[](size_t Index)
             {
@@ -98,8 +102,22 @@ namespace Core
             }
 
         private:
-            Iterable::List<EventLoop> Loops;
+            Iterable::Span<EventLoop> Loops;
             Duration Interval;
+            std::atomic_bool HasJoined{false};
+
+            std::promise<void> Go;
+            std::shared_future<void> GoPromise{Go.get_future()};
+
+            void SignalGo()
+            {
+                Go.set_value();
+            }
+
+            void AwaitGo()
+            {
+                GoPromise.get();
+            }
         };
     }
 }

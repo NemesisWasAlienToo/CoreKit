@@ -3,6 +3,7 @@
 #include <iostream>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <system_error>
 
 #include <Descriptor.hpp>
@@ -122,20 +123,17 @@ namespace Core
             }
         }
 
-        static std::string ReadAll(const std::string &Path)
+        static Iterable::Span<char> ReadAll(const std::string &Path)
         {
             auto file = Open(Path, ReadOnly);
 
-            size_t size = file.Size();
+            Iterable::Span<char> buffer = file.Size();
+
             size_t len = 0;
 
-            char buffer[size + 1];
-
-            buffer[size] = 0;
-
-            while (len < size)
+            while (len < buffer.Length())
             {
-                len += file.Read(&(buffer[len]), (size - len));
+                len += file.Read(&(buffer[len]), (buffer.Length() - len));
             }
 
             file.Close();
@@ -192,6 +190,20 @@ namespace Core
             }
 
             return static_cast<size_t>(Result);
+        }
+
+        static size_t SizeOf(const std::string &Path)
+        {
+            struct stat st;
+
+            int Result = stat(Path.c_str(), &st);
+
+            if (Result < 0)
+            {
+                throw std::system_error(errno, std::generic_category());
+            }
+
+            return st.st_size;
         }
 
         size_t Size() const
@@ -257,6 +269,8 @@ namespace Core
         }
 
         File &operator=(File const &Other) = delete;
+
+        // @todo Remove these operators
 
         File &operator<<(const char Message)
         {

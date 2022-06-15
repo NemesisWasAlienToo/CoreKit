@@ -56,6 +56,13 @@ namespace Core
                 WaitAll = MSG_WAITALL,
             };
 
+            enum ShutDown
+            {
+                Read = SHUT_RD,
+                Write = SHUT_WR,
+                Both = SHUT_RDWR,
+            };
+
             Socket() = default;
 
             Socket(const int INode) : Descriptor(INode) {}
@@ -192,7 +199,17 @@ namespace Core
                 return ClientDescriptor;
             }
 
-            // @todo Implement these
+            void ShutDown(int How) const
+            {
+                int Result = shutdown(_INode, How);
+
+                // Error handling here
+
+                if (Result < 0)
+                {
+                    throw std::system_error(errno, std::generic_category());
+                }
+            }
 
             void SetOptions(int Level, int Option, const void *Value, socklen_t Length) const
             {

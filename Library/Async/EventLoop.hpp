@@ -38,8 +38,6 @@ namespace Core
 
                 // @todo Remove Buffer and Parser from here and put it in the callback handler
 
-                Iterable::Queue<char> Buffer;
-                Network::HTTP::Parser Parser;
                 TimeWheelType::Bucket::Iterator Timer;
             };
 
@@ -65,6 +63,8 @@ namespace Core
                         ev.Listen();
 
                         {
+                            // @todo Potential buttle neck
+
                             std::unique_lock lock(This->QueueMutex);
 
                             while (!This->Queue.IsEmpty())
@@ -101,7 +101,6 @@ namespace Core
 
             inline bool HasPermission()
             {
-                // return Runner.get_id() == std::this_thread::get_id();
                 return RunnerId == std::this_thread::get_id();
             }
 
@@ -172,12 +171,6 @@ namespace Core
                             throw std::runtime_error("Invalid file descriptor");
 
                         Queue.Add({std::move(Client), std::move(Callback), Interval});
-
-                        // if (Queue.First().File.INode() < 0 || (Queue.Content() != &Queue.First() && Queue.Content()[0].File.INode() > 0))
-                        // {
-                        //     auto &Entry = Queue.First();
-                        //     int a = Entry.File.INode();
-                        // }
                     }
 
                     Notify();
@@ -233,9 +226,8 @@ namespace Core
         private:
             Container::iterator Insert(Descriptor &&descriptor, CallbackType &&handler, Duration const &Timeout)
             {
-                auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), {}, {}, {}, {}});
-                // auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler)});
-                // auto Iterator = Handlers.emplace_back(std::move(descriptor), std::move(handler), nullptr);
+                auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), {}, {}});
+                // auto Iterator = Handlers.emplace(std::move(descriptor), std::move(handler), Handlers.end(), Wheel.end());
                 Iterator->Iterator = Iterator;
 
                 if (Timeout.AsMilliseconds() > 0)

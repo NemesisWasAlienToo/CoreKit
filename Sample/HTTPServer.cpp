@@ -1,95 +1,79 @@
 #include <iostream>
 #include <string>
-#include <unordered_map>
 
 #include <Format/Stream.hpp>
 #include <Network/HTTP/Server.hpp>
+#include <Test.hpp>
 
 using namespace Core::Network;
 
-int main(int argc, char const *argv[])
+int main(int, char const *[])
 {
     HTTP::Server Server({"0.0.0.0:8888"}, {5, 0}, 7);
 
+    Test::Log("Server started");
+
+    // Default route for the cases that no route matches the request
+
     Server.SetDefault(
-        "/",
-        [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
+        [](EndPoint const &, HTTP::Request const &Request)
         {
-            // @todo Store route arguments in a tuple.
-            // @todo Make argument names a compile time template parameter accessing the tuple to get access timeto O(1).
-
-            Request.Cookies(Parameters);
-
-            for (auto &[Key, Value] : Parameters)
-            {
-                std::cout << Key << ": " << Value << std::endl;
-            }
-
             return HTTP::Response::Text(Request.Version, HTTP::Status::NotFound, "This path does not exist");
         });
 
-    Server.GET(
-        "/Static/[Folder]",
-        [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
+    // Simples route for home path
+
+    Server.GET<"/">(
+        [](EndPoint const &, HTTP::Request const &Request)
         {
-            Iterable::Queue<char> Queue;
-            Format::Stream Stream(Queue);
+            return HTTP::Response::Text(Request.Version, HTTP::Status::OK, "Hello world");
+        });
 
-            Stream << "<h1>Folder = " << Parameters["Folder"] << "</h1>"
-                        << "<h1>Extension = " << Parameters["Ext"] << "</h1>";
+    // More complex group route
 
-            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Stream.ToString());
-        },
-        "Ext");
-
-    Server.GET(
-        "/Home",
-        [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
+    Server.GET<"/Static/[]", true>(
+        [](EndPoint const &, HTTP::Request const &Request, std::string_view Folder, std::string_view File)
         {
-            Request.FormData(Parameters);
+            auto Params = Request.QueryParams();
+            Request.Cookies(Params);
+            Request.FormData(Params);
 
-            // print all Parameters
+            auto BodyQueue = Iterable::Queue<char>(128);
+            Format::Stream Sr(BodyQueue);
 
-            for (auto &[Key, Value] : Parameters)
+            Sr << "Hello world!\n" << "Accesing file : [" << Folder << '/' << File << ']';
+
+            return HTTP::Response::Text(Request.Version, HTTP::Status::OK, Sr.ToString());
+        });
+
+    // // Building a simple filter that just forwards the request
+
+    Server.FilterFrom(
+        [](HTTP::Server::TFilter &&Next)
+        {
+            return [Next = std::move(Next)](Network::EndPoint const &Target, HTTP::Request &Request)
             {
-                std::cout << Key << ": " << Value << std::endl;
-            }
+                // Manipulate request before passing it down
 
-            return HTTP::Response::Redirect(Request.Version, "/Home/1", {{"test", "test2"}});
-        });
+                Request.Headers.insert_or_assign("Filter", "FirstFilter");
 
-    Server.GET(
-        "/Home/[Index]",
-        [&](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
-        {
-            Iterable::Queue<char> Queue;
-            Format::Stream Stream(Queue);
+                // Pass the request down the chain
 
-            Stream << "<h1>Index = " << Parameters["Index"] << "</h1>";
+                auto Res = Next(Target, Request);
 
-            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Stream.ToString())
-                .SetCookie("Name", "TestName", DateTime::FromNow(Duration(60, 0)))
-                .SetCookie("Family", "TestFamily", 60)
-                .SetCookie("Id", "TestFamily");
-        });
+                // Manipulate response before returning it
 
-    Server.POST(
-        "/Home/[Index]",
-        [](EndPoint const &, HTTP::Request const &Request, std::unordered_map<std::string, std::string> &Parameters)
-        {
-            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Index = " + Parameters["Index"] + "</h1>");
+                Res.SetContent(Res.Content + "\nAdded by filter");
+
+                return Res;
+            };
         });
 
     Server.Run();
 
     Server.GetInPool();
 
-    // while (true)
-    // {
-    //     std::string input;
-
-    //     std::cin >> input;
-    // }
+    // sleep(10);
 
     // Server.Stop();
 

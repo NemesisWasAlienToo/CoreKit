@@ -100,7 +100,7 @@ namespace Core
 
             T &Last()
             {
-                return *this[_Length - 1];
+                return this->operator[](_Length - 1);
             }
 
             T const &First() const

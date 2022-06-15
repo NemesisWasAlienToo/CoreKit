@@ -117,9 +117,24 @@ namespace Core
                 return *this;
             }
 
-            Stream &operator<<(const std::string &Value)
+            template<size_t Size>
+            Stream &operator<<(char const (&Value)[Size])
+            {
+                Queue.Add(Value, Size - 1);
+
+                return *this;
+            }
+
+            Stream &operator<<(std::string const &Value)
             {
                 Queue.Add(Value.c_str(), Value.length());
+
+                return *this;
+            }
+
+            Stream &operator<<(std::string_view const &Value)
+            {
+                Queue.Add(Value.begin(), Value.length());
 
                 return *this;
             }

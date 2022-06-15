@@ -14,11 +14,11 @@ namespace Core
         class TCPServer : public Runnable
         {
         public:
-            using BuilderType = std::function<Async::EventLoop::CallbackType()>;
-
             TCPServer() = default;
             TCPServer(TCPServer const &Other) = delete;
-            TCPServer(EndPoint const &endPoint, BuilderType handlerBuilder, Duration const &Timeout, size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500)) : Pool(Interval, ThreadCount), HandlerBuilder(handlerBuilder)
+
+            template <typename TCallback>
+            TCPServer(EndPoint const &endPoint, TCallback&& handlerBuilder, Duration const &Timeout, size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500)) : Pool(Interval, ThreadCount)
             {
                 Network::Socket Server(static_cast<Network::Socket::SocketFamily>(endPoint.Address().Family()), Network::Socket::TCP);
 
@@ -33,10 +33,9 @@ namespace Core
 
                 Server.Listen();
 
-                // if (Pool.Length() > 0)
                 Pool[0].Assign(
                     std::move(Server),
-                    [this, Timeout, Counter = 0](Async::EventLoop *, ePoll::Entry &, Async::EventLoop::Entry &Self) mutable
+                    [this, HandlerBuilder = std::forward<TCallback>(handlerBuilder), Timeout, Counter = 0](Async::EventLoop *, ePoll::Entry &, Async::EventLoop::Entry &Self) mutable
                     {
                         Network::Socket &Server = *static_cast<Network::Socket *>(&Self.File);
 
@@ -52,7 +51,7 @@ namespace Core
 
                         auto &Turn = Pool[Counter];
 
-                        Turn.Assign(std::move(Client), HandlerBuilder(), Timeout);
+                        Turn.Assign(std::move(Client), HandlerBuilder(Info), Timeout);
 
                         Counter = (Counter + 1) % Pool.Length();
                     },
@@ -92,7 +91,6 @@ namespace Core
             // @todo Since Poll is shared, Make it immutable
 
             Async::ThreadPool Pool;
-            BuilderType HandlerBuilder;
         };
     }
 }

@@ -164,7 +164,7 @@ namespace Core
 
                 // return *this + Result;
 
-                return std::move(Result += *this);
+                return Result += *this;
             }
 
             //

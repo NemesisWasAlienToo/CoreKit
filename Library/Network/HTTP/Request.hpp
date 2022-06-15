@@ -4,11 +4,12 @@
 #include <string>
 #include <unordered_map>
 #include <regex>
+#include <ThirdParty/ctre.hpp>
 
 #include <Duration.hpp>
 #include <Iterable/Queue.hpp>
 #include <Network/Socket.hpp>
-#include <Format/Serializer.hpp>
+#include <Format/Stream.hpp>
 #include <Network/HTTP/Response.hpp>
 
 namespace Core
@@ -20,26 +21,27 @@ namespace Core
             class Request : public Message
             {
             public:
-                enum class Methods : unsigned short
-                {
-                    GET = 0,
-                    POST,
-                    PUT,
-                    DELETE,
-                    HEAD,
-                    OPTIONS,
-                    PATCH,
-                    Any
-                };
+                // enum class Methods : unsigned short
+                // {
+                //     GET = 0,
+                //     POST,
+                //     PUT,
+                //     DELETE,
+                //     HEAD,
+                //     OPTIONS,
+                //     PATCH,
+                //     Any
+                // };
+                // static std::string const MethodStrings[];
 
-                std::string Type;
+                Methods Method;
                 std::string Path;
 
-                void AppendToBuffer(Iterable::Queue<char>& Result)
+                void AppendToBuffer(Iterable::Queue<char> &Result)
                 {
-                    Format::Stringifier Ser(Result);
+                    Format::Stream Ser(Result);
 
-                    Ser << Type << ' ' << Path << " HTTP/" << Version << "\r\n";
+                    Ser << MethodStrings[size_t(Method)] << ' ' << Path << " HTTP/" << Version << "\r\n";
 
                     for (auto const &[k, v] : Headers)
                         Ser << k << ": " << v << "\r\n";
@@ -52,9 +54,9 @@ namespace Core
                 {
                     Iterable::Queue<char> Result(20);
 
-                    Format::Stringifier Ser(Result);
+                    Format::Stream Ser(Result);
 
-                    Ser << Type << ' ' << Path << " HTTP/" << Version << "\r\n";
+                    Ser << MethodStrings[size_t(Method)] << ' ' << Path << " HTTP/" << Version << "\r\n";
 
                     for (auto const &[k, v] : Headers)
                         Ser << k << ": " << v << "\r\n";
@@ -69,7 +71,7 @@ namespace Core
                 {
                     std::stringstream ss;
 
-                    ss << Type << ' ' << Path << " HTTP/" << Version << "\r\n";
+                    ss << MethodStrings[size_t(Method)] << ' ' << Path << " HTTP/" << Version << "\r\n";
 
                     for (auto const &[k, v] : Headers)
                         ss << k << ": " << v << "\r\n";
@@ -89,18 +91,11 @@ namespace Core
                         return;
                     }
 
-                    const std::string &Cookie = Iterator->second;
+                    std::string_view Cookie = Iterator->second;
 
-                    std::regex Capture("([^;]+)=([^;]+)(?:;\\s)?");
-
-                    auto QueryBegin = std::sregex_iterator(Cookie.begin(), Cookie.end(), Capture);
-                    auto QueryEnd = std::sregex_iterator();
-
-                    std::smatch Matches;
-
-                    for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
+                    for (auto match : ctre::range<"([^;]+)=([^;]+)(?:;\\s)?">(Cookie))
                     {
-                        Result[i->str(1)] = i->str(2);
+                        Result.emplace(match.get<1>(), match.get<2>());
                     }
                 }
 
@@ -113,19 +108,41 @@ namespace Core
                     return Result;
                 }
 
+                void QueryParams(std::unordered_map<std::string, std::string> &Result) const
+                {
+                    std::string_view PathView{Path};
+
+                    auto Start = PathView.find('?');
+
+                    if (Start == std::string_view::npos || PathView.length() == ++Start)
+                    {
+                        return;
+                    }
+
+                    std::string_view Params = PathView.substr(Start);
+
+                    for (auto match : ctre::range<"([^&]+)=([^&]+)">(Params))
+                    {
+                        Result.emplace(match.get<1>(), match.get<2>());
+                    }
+                }
+
+                std::unordered_map<std::string, std::string> QueryParams() const
+                {
+                    std::unordered_map<std::string, std::string> Result;
+
+                    QueryParams(Result);
+
+                    return Result;
+                }
+
                 void FormData(std::unordered_map<std::string, std::string> &Result) const
                 {
-                    std::regex Capture("([^&]+)=([^&]+)");
-
-                    auto QueryBegin = std::sregex_iterator(Content.begin(), Content.end(), Capture);
-                    auto QueryEnd = std::sregex_iterator();
-
-                    std::smatch Matches;
-
-                    for (std::sregex_iterator i = QueryBegin; i != QueryEnd; ++i)
+                    for (auto match : ctre::range<"([^&]+)=([^&]+)">(Content))
                     {
-                        std::cout << i->str(1) << " : " << i->str(2) << std::endl;
-                        Result[i->str(1)] = i->str(2);
+                        // @todo Optimize string
+
+                        Result.emplace(match.get<1>(), match.get<2>());
                     }
                 }
 
@@ -138,7 +155,7 @@ namespace Core
                     return Result;
                 }
 
-                size_t ParseFirstLine(std::string_view const &Text) override
+                size_t ParseFirstLine(std::string_view const &Text)
                 {
                     // @todo Hanlde null case
 
@@ -152,7 +169,9 @@ namespace Core
                         throw std::invalid_argument("Invalid method");
                     }
 
-                    Type = Text.substr(Cursor, CursorTmp - Cursor);
+                    Method = FromString(Text.substr(Cursor, CursorTmp - Cursor));
+
+                    // Type = Text.substr(Cursor, CursorTmp - Cursor);
                     Cursor = CursorTmp + 1;
 
                     // Parse path
@@ -191,81 +210,83 @@ namespace Core
                     return ret;
                 }
 
-                inline static Request From(std::string Version, std::string Method, std::string Path, std::unordered_map<std::string, std::string> Headers = {}, std::string Content = "")
+                inline static Request From(std::string_view const &Version, Methods Method, std::string_view const &Path, std::unordered_map<std::string, std::string> Headers = {}, std::string_view const &Content = "")
                 {
                     Request request;
-                    request.Type = std::move(Method);
-                    request.Path = std::move(Path);
-                    request.Version = std::move(Version);
+                    request.Method = Method;
+                    request.Path = Path;
+                    request.Version = Version;
                     request.Headers = std::move(Headers);
-                    request.Content = std::move(Content);
+                    request.Content = Content;
                     return request;
                 }
 
-                static Request Get(std::string Version, const std::string &Path)
+                static Request Get(std::string_view const &Version, std::string_view const &Path)
                 {
                     return Request::From(
-                        std::move(Version),
-                        "GET",
+                        Version,
+                        Methods::GET,
                         Path);
                 }
 
-                static Request Post(std::string Version, std::string Path, std::string Content)
+                static Request Post(std::string_view const &Version, std::string_view const &Path, std::string_view const &Content)
                 {
                     return Request::From(
-                        std::move(Version),
-                        "POST",
+                        Version,
+                        Methods::POST,
                         Path,
                         {{"Content-Type", "application/x-www-form-urlencoded"},
                          {"Content-Length", std::to_string(Content.size())}},
                         Content);
                 }
 
-                static Request Put(std::string Version, const std::string &Path, const std::string &Content)
+                static Request Put(std::string_view const &Version, std::string_view const &Path, std::string_view const &Content)
                 {
                     return Request::From(
-                        std::move(Version),
-                        "PUT",
+                        Version,
+                        Methods::PUT,
                         Path,
                         {{"Content-Type", "application/x-www-form-urlencoded"},
                          {"Content-Length", std::to_string(Content.size())}},
                         Content);
                 }
 
-                static Request Delete(std::string Version, const std::string &Path)
+                static Request Delete(std::string_view const & Version, std::string_view const &Path)
                 {
                     return Request::From(
-                        std::move(Version),
-                        "DELETE",
+                        Version,
+                        Methods::DELETE,
                         Path);
                 }
 
-                static Request Options(std::string Version, const std::string &Path)
+                static Request Options(std::string_view const &Version, std::string_view const &Path)
                 {
                     return Request::From(
-                        std::move(Version),
-                        "OPTIONS",
+                        Version,
+                        Methods::OPTIONS,
                         Path);
                 }
 
-                static Request Head(std::string Version, const std::string &Path)
+                static Request Head(std::string_view const & Version, std::string_view const &Path)
                 {
                     return Request::From(
-                        std::move(Version),
-                        "HEAD",
+                        Version,
+                        Methods::HEAD,
                         Path);
                 }
 
-                static Request Patch(std::string Version, const std::string &Path, const std::string &Content)
+                static Request Patch(std::string_view const &Version, std::string_view const &Path, std::string_view const &Content)
                 {
                     return Request::From(
-                        std::move(Version),
-                        "PATCH",
+                        Version,
+                        Methods::PATCH,
                         Path,
                         {{"Content-Length", std::to_string(Content.size())}},
                         Content);
                 }
             };
+
+            // inline std::string const Request::MethodStrings[]{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH", ""};
         }
     }
 }
