@@ -2,8 +2,10 @@
 
 #include <iostream>
 #include <string>
-#include <map>
+#include <variant>
+#include <memory>
 
+#include <File.hpp>
 #include <Duration.hpp>
 #include <DateTime.hpp>
 #include <Network/HTTP/HTTP.hpp>
@@ -22,51 +24,40 @@ namespace Core
                 HTTP::Status Status;
                 std::string Brief;
                 Iterable::List<std::string> SetCookies;
+                std::variant<std::string, std::shared_ptr<File>> Content;
 
-                void AppendToBuffer(Iterable::Queue<char> &Result) const
+                friend Format::Stream &operator<<(Format::Stream &Ser, Response const &R)
                 {
-                    Format::Stream Ser(Result);
+                    Ser << "HTTP/" << R.Version << ' ' << std::to_string(static_cast<unsigned short>(R.Status)) << ' ' << R.Brief << "\r\n";
 
-                    Ser << "HTTP/" << Version << ' ' << std::to_string(static_cast<unsigned short>(Status)) << ' ' << Brief << "\r\n";
-
-                    for (auto const &[k, v] : Headers)
+                    for (auto const &[k, v] : R.Headers)
                         Ser << k << ": " << v << "\r\n";
 
-                    SetCookies.ForEach(
+                    R.SetCookies.ForEach(
                         [&Ser](std::string const &Cookie)
                         {
                             Ser << "Set-Cookie: " << Cookie << "\r\n";
                         });
 
-                    Ser << "\r\n"
-                        << Content;
-                }
+                    Ser << "\r\n";
 
-                Iterable::Queue<char> ToBuffer(size_t InitSize = 1024) const
-                {
-                    Iterable::Queue<char> Result(InitSize);
+                    if (std::holds_alternative<std::string>(R.Content))
+                        Ser << std::get<0>(R.Content);
 
-                    AppendToBuffer(Result);
+                    // else
+                    // What should we do?
 
-                    return Result;
+                    return Ser;
                 }
 
                 std::string ToString() const
                 {
-                    std::stringstream ss;
+                    Iterable::Queue<char> Buffer;
+                    Format::Stream Ser(Buffer);
 
-                    ss << "HTTP/" << Version << " " << std::to_string(static_cast<unsigned short>(Status)) << " " << Brief << "\r\n";
+                    Ser << *this;
 
-                    for (auto const &[k, v] : Headers)
-                        ss << k + ": " << v << "\r\n";
-
-                    SetCookies.ForEach([&ss](std::string const &Cookie)
-                                       { ss << "Set-Cookie: " << Cookie << "\r\n"; });
-
-                    ss << "\r\n"
-                       << Content;
-
-                    return ss.str();
+                    return Ser.ToString();
                 }
 
                 Response &SetCookie(const std::string &Name, const std::string &Value,
@@ -104,44 +95,9 @@ namespace Core
                     return *this;
                 }
 
-                Response &SetCookie(const std::string &Name, const std::string &Value, size_t MaxAge,
-                                    const std::string &Path = "", const std::string &Domain = "",
-                                    bool Secure = false, bool HttpOnly = false)
-                {
-                    std::stringstream ResultStream;
-
-                    ResultStream << Name << "=" << Value;
-
-                    ResultStream << "; Max-Age=" << MaxAge;
-
-                    if (!Path.empty())
-                    {
-                        ResultStream << "; Path=" << Path;
-                    }
-
-                    if (!Domain.empty())
-                    {
-                        ResultStream << "; Domain=" << Domain;
-                    }
-
-                    if (Secure)
-                    {
-                        ResultStream << "; Secure";
-                    }
-
-                    if (HttpOnly)
-                    {
-                        ResultStream << "; HttpOnly";
-                    }
-
-                    SetCookies.Add(ResultStream.str());
-
-                    return *this;
-                }
-
                 Response &SetCookie(const std::string &Name, const std::string &Value, const Duration &MaxAge,
-                                    const std::string &Path = "", const std::string &Domain = "",
-                                    bool Secure = false, bool HttpOnly = false)
+                                   const std::string &Path = "", const std::string &Domain = "",
+                                   bool Secure = false, bool HttpOnly = false)
                 {
                     std::stringstream ResultStream;
 
@@ -283,9 +239,18 @@ namespace Core
                     return ret;
                 }
 
-                // @todo Optimize rvalue
-
                 static Response From(std::string_view const &Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, std::string_view const &Content = "")
+                {
+                    Response response;
+                    response.Status = Status;
+                    response.Version = Version;
+                    response.Headers = std::move(Headers);
+                    response.Content = std::string{Content};
+                    response.Brief = StatusMessage.at(Status);
+                    return response;
+                }
+
+                static Response From(std::string_view const &Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, std::shared_ptr<File> Content = nullptr)
                 {
                     Response response;
                     response.Status = Status;
@@ -296,23 +261,41 @@ namespace Core
                     return response;
                 }
 
+                // String
+
                 static Response Text(std::string_view const &Version, HTTP::Status Status, std::string_view const &Content)
                 {
-                    auto size = Content.size();
-                    return From(Version, Status, {{"Content-Type", "text/plain"}, {"Content-Length", std::to_string(size)}}, Content);
+                    return From(Version, Status, {{"Content-Type", "text/plain"}, {"Content-Length", std::to_string(Content.length())}}, Content);
                 }
 
                 static Response HTML(std::string_view const &Version, HTTP::Status Status, std::string_view const &Content)
                 {
-                    auto size = Content.size();
-                    return From(Version, Status, {{"Content-Type", "text/html"}, {"Content-Length", std::to_string(size)}}, Content);
+                    return From(Version, Status, {{"Content-Type", "text/html"}, {"Content-Length", std::to_string(Content.length())}}, Content);
                 }
 
                 static Response Json(std::string_view const &Version, HTTP::Status Status, std::string_view const &Content)
                 {
-                    auto size = Content.size();
-                    return From(Version, Status, {{"Content-Type", "application/json"}, {"Content-Length", std::to_string(size)}}, Content);
+                    return From(Version, Status, {{"Content-Type", "application/json"}, {"Content-Length", std::to_string(Content.length())}}, Content);
                 }
+
+                // File
+
+                static Response Text(std::string_view const &Version, HTTP::Status Status, std::shared_ptr<File> Content = nullptr)
+                {
+                    return From(Version, Status, {{"Content-Type", "text/plain"}, {"Content-Length", std::to_string(Content ? Content->Size() : 0)}}, Content);
+                }
+
+                static Response HTML(std::string_view const &Version, HTTP::Status Status, std::shared_ptr<File> Content = nullptr)
+                {
+                    return From(Version, Status, {{"Content-Type", "text/html"}, {"Content-Length", std::to_string(Content ? Content->Size() : 0)}}, Content);
+                }
+
+                static Response Json(std::string_view const &Version, HTTP::Status Status, std::shared_ptr<File> Content = nullptr)
+                {
+                    return From(Version, Status, {{"Content-Type", "application/json"}, {"Content-Length", std::to_string(Content ? Content->Size() : 0)}}, Content);
+                }
+
+                // Redirect
 
                 static inline Response Redirect(std::string_view const &Version, HTTP::Status Status, std::string_view const &Location, std::unordered_map<std::string, std::string> Parameters = {})
                 {
@@ -336,11 +319,51 @@ namespace Core
                     return Redirect(Version, HTTP::Status::Found, std::move(Location), std::move(Parameters));
                 }
 
-                // static Response File(std::string_view const &Version, HTTP::Status Status, std::string_view const &FilePath, std::unordered_map<std::string, std::string> Parameters = {})
-                // {
-                //     Response res;
-                //     res.
-                // }
+                bool HasString()
+                {
+                    return std::holds_alternative<std::string>(Content);
+                }
+
+                std::string GetContent()
+                {
+                    if(std::holds_alternative<std::string>(Content))
+                    {
+                        return std::get<std::string>(Content);
+                    }
+                    else
+                    {
+                        return "";
+                    }
+                }
+
+                bool HasFile()
+                {
+                    return std::holds_alternative<std::shared_ptr<File>>(Content);
+                }
+
+                std::shared_ptr<File>GetFile()
+                {
+                    if(std::holds_alternative<std::shared_ptr<File>>(Content))
+                    {
+                        return std::get<std::shared_ptr<File>>(Content);
+                    }
+                    else
+                    {
+                        return nullptr;
+                    }
+                }
+
+                void SetContent(std::string_view NewContent)
+                {
+                    Content = std::string{NewContent};
+                    Headers.insert_or_assign("Content-Length", std::to_string(NewContent.length()));
+                }
+
+                void SetContent(std::shared_ptr<File> NewContent)
+                {
+                    Content = NewContent;
+                    Headers.insert_or_assign("Content-Length", std::to_string(NewContent->Size()));
+                }
             };
         }
     }

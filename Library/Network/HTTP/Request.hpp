@@ -37,49 +37,33 @@ namespace Core
                 Methods Method;
                 std::string Path;
 
-                void AppendToBuffer(Iterable::Queue<char> &Result)
+                friend Format::Stream &operator<<(Format::Stream &Ser, Request const &R)
                 {
-                    Format::Stream Ser(Result);
+                    Ser << MethodStrings[size_t(R.Method)] << ' ' << R.Path << " HTTP/" << R.Version << "\r\n";
 
-                    Ser << MethodStrings[size_t(Method)] << ' ' << Path << " HTTP/" << Version << "\r\n";
-
-                    for (auto const &[k, v] : Headers)
+                    for (auto const &[k, v] : R.Headers)
                         Ser << k << ": " << v << "\r\n";
 
                     Ser << "\r\n"
-                        << Content;
+                        << R.Content;
+
+                    return Ser;
                 }
 
-                Iterable::Queue<char> ToBuffer()
+                void SetContent(std::string_view const &NewContent)
                 {
-                    Iterable::Queue<char> Result(20);
-
-                    Format::Stream Ser(Result);
-
-                    Ser << MethodStrings[size_t(Method)] << ' ' << Path << " HTTP/" << Version << "\r\n";
-
-                    for (auto const &[k, v] : Headers)
-                        Ser << k << ": " << v << "\r\n";
-
-                    Ser << "\r\n"
-                        << Content;
-
-                    return Result;
+                    Content = std::string{NewContent};
+                    Headers.insert_or_assign("Content-Length", std::to_string(Content.length()));
                 }
 
                 std::string ToString() const
                 {
-                    std::stringstream ss;
+                    Iterable::Queue<char> Buffer;
+                    Format::Stream Ser(Buffer);
 
-                    ss << MethodStrings[size_t(Method)] << ' ' << Path << " HTTP/" << Version << "\r\n";
+                    Ser << *this;
 
-                    for (auto const &[k, v] : Headers)
-                        ss << k << ": " << v << "\r\n";
-
-                    ss << "\r\n"
-                       << Content;
-
-                    return ss.str();
+                    return Ser.ToString();
                 }
 
                 void Cookies(std::unordered_map<std::string, std::string> &Result) const

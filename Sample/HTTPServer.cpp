@@ -1,8 +1,10 @@
 #include <iostream>
 #include <string>
+#include <memory>
 
 #include <Format/Stream.hpp>
 #include <Network/HTTP/Server.hpp>
+#include <File.hpp>
 #include <Test.hpp>
 
 using namespace Core::Network;
@@ -41,31 +43,27 @@ int main(int, char const *[])
             auto BodyQueue = Iterable::Queue<char>(128);
             Format::Stream Sr(BodyQueue);
 
-            Sr << "Hello world!\n" << "Accesing file : [" << Folder << '/' << File << ']';
+            Sr << "Hello world!\n"
+               << "Accesing file : [" << Folder << '/' << File << ']';
 
             return HTTP::Response::Text(Request.Version, HTTP::Status::OK, Sr.ToString());
         });
 
-    // // Building a simple filter that just forwards the request
+    // Building a simple filter
+
+    std::shared_ptr<File> Index = std::make_shared<File>(File::Open("html/index.html", File::ReadOnly));
 
     Server.FilterFrom(
-        [](HTTP::Server::TFilter &&Next)
+        [&Index](HTTP::Server::TFilter &&Next)
         {
-            return [Next = std::move(Next)](Network::EndPoint const &Target, HTTP::Request &Request)
+            return [&Index, Next = std::move(Next)](Network::EndPoint const &Target, HTTP::Request &Request)
             {
-                // Manipulate request before passing it down
+                if (Request.Path == "/index.html")
+                {
+                    return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Index);
+                }
 
-                Request.Headers.insert_or_assign("Filter", "FirstFilter");
-
-                // Pass the request down the chain
-
-                auto Res = Next(Target, Request);
-
-                // Manipulate response before returning it
-
-                Res.SetContent(Res.Content + "\nAdded by filter");
-
-                return Res;
+                return Next(Target, Request);
             };
         });
 

@@ -1,6 +1,9 @@
 #pragma once
 
 #include <string>
+#include <tuple>
+#include <memory>
+#include <variant>
 
 #include <Event.hpp>
 #include <Duration.hpp>
@@ -28,7 +31,7 @@ namespace Core
                 Duration Timeout;
                 Network::EndPoint Target;
                 // Iterable::Queue<char> IBuffer;
-                Iterable::Queue<Iterable::Queue<char>> OBuffer;
+                Iterable::Queue<std::tuple<Iterable::Queue<char>, std::shared_ptr<File>>> OBuffer;
                 TServer &CTServer;
 
                 HTTP::Parser Parser;
@@ -41,10 +44,21 @@ namespace Core
                 {
                 }
 
+                void AppendResponse(HTTP::Response const &Response)
+                {
+                    OBuffer.Add(
+                        {Iterable::Queue<char>(1024),
+                         std::holds_alternative<std::shared_ptr<File>>(Response.Content) ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr});
+
+                    Format::Stream Ser(std::get<0>(OBuffer.Last()));
+
+                    Ser << Response;
+                }
+
                 void operator()(Async::EventLoop *Loop, ePoll::Entry &Item, Async::EventLoop::Entry &Self)
                 {
                     Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
-                    
+
                     if (Item.Happened(ePoll::In) | Item.Happened(ePoll::UrgentIn))
                     {
                         if (!Client.Received())
@@ -125,7 +139,7 @@ namespace Core
 
                             // Append response to buffer
 
-                            OBuffer.Add(Response.ToBuffer());
+                            AppendResponse(Response);
 
                             // Modify events
 
@@ -138,7 +152,7 @@ namespace Core
                     }
                     catch (HTTP::Response const &Response)
                     {
-                        OBuffer.Add(Response.ToBuffer());
+                        AppendResponse(Response);
 
                         ShouldClose = true;
                     }
@@ -146,6 +160,8 @@ namespace Core
 
                 void OnWrite(Async::EventLoop *Loop, ePoll::Entry &, Async::EventLoop::Entry &Self)
                 {
+                    Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
+
                     if (OBuffer.IsEmpty())
                     {
                         if (ShouldClose)
@@ -164,14 +180,22 @@ namespace Core
 
                     // Write data
 
-                    Format::Stream Ser(CurBuf);
+                    Format::Stream Ser(std::get<0>(CurBuf));
 
                     // Make socket non-blocking and improve this
 
                     Self.File << Ser;
 
-                    if (CurBuf.IsEmpty())
+                    if (Ser.Queue.IsEmpty())
                     {
+                        if (std::get<1>(CurBuf))
+                        {
+                            // @todo Optimize getting size
+
+                            std::get<1>(CurBuf)->Seek();
+                            Client.SendFile(*std::get<1>(CurBuf), std::get<1>(CurBuf)->Size());
+                        }
+
                         OBuffer.Take();
                     }
                 }

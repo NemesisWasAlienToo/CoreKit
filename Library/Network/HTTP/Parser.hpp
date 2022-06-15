@@ -94,12 +94,12 @@ namespace Core
 
                         if (Result.Version[5] == '1' && Result.Version[7] == '0')
                         {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::ExpectationFailed, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::ExpectationFailed, {{"Connection", "close"}}, "");
                         }
 
                         if (ContetLength == 0)
                         {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
                         }
 
                         // Respond to 100-continue
@@ -176,14 +176,14 @@ namespace Core
                         }
                         catch (...)
                         {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
                         }
 
                         // Check for version
 
                         if (Result.Version[0] != '1' || (Result.Version[2] != '0' && Result.Version[2] != '1'))
                         {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::HTTPVersionNotSupported, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::HTTPVersionNotSupported, {{"Connection", "close"}}, "");
                         }
 
                         Result.ParseHeaders(Message, TempIndex, bodyPos);
@@ -203,14 +203,14 @@ namespace Core
                         }
                         catch (...)
                         {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
                         }
 
                         // Check if the length is in valid range
 
                         if (ContetLength > ContentLimit)
                         {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
                         }
 
                         // Handle 100-continue
@@ -251,7 +251,7 @@ namespace Core
                             // @todo Check content length to be in the acceptable range
                             // throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
 
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
                         }
                         else if (Iterator->second == "gzip")
                         {
@@ -263,13 +263,13 @@ namespace Core
 
                             // @todo Implement later
 
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
                         }
                         else
                         {
                             // Not implemented
 
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}});
+                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
                         }
                     }
 

@@ -276,7 +276,7 @@ namespace Core
 
         ssize_t SendFile(Descriptor const &Other, size_t Size) const
         {
-            int Result = sendfile(Other._INode, _INode, nullptr, Size);
+            int Result = sendfile(_INode, Other._INode, nullptr, Size);
 
             // Error handling here
 

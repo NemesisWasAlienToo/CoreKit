@@ -233,12 +233,6 @@ namespace Core
                 {
                     Content = std::string{Text.substr(BodyIndex)};
                 }
-
-                void SetContent(std::string NewContent)
-                {
-                    Content = std::move(NewContent);
-                    Headers.insert_or_assign("Content-Length", std::to_string(Content.length()));
-                }
             };
         }
     }
