@@ -4,6 +4,7 @@
 #include <list>
 #include <thread>
 #include <mutex>
+#include <memory>
 
 #include <Event.hpp>
 #include <Duration.hpp>
@@ -196,7 +197,7 @@ namespace Core
                     _Poll(Events);
 
                     Events.ForEach(
-                        [&](ePoll::Entry &Item)
+                        [this](ePoll::Entry &Item)
                         {
                             auto &Ent = *reinterpret_cast<Entry *>(Item.Data);
 
@@ -278,6 +279,7 @@ namespace Core
         public:
             std::thread Runner;
             std::thread::id RunnerId;
+            std::shared_ptr<void> Storage = nullptr;
         };
     }
 }

@@ -104,7 +104,7 @@ namespace Core
 
                             // @todo Optimize Info passing
 
-                            Network::HTTP::Response Response = CTServer.OnRequest(Target, Parser.Result);
+                            Network::HTTP::Response Response = CTServer.OnRequest(Target, Parser.Result, Loop->Storage);
 
                             // Decide if we should keep the connection
 
