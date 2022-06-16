@@ -1,6 +1,6 @@
 #pragma once
 #include <iostream>
-#include <ThirdParty/ctre.hpp>
+#include <Extra/ctre.hpp>
 
 template <ctll::fixed_string... Strings>
 constexpr auto Concatenate() noexcept
