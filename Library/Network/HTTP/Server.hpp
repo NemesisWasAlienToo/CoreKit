@@ -130,7 +130,7 @@ namespace Core
                         std::forward<TAction>(Action));
                 }
 
-                using TFilter = std::function<HTTP::Response(Network::EndPoint const &Target, Network::HTTP::Request &, std::shared_ptr<void>&)>;
+                using TFilter = std::function<HTTP::Response(Network::EndPoint const &Target, Network::HTTP::Request &, std::shared_ptr<void>)>;
 
                 template <typename TBuildCallback>
                 inline void FilterFrom(TBuildCallback &&Builder)
@@ -138,9 +138,9 @@ namespace Core
                     if (!Filters)
                     {
                         Filters = Builder(
-                            [this](Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void>& DataPtr)
+                            [this](Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> storage)
                             {
-                                return _Router.Match(Request.Method, Request.Path, Target, Request, DataPtr);
+                                return _Router.Match(Request.Method, Request.Path, Target, Request, storage);
                             });
 
                         return;
@@ -151,13 +151,13 @@ namespace Core
 
             private:
                 TCPServer TCP;
-                Router<HTTP::Response(Network::EndPoint const &, Network::HTTP::Request const &, std::shared_ptr<void>&)> _Router;
+                Router<HTTP::Response(Network::EndPoint const &, Network::HTTP::Request const &, std::shared_ptr<void>)> _Router;
                 Duration Timeout;
 
                 TFilter Filters = nullptr;
 
             public:
-                inline HTTP::Response OnRequest(Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void>& Storage) const
+                inline HTTP::Response OnRequest(Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> Storage) const
                 {
                     if (!Filters)
                         return _Router.Match(Request.Method, Request.Path, Target, Request, Storage);
