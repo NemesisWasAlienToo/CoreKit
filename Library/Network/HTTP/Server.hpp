@@ -24,6 +24,15 @@ namespace Core
             class Server
             {
             public:
+                struct Setting
+                {
+                    size_t MaxHeaderSize;
+                    size_t MaxBodySize;
+                    size_t MaxConnectionCount;
+                    size_t MaxFileSize;
+                    size_t SendFileThreshold;
+                };
+
                 Server() = default;
                 Server(EndPoint const &endPoint, Duration const &timeout, size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500))
                     : TCP(
@@ -39,9 +48,44 @@ namespace Core
                 {
                 }
 
-                void Run()
+                // Server settings
+
+                // Server& MaxHeaderSize(size_t Size)
+                // {
+                //     Settings.MaxHeaderSize = Size;
+                //     return *this;
+                // }
+
+                // Server& MaxBodySize(size_t Size)
+                // {
+                //     Settings.MaxBodySize = Size;
+                //     return *this;
+                // }
+
+                // Server& MaxConnectionCount(size_t Count)
+                // {
+                //     Settings.MaxConnectionCount = Count;
+                //     return *this;
+                // }
+
+                // Server& MaxFileSize(size_t Size)
+                // {
+                //     Settings.MaxFileSize = Size;
+                //     return *this;
+                // }
+
+                // Server& SendFileThreshold(size_t Size)
+                // {
+                //     Settings.SendFileThreshold = Size;
+                //     return *this;
+                // }
+
+                // Server functions
+
+                Server& Run()
                 {
                     TCP.Run();
+                    return *this;
                 }
 
                 void GetInPool()
@@ -130,7 +174,7 @@ namespace Core
                         std::forward<TAction>(Action));
                 }
 
-                using TFilter = std::function<HTTP::Response(Network::EndPoint const &Target, Network::HTTP::Request &, std::shared_ptr<void>)>;
+                using TFilter = std::function<HTTP::Response(Network::EndPoint const &Target, Network::HTTP::Request &, std::shared_ptr<void> &)>;
 
                 template <typename TBuildCallback>
                 inline void FilterFrom(TBuildCallback &&Builder)
@@ -138,9 +182,9 @@ namespace Core
                     if (!Filters)
                     {
                         Filters = Builder(
-                            [this](Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> storage)
+                            [this](Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> &Storage)
                             {
-                                return _Router.Match(Request.Method, Request.Path, Target, Request, storage);
+                                return _Router.Match(Request.Method, Request.Path, Target, Request, Storage);
                             });
 
                         return;
@@ -149,15 +193,23 @@ namespace Core
                     Filters = Builder(std::move(Filters));
                 }
 
+                template <typename TCallback>
+                inline Server& InitStorages(TCallback &&Callback)
+                {
+                    TCP.InitStorages(Callback);
+                    return *this;
+                }
+
             private:
                 TCPServer TCP;
-                Router<HTTP::Response(Network::EndPoint const &, Network::HTTP::Request const &, std::shared_ptr<void>)> _Router;
+                Router<HTTP::Response(Network::EndPoint const &, Network::HTTP::Request const &, std::shared_ptr<void> &)> _Router;
                 Duration Timeout;
 
                 TFilter Filters = nullptr;
+                Setting Settings;
 
             public:
-                inline HTTP::Response OnRequest(Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> Storage) const
+                inline HTTP::Response OnRequest(Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> &Storage) const
                 {
                     if (!Filters)
                         return _Router.Match(Request.Method, Request.Path, Target, Request, Storage);

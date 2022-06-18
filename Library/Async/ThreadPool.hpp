@@ -24,12 +24,6 @@ namespace Core
         class ThreadPool
         {
         public:
-            struct Entry
-            {
-                std::thread Thread;
-                EventLoop Loop;
-            };
-
             ThreadPool() = default;
             ThreadPool(Duration const &interval, size_t Count) : Loops(Count + 1), Interval(interval)
             {
@@ -101,22 +95,31 @@ namespace Core
                 return Loops[Index];
             }
 
+            template<typename TCallback>
+            inline void InitStorages(TCallback&& Callback)
+            {
+                for (size_t i = 0; i < Loops.Length(); i++)
+                {
+                    Callback(Loops[i].Storage);
+                }
+            }
+
         private:
             Iterable::Span<EventLoop> Loops;
             Duration Interval;
             std::atomic_bool HasJoined{false};
 
-            std::promise<void> Go;
-            std::shared_future<void> GoPromise{Go.get_future()};
+            std::promise<void> GoPromis;
+            std::shared_future<void> GoFuture{GoPromis.get_future()};
 
             void SignalGo()
             {
-                Go.set_value();
+                GoPromis.set_value();
             }
 
             void AwaitGo()
             {
-                GoPromise.get();
+                GoFuture.get();
             }
         };
     }

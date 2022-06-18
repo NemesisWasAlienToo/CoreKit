@@ -87,6 +87,12 @@ namespace Core
                 Pool.Stop();
             }
 
+            template<typename TCallback>
+            inline void InitStorages(TCallback&& Callback)
+            {
+                Pool.InitStorages(Callback);
+            }
+
         private:
             // @todo Since Poll is shared, Make it immutable
 

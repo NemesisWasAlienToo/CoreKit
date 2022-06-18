@@ -240,60 +240,68 @@ namespace Core
                     return ret;
                 }
 
-                static Response From(std::string_view const &Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, std::string_view const &Content = "")
+                static Response From(std::string_view const &Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, std::string Content = "")
                 {
                     Response response;
                     response.Status = Status;
                     response.Version = Version;
+
+                    Headers.emplace("Content-Length", std::to_string(Content.length()));
+
                     response.Headers = std::move(Headers);
-                    response.Content = std::string{Content};
+                    response.Content = std::move(Content);
                     response.Brief = StatusMessage.at(Status);
                     return response;
                 }
 
-                static Response From(std::string_view const &Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, std::shared_ptr<File> Content = nullptr)
+                static Response From(std::string_view const &Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, File Content = File{})
                 {
                     Response response;
                     response.Status = Status;
                     response.Version = Version;
+
+                    Headers.emplace("Content-Length", std::to_string(Content.Size()));
+
                     response.Headers = std::move(Headers);
-                    response.Content = Content;
                     response.Brief = StatusMessage.at(Status);
+
+                    response.Content = std::make_shared<File>(std::move(Content));
+                    
                     return response;
                 }
 
                 // String
 
-                static Response Text(std::string_view const &Version, HTTP::Status Status, std::string_view const &Content)
+                static Response Text(std::string_view const &Version, HTTP::Status Status, std::string Content)
                 {
-                    return From(Version, Status, {{"Content-Type", "text/plain"}, {"Content-Length", std::to_string(Content.length())}}, Content);
+                    return From(Version, Status, {{"Content-Type", "text/plain"}}, std::move(Content));
                 }
 
-                static Response HTML(std::string_view const &Version, HTTP::Status Status, std::string_view const &Content)
+                static Response HTML(std::string_view const &Version, HTTP::Status Status, std::string Content)
                 {
-                    return From(Version, Status, {{"Content-Type", "text/html"}, {"Content-Length", std::to_string(Content.length())}}, Content);
+                    return From(Version, Status, {{"Content-Type", "text/html"}}, std::move(Content));
                 }
 
-                static Response Json(std::string_view const &Version, HTTP::Status Status, std::string_view const &Content)
+                static Response Json(std::string_view const &Version, HTTP::Status Status, std::string Content)
                 {
-                    return From(Version, Status, {{"Content-Type", "application/json"}, {"Content-Length", std::to_string(Content.length())}}, Content);
+                    return From(Version, Status, {{"Content-Type", "application/json"}}, std::move(Content));
                 }
 
                 // File
 
-                static Response Text(std::string_view const &Version, HTTP::Status Status, std::shared_ptr<File> Content = nullptr)
+                static Response Text(std::string_view const &Version, HTTP::Status Status, File Content = File{})
                 {
-                    return From(Version, Status, {{"Content-Type", "text/plain"}, {"Content-Length", std::to_string(Content ? Content->Size() : 0)}}, Content);
+                    return From(Version, Status, {{"Content-Type", "text/plain"}}, std::move(Content));
                 }
 
-                static Response HTML(std::string_view const &Version, HTTP::Status Status, std::shared_ptr<File> Content = nullptr)
+                static Response HTML(std::string_view const &Version, HTTP::Status Status, File Content = File{})
                 {
-                    return From(Version, Status, {{"Content-Type", "text/html"}, {"Content-Length", std::to_string(Content ? Content->Size() : 0)}}, Content);
+                    return From(Version, Status, {{"Content-Type", "text/html"}}, std::move(Content));
                 }
 
-                static Response Json(std::string_view const &Version, HTTP::Status Status, std::shared_ptr<File> Content = nullptr)
+                static Response Json(std::string_view const &Version, HTTP::Status Status, File Content)
                 {
-                    return From(Version, Status, {{"Content-Type", "application/json"}, {"Content-Length", std::to_string(Content ? Content->Size() : 0)}}, Content);
+                    return From(Version, Status, {{"Content-Type", "application/json"}}, std::move(Content));
                 }
 
                 // Redirect
@@ -309,8 +317,8 @@ namespace Core
                         str << key << "=" << value << "&";
                     }
 
-                    Parameters.insert_or_assign("Location", str.str());
-                    Parameters.insert_or_assign("Content-Length", "0");
+                    Parameters.emplace("Location", str.str());
+                    Parameters.emplace("Content-Length", "0");
 
                     return From(Version, Status, std::move(Parameters), "");
                 }

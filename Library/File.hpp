@@ -123,6 +123,36 @@ namespace Core
             }
         }
 
+        std::string ReadAll()
+        {
+            std::string buffer;
+            buffer.resize(Size());
+
+            size_t len = 0;
+
+            while (len < buffer.length())
+            {
+                len += Read(&(buffer[len]), (buffer.length() - len));
+            }
+
+            return buffer;
+        }
+
+        std::string ReadAllString()
+        {
+            std::string buffer;
+            buffer.resize(Size());
+
+            size_t len = 0;
+
+            while (len < buffer.length())
+            {
+                len += Read(&(buffer[len]), (buffer.length() - len));
+            }
+
+            return buffer;
+        }
+
         static Iterable::Span<char> ReadAll(const std::string &Path)
         {
             auto file = Open(Path, ReadOnly);
@@ -134,6 +164,25 @@ namespace Core
             while (len < buffer.Length())
             {
                 len += file.Read(&(buffer[len]), (buffer.Length() - len));
+            }
+
+            file.Close();
+
+            return buffer;
+        }
+
+        static std::string ReadAllString(const std::string &Path)
+        {
+            auto file = Open(Path, ReadOnly);
+
+            std::string buffer;
+            buffer.resize(file.Size());
+
+            size_t len = 0;
+
+            while (len < buffer.length())
+            {
+                len += file.Read(&(buffer[len]), (buffer.length() - len));
             }
 
             file.Close();
@@ -192,7 +241,7 @@ namespace Core
             return static_cast<size_t>(Result);
         }
 
-        static size_t SizeOf(const std::string &Path)
+        static struct stat Stat(const std::string &Path)
         {
             struct stat st;
 
@@ -203,7 +252,47 @@ namespace Core
                 throw std::system_error(errno, std::generic_category());
             }
 
-            return st.st_size;
+            return st;
+        }
+
+        inline static bool IsDirectory(std::string const &Path)
+        {
+            return S_ISDIR(Stat(Path).st_mode);
+        }
+
+        inline static bool IsChar(std::string const &Path)
+        {
+            return S_ISCHR(Stat(Path).st_mode);
+        }
+
+        inline static bool IsBulk(std::string const &Path)
+        {
+            return S_ISBLK(Stat(Path).st_mode);
+        }
+
+        inline static bool IsFIFO(std::string const &Path)
+        {
+            return S_ISFIFO(Stat(Path).st_mode);
+        }
+
+        inline static bool IsLink(std::string const &Path)
+        {
+            return S_ISLNK(Stat(Path).st_mode);
+        }
+
+        inline static bool IsSocket(std::string const &Path)
+        {
+            return S_ISSOCK(Stat(Path).st_mode);
+        }
+
+        inline static bool IsRegular(std::string const &Path)
+        {
+            return S_ISREG(Stat(Path).st_mode);
+        }
+
+        inline static size_t SizeOf(const std::string &Path)
+        {
+            return Stat(Path).st_size;
         }
 
         size_t Size() const
@@ -308,6 +397,11 @@ namespace Core
             }
 
             return *this;
+        }
+
+        operator bool() const
+        {
+            return _INode != -1;
         }
 
         // @todo Remove these
