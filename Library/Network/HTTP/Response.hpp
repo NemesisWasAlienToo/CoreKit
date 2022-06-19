@@ -97,8 +97,8 @@ namespace Core
                 }
 
                 Response &SetCookie(const std::string &Name, const std::string &Value, const Duration &MaxAge,
-                                   const std::string &Path = "", const std::string &Domain = "",
-                                   bool Secure = false, bool HttpOnly = false)
+                                    const std::string &Path = "", const std::string &Domain = "",
+                                    bool Secure = false, bool HttpOnly = false)
                 {
                     std::stringstream ResultStream;
 
@@ -260,48 +260,61 @@ namespace Core
                     response.Status = Status;
                     response.Version = Version;
 
-                    Headers.emplace("Content-Length", std::to_string(Content.Size()));
-
                     response.Headers = std::move(Headers);
                     response.Brief = StatusMessage.at(Status);
 
                     response.Content = std::make_shared<File>(std::move(Content));
-                    
+
                     return response;
                 }
 
                 // String
 
+                static Response Type(std::string_view const &Version, HTTP::Status Status, std::string_view const &ContentType, std::string Content)
+                {
+                    return From(Version, Status, {{"Content-Type", std::string{ContentType}}}, std::move(Content));
+                }
+
                 static Response Text(std::string_view const &Version, HTTP::Status Status, std::string Content)
                 {
-                    return From(Version, Status, {{"Content-Type", "text/plain"}}, std::move(Content));
+                    return Type(Version, Status, "text/plain", std::move(Content));
                 }
 
                 static Response HTML(std::string_view const &Version, HTTP::Status Status, std::string Content)
                 {
-                    return From(Version, Status, {{"Content-Type", "text/html"}}, std::move(Content));
+                    return Type(Version, Status, "text/html", std::move(Content));
                 }
 
                 static Response Json(std::string_view const &Version, HTTP::Status Status, std::string Content)
                 {
-                    return From(Version, Status, {{"Content-Type", "application/json"}}, std::move(Content));
+                    return Type(Version, Status, "application/json", std::move(Content));
                 }
 
                 // File
 
+                static Response Type(std::string_view const &Version, HTTP::Status Status, std::string_view const &ContentType, File Content = File{})
+                {
+                    return From(Version, Status, {{"Content-Type", std::string{ContentType}}}, std::move(Content));
+                }
+
+                static Response FromPath(std::string_view const &Version, HTTP::Status Status, std::string_view const &Path)
+                {
+                    return Type(Version, Status, GetContentType(GetExtension(Path)), File::Open(Path));
+                }
+
                 static Response Text(std::string_view const &Version, HTTP::Status Status, File Content = File{})
                 {
-                    return From(Version, Status, {{"Content-Type", "text/plain"}}, std::move(Content));
+                    return Type(Version, Status, "text/plain", std::move(Content));
                 }
 
                 static Response HTML(std::string_view const &Version, HTTP::Status Status, File Content = File{})
                 {
-                    return From(Version, Status, {{"Content-Type", "text/html"}}, std::move(Content));
+                    return Type(Version, Status, "text/html", std::move(Content));
                 }
 
                 static Response Json(std::string_view const &Version, HTTP::Status Status, File Content)
                 {
-                    return From(Version, Status, {{"Content-Type", "application/json"}}, std::move(Content));
+                    return Type(Version, Status, "application/json", std::move(Content));
                 }
 
                 // Redirect
@@ -310,15 +323,19 @@ namespace Core
                 {
                     std::stringstream str;
 
-                    str << Location << '?';
+                    str << Location;
 
-                    for (auto &[key, value] : Parameters)
-                    {
-                        str << key << "=" << value << "&";
-                    }
+                    // if (Parameters.size())
+                    // {
+                    //     str << '?';
+
+                    //     for (auto &[key, value] : Parameters)
+                    //     {
+                    //         str << key << "=" << value << "&";
+                    //     }
+                    // }
 
                     Parameters.emplace("Location", str.str());
-                    Parameters.emplace("Content-Length", "0");
 
                     return From(Version, Status, std::move(Parameters), "");
                 }
@@ -335,7 +352,7 @@ namespace Core
 
                 std::string GetContent()
                 {
-                    if(std::holds_alternative<std::string>(Content))
+                    if (std::holds_alternative<std::string>(Content))
                     {
                         return std::get<std::string>(Content);
                     }
@@ -350,9 +367,9 @@ namespace Core
                     return std::holds_alternative<std::shared_ptr<File>>(Content);
                 }
 
-                std::shared_ptr<File>GetFile()
+                std::shared_ptr<File> GetFile()
                 {
-                    if(std::holds_alternative<std::shared_ptr<File>>(Content))
+                    if (std::holds_alternative<std::shared_ptr<File>>(Content))
                     {
                         return std::get<std::shared_ptr<File>>(Content);
                     }
@@ -365,13 +382,11 @@ namespace Core
                 void SetContent(std::string_view NewContent)
                 {
                     Content = std::string{NewContent};
-                    Headers.insert_or_assign("Content-Length", std::to_string(NewContent.length()));
                 }
 
-                void SetContent(std::shared_ptr<File> NewContent)
+                void SetContent(File NewContent)
                 {
-                    Content = NewContent;
-                    Headers.insert_or_assign("Content-Length", std::to_string(NewContent->Size()));
+                    Content = std::make_shared<File>(std::move(NewContent));
                 }
             };
         }

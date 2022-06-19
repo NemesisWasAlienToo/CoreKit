@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <system_error>
+#include <string_view>
 
 #include <Descriptor.hpp>
 
@@ -84,14 +85,14 @@ namespace Core
 
         // ### Static functions
 
-        static inline bool Exist(const std::string &Name, int Tests = F_OK)
+        static inline bool Exist(std::string_view const &Name, int Tests = F_OK)
         {
-            return (access(Name.c_str(), Tests) != -1);
+            return (access(Name.begin(), Tests) != -1);
         }
 
-        static File Create(const std::string &Path, uint32_t Permissions = DefaultPermission)
+        static File Create(std::string_view const &Path, uint32_t Permissions = DefaultPermission)
         {
-            int Result = creat(Path.c_str(), Permissions);
+            int Result = creat(Path.begin(), Permissions);
 
             if (Result < 0)
             {
@@ -101,9 +102,9 @@ namespace Core
             return Result;
         }
 
-        static File Open(const std::string &Path, int Flags = 0, uint32_t Permissions = DefaultPermission)
+        static File Open(std::string_view const &Path, int Flags = 0, uint32_t Permissions = DefaultPermission)
         {
-            int Result = open(Path.c_str(), Flags, Permissions);
+            int Result = open(Path.begin(), Flags, Permissions);
 
             if (Result < 0)
             {
@@ -113,9 +114,9 @@ namespace Core
             return Result;
         }
 
-        static void Remove(const std::string &Path)
+        static void Remove(std::string_view const &Path)
         {
-            int Result = remove(Path.c_str());
+            int Result = remove(Path.begin());
 
             if (Result < 0)
             {
@@ -153,7 +154,7 @@ namespace Core
             return buffer;
         }
 
-        static Iterable::Span<char> ReadAll(const std::string &Path)
+        static Iterable::Span<char> ReadAll(std::string_view const &Path)
         {
             auto file = Open(Path, ReadOnly);
 
@@ -171,7 +172,7 @@ namespace Core
             return buffer;
         }
 
-        static std::string ReadAllString(const std::string &Path)
+        static std::string ReadAllString(std::string_view const &Path)
         {
             auto file = Open(Path, ReadOnly);
 
@@ -190,7 +191,7 @@ namespace Core
             return buffer;
         }
 
-        static void WriteAll(const std::string &Path, const std::string &Content, bool Create = true, uint32_t Permissions = DefaultPermission)
+        static void WriteAll(std::string_view const &Path, std::string_view const &Content, bool Create = true, uint32_t Permissions = DefaultPermission)
         {
             int flags = WriteOnly;
 
@@ -199,29 +200,27 @@ namespace Core
 
             auto file = Open(Path, flags, Permissions);
 
-            const char *buffer = Content.c_str();
             size_t size = Content.length();
             size_t len = 0;
 
             while (len < size)
             {
-                len += file.Write(&(buffer[len]), (size - len));
+                len += file.Write(&(Content.begin()[len]), (size - len));
             }
 
             file.Close();
         }
 
-        static void AppendAll(const std::string &Path, const std::string &Content)
+        static void AppendAll(std::string_view const &Path, std::string_view const &Content)
         {
             auto file = Open(Path, WriteOnly | Append);
 
-            const char *buffer = Content.c_str();
             size_t size = Content.length();
             size_t len = 0;
 
             while (len < size)
             {
-                len += file.Write(&(buffer[len]), (size - len));
+                len += file.Write(&(Content.begin()[len]), (size - len));
             }
 
             file.Close();
@@ -241,11 +240,11 @@ namespace Core
             return static_cast<size_t>(Result);
         }
 
-        static struct stat Stat(const std::string &Path)
+        static struct stat Stat(std::string_view const &Path)
         {
             struct stat st;
 
-            int Result = stat(Path.c_str(), &st);
+            int Result = stat(Path.begin(), &st);
 
             if (Result < 0)
             {
@@ -255,42 +254,42 @@ namespace Core
             return st;
         }
 
-        inline static bool IsDirectory(std::string const &Path)
+        inline static bool IsDirectory(std::string_view const &Path)
         {
             return S_ISDIR(Stat(Path).st_mode);
         }
 
-        inline static bool IsChar(std::string const &Path)
+        inline static bool IsChar(std::string_view const &Path)
         {
             return S_ISCHR(Stat(Path).st_mode);
         }
 
-        inline static bool IsBulk(std::string const &Path)
+        inline static bool IsBulk(std::string_view const &Path)
         {
             return S_ISBLK(Stat(Path).st_mode);
         }
 
-        inline static bool IsFIFO(std::string const &Path)
+        inline static bool IsFIFO(std::string_view const &Path)
         {
             return S_ISFIFO(Stat(Path).st_mode);
         }
 
-        inline static bool IsLink(std::string const &Path)
+        inline static bool IsLink(std::string_view const &Path)
         {
             return S_ISLNK(Stat(Path).st_mode);
         }
 
-        inline static bool IsSocket(std::string const &Path)
+        inline static bool IsSocket(std::string_view const &Path)
         {
             return S_ISSOCK(Stat(Path).st_mode);
         }
 
-        inline static bool IsRegular(std::string const &Path)
+        inline static bool IsRegular(std::string_view const &Path)
         {
             return S_ISREG(Stat(Path).st_mode);
         }
 
-        inline static size_t SizeOf(const std::string &Path)
+        inline static size_t SizeOf(std::string_view const &Path)
         {
             return Stat(Path).st_size;
         }
@@ -323,7 +322,7 @@ namespace Core
             return static_cast<size_t>(Result);
         }
 
-        void WriteLine(const std::string &Message)
+        void WriteLine(std::string_view const &Message)
         {
             *this << Message << '\n';
         }
@@ -375,18 +374,19 @@ namespace Core
             return *this;
         }
 
-        File &operator<<(const std::string &Message)
+        File &operator<<(std::string_view const &Message)
         {
             int Result = 0;
-            int Left = Message.length();
-            const char *str = Message.c_str();
+            int Length = Message.length();
+            int Sent = 0;
+            const char *str = Message.begin();
 
-            while (Left > 0)
+            while (Sent < Length)
             {
                 // Need to check for unblocking too
 
-                Result = write(_INode, str, Left);
-                Left -= Result;
+                Result = write(_INode, str + Sent, Length - Sent);
+                Sent += Result;
             }
 
             // Error handling here
@@ -462,7 +462,7 @@ namespace Core
             return *this;
         }
 
-        friend std::ostream &operator<<(std::ostream &os, const File &file)
+        friend std::ostream &operator<<(std::ostream &os, File const &file)
         {
             std::string str;
             file >> str; // fix this
@@ -470,7 +470,7 @@ namespace Core
         }
     };
 
-    File STDIN = STDIN_FILENO;
-    File STDOUT = STDOUT_FILENO;
-    File STDERR = STDERR_FILENO;
+    inline File STDIN = STDIN_FILENO;
+    inline File STDOUT = STDOUT_FILENO;
+    inline File STDERR = STDERR_FILENO;
 }

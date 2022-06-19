@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <atomic>
 #include <netinet/tcp.h>
 
 #include <Duration.hpp>
@@ -18,7 +19,7 @@ namespace Core
             TCPServer(TCPServer const &Other) = delete;
 
             template <typename TCallback>
-            TCPServer(EndPoint const &endPoint, TCallback&& handlerBuilder, Duration const &Timeout, size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500)) : Pool(Interval, ThreadCount)
+            TCPServer(EndPoint const &endPoint, TCallback &&handlerBuilder, Duration const &Timeout, size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500)) : Pool(Interval, ThreadCount)
             {
                 Network::Socket Server(static_cast<Network::Socket::SocketFamily>(endPoint.Address().Family()), Network::Socket::TCP);
 
@@ -41,6 +42,12 @@ namespace Core
 
                         auto [Client, Info] = Server.Accept();
 
+                        if (ConnectionCount.fetch_add(1, std::memory_order_relaxed) > MaxConnections)
+                        {
+                            ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
+                            return;
+                        }
+
                         // Set Non-blocking
 
                         Client.Blocking(false);
@@ -51,10 +58,15 @@ namespace Core
 
                         auto &Turn = Pool[Counter];
 
-                        Turn.Assign(std::move(Client), HandlerBuilder(Info), Timeout);
+                        Turn.Assign(
+                            std::move(Client), HandlerBuilder(Info),
+                            [this](Async::EventLoop *, Async::EventLoop::Entry &)
+                            { ConnectionCount.fetch_sub(1, std::memory_order_relaxed); },
+                            Timeout);
 
                         Counter = (Counter + 1) % Pool.Length();
                     },
+                    nullptr,
                     {0, 0});
             }
 
@@ -87,16 +99,23 @@ namespace Core
                 Pool.Stop();
             }
 
-            template<typename TCallback>
-            inline void InitStorages(TCallback&& Callback)
+            template <typename TCallback>
+            inline void InitStorages(TCallback &&Callback)
             {
                 Pool.InitStorages(Callback);
+            }
+
+            void MaxConnectionCount(size_t Max)
+            {
+                MaxConnections = Max;
             }
 
         private:
             // @todo Since Poll is shared, Make it immutable
 
             Async::ThreadPool Pool;
+            size_t MaxConnections = 1024;
+            std::atomic<size_t> ConnectionCount{0};
         };
     }
 }

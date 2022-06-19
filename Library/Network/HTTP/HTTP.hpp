@@ -62,7 +62,7 @@ namespace Core
                 HTTPVersionNotSupported = 505
             };
 
-            std::string const Message[]{
+            inline std::string const Message[]{
                 "Continue",
                 "Switching Protocols",
                 "OK",
@@ -104,7 +104,7 @@ namespace Core
                 "Gateway Timeout",
                 "HTTP Version Not Supported"};
 
-            std::unordered_map<Status, std::string> const StatusMessage{
+            inline std::unordered_map<Status, std::string> const StatusMessage{
                 {Status::Continue, "Continue"},
                 {Status::SwitchingProtocols, "Switching Protocols"},
                 {Status::OK, "OK"},
@@ -146,7 +146,7 @@ namespace Core
                 {Status::GatewayTimeout, "Gateway Timeout"},
                 {Status::HTTPVersionNotSupported, "HTTP Version Not Supported"}};
 
-            std::string const MethodStrings[]{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH", ""};
+            inline std::string const MethodStrings[]{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH", ""};
 
             enum class Methods : unsigned short
             {
@@ -178,6 +178,70 @@ namespace Core
                 if (method == "PATCH")
                     return Methods::PATCH;
                 return Methods::Any;
+            }
+
+            inline std::unordered_map<std::string, std::string> const ExtensionMappings =
+                {
+                    {"html", "text/html"},
+                    {"htm", "text/html"},
+                    {"css", "text/css"},
+                    {"js", "application/javascript"},
+                    {"json", "application/json"},
+                    {"jpg", "image/jpeg"},
+                    {"jpeg", "image/jpeg"},
+                    {"png", "image/png"},
+                    {"gif", "image/gif"},
+                    {"ico", "image/x-icon"},
+                    {"svg", "image/svg+xml"},
+                    {"xml", "text/xml"},
+                    {"pdf", "application/pdf"},
+                    {"zip", "application/zip"},
+                    {"gz", "application/gzip"},
+                    {"tar", "application/x-tar"},
+                    {"bz2", "application/x-bzip2"},
+                    {"7z", "application/x-7z-compressed"},
+                    {"doc", "application/msword"},
+                    {"docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+                    {"xls", "application/vnd.ms-excel"},
+                    {"xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+                    {"ppt", "application/vnd.ms-powerpoint"},
+                    {"pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+                    {"odt", "application/vnd.oasis.opendocument.text"},
+                    {"ods", "application/vnd.oasis.opendocument.spreadsheet"},
+                    {"odp", "application/vnd.oasis.opendocument.presentation"},
+                    {"sxw", "application/vnd.sun.xml.writer"},
+                    {"sxc", "application/vnd.sun.xml.calc"},
+                    {"sxi", "application/vnd.sun.xml.impress"},
+                    {"sxd", "application/vnd.sun.xml.draw"},
+                    {"sxg", "application/vnd.sun.xml.writer.global"},
+                    {"sxm", "application/vnd.sun.xml.math"},
+                    {"avi", "video/x-msvideo"},
+                    {"aac", "audio/aac"},
+                    {"aif", "audio/x-aiff"},
+                    {"bin", "application/octet-stream"},
+                    {"bmp", "image/bmp"},
+                    {"class", "application/java"},
+                    {"csh", "application/x-csh"}};
+
+            std::string_view GetExtension(std::string_view const &Path)
+            {
+                auto pos = Path.find_last_of('.');
+                if (pos == std::string_view::npos)
+                    return "";
+                return Path.substr(pos + 1);
+            }
+
+            std::string_view GetContentType(std::string_view const &Extension)
+            {
+                if (Extension == "")
+                    return "text/plain";
+
+                auto it = ExtensionMappings.find(std::string{Extension});
+
+                if (it == ExtensionMappings.end())
+                    return "text/plain";
+
+                return it->second;
             }
 
             class Message

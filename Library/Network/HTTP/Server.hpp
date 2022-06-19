@@ -28,7 +28,6 @@ namespace Core
                 {
                     size_t MaxHeaderSize;
                     size_t MaxBodySize;
-                    size_t MaxConnectionCount;
                     size_t MaxFileSize;
                     size_t SendFileThreshold;
                 };
@@ -50,126 +49,130 @@ namespace Core
 
                 // Server settings
 
-                // Server& MaxHeaderSize(size_t Size)
-                // {
-                //     Settings.MaxHeaderSize = Size;
-                //     return *this;
-                // }
+                inline Server &MaxHeaderSize(size_t Size)
+                {
+                    Settings.MaxHeaderSize = Size;
+                    return *this;
+                }
 
-                // Server& MaxBodySize(size_t Size)
-                // {
-                //     Settings.MaxBodySize = Size;
-                //     return *this;
-                // }
+                inline Server &MaxBodySize(size_t Size)
+                {
+                    Settings.MaxBodySize = Size;
+                    return *this;
+                }
 
-                // Server& MaxConnectionCount(size_t Count)
-                // {
-                //     Settings.MaxConnectionCount = Count;
-                //     return *this;
-                // }
+                inline Server &MaxConnectionCount(size_t Count)
+                {
+                    TCP.MaxConnectionCount(Count);
+                    return *this;
+                }
 
-                // Server& MaxFileSize(size_t Size)
-                // {
-                //     Settings.MaxFileSize = Size;
-                //     return *this;
-                // }
+                inline Server &MaxFileSize(size_t Size)
+                {
+                    Settings.MaxFileSize = Size;
+                    return *this;
+                }
 
-                // Server& SendFileThreshold(size_t Size)
-                // {
-                //     Settings.SendFileThreshold = Size;
-                //     return *this;
-                // }
+                // Zero means no sendfile will be used
+                
+                inline Server &SendFileThreshold(size_t Size)
+                {
+                    Settings.SendFileThreshold = Size;
+                    return *this;
+                }
 
                 // Server functions
 
-                Server& Run()
+                inline Server &Run()
                 {
                     TCP.Run();
                     return *this;
                 }
 
-                void GetInPool()
+                inline void GetInPool()
                 {
                     TCP.GetInPool();
                 }
 
-                void Stop()
+                inline void Stop()
                 {
                     TCP.Stop();
                 }
 
                 template <typename TAction>
-                inline void SetDefault(TAction &&Action)
+                inline Server &SetDefault(TAction &&Action)
                 {
                     _Router.Default = std::forward<TAction>(Action);
+                    return *this;
                 }
 
                 template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
-                inline void Set(HTTP::Methods Method, TAction &&Action)
+                inline Server &Set(HTTP::Methods Method, TAction &&Action)
                 {
                     _Router.Add<TRoute, Group>(Method, std::forward<TAction>(Action));
+                    return *this;
                 }
 
                 template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
-                inline void GET(TAction &&Action)
+                inline Server &GET(TAction &&Action)
                 {
-                    Set<TRoute, Group>(
+                    return Set<TRoute, Group>(
                         HTTP::Methods::GET,
                         std::forward<TAction>(Action));
                 }
 
                 template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
-                inline void POST(TAction &&Action)
+                inline Server &POST(TAction &&Action)
                 {
-                    Set<TRoute, Group>(
+                    return Set<TRoute, Group>(
                         HTTP::Methods::POST,
                         std::forward<TAction>(Action));
                 }
 
                 template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
-                inline void PUT(TAction &&Action)
+                inline Server &PUT(TAction &&Action)
                 {
-                    Set<TRoute, Group>(
+                    return Set<TRoute, Group>(
                         HTTP::Methods::PUT,
                         std::forward<TAction>(Action));
                 }
 
                 template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
-                inline void DELETE(TAction &&Action)
+                inline Server &DELETE(TAction &&Action)
                 {
-                    Set<TRoute, Group>(
+                    return Set<TRoute, Group>(
                         HTTP::Methods::DELETE,
                         std::forward<TAction>(Action));
                 }
 
                 template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
-                inline void HEAD(TAction &&Action)
+                inline Server &HEAD(TAction &&Action)
                 {
-                    Set<TRoute, Group>(
+                    return Set<TRoute, Group>(
                         HTTP::Methods::HEAD,
                         std::forward<TAction>(Action));
                 }
 
                 template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
-                inline void OPTIONS(TAction &&Action)
+                inline Server &OPTIONS(TAction &&Action)
                 {
-                    Set<TRoute, Group>(
+                    return Set<TRoute, Group>(
                         HTTP::Methods::OPTIONS,
                         std::forward<TAction>(Action));
                 }
 
                 template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
-                inline void PATCH(TAction &&Action)
+                inline Server &PATCH(TAction &&Action)
                 {
-                    Set<TRoute, Group>(
+                    return Set<TRoute, Group>(
                         HTTP::Methods::PATCH,
                         std::forward<TAction>(Action));
                 }
 
                 template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
-                inline void Any(TAction &&Action)
+                inline Server &Any(TAction &&Action)
                 {
-                    Set<TRoute, Group>(
+                    return Set<TRoute, Group>(
                         HTTP::Methods::Any,
                         std::forward<TAction>(Action));
                 }
@@ -177,7 +180,7 @@ namespace Core
                 using TFilter = std::function<HTTP::Response(Network::EndPoint const &Target, Network::HTTP::Request &, std::shared_ptr<void> &)>;
 
                 template <typename TBuildCallback>
-                inline void FilterFrom(TBuildCallback &&Builder)
+                inline Server &FilterFrom(TBuildCallback &&Builder)
                 {
                     if (!Filters)
                     {
@@ -187,14 +190,16 @@ namespace Core
                                 return _Router.Match(Request.Method, Request.Path, Target, Request, Storage);
                             });
 
-                        return;
+                        return *this;
                     }
 
                     Filters = Builder(std::move(Filters));
+
+                    return *this;
                 }
 
                 template <typename TCallback>
-                inline Server& InitStorages(TCallback &&Callback)
+                inline Server &InitStorages(TCallback &&Callback)
                 {
                     TCP.InitStorages(Callback);
                     return *this;
@@ -206,9 +211,14 @@ namespace Core
                 Duration Timeout;
 
                 TFilter Filters = nullptr;
-                Setting Settings;
 
             public:
+                Setting Settings{
+                    .MaxHeaderSize = 1024 * 1024 * 1,
+                    .MaxBodySize = 1024 * 1024 * 5,
+                    .MaxFileSize = 1024 * 1024 * 5,
+                    .SendFileThreshold = 1024 * 10};
+
                 inline HTTP::Response OnRequest(Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> &Storage) const
                 {
                     if (!Filters)

@@ -21,8 +21,11 @@ namespace Core
         {
             struct Parser : Machine<void(Network::Socket const *)>
             {
-                static constexpr auto HeaderLimit = 16 * 1024;
-                static constexpr auto ContentLimit = 8 * 1024 * 1024;
+                size_t HeaderLimit = 16 * 1024;
+                size_t ContentLimit = 8 * 1024 * 1024;
+
+                Parser() = default;
+                Parser(size_t headerLimit, size_t contentLimit) : HeaderLimit(headerLimit), ContentLimit(contentLimit) {}
 
                 Iterable::Queue<char> Queue = Iterable::Queue<char>(1024);
 
@@ -152,11 +155,25 @@ namespace Core
 
                         if (bodyPosTmp == std::string::npos)
                         {
+                            // @todo Optimize this
+                            // Check header size
+
+                            if(Message.length() > HeaderLimit)
+                            {
+                                throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
+                            }
+
                             bodyPosTmp = Message.length() - 3;
                         }
                         else
                         {
                             bodyPos = bodyPosTmp + 4;
+
+                            if(bodyPos > HeaderLimit)
+                            {
+                                throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
+                            }
+
                             break;
                         }
 

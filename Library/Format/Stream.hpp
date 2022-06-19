@@ -117,7 +117,7 @@ namespace Core
                 return *this;
             }
 
-            template<size_t Size>
+            template <size_t Size>
             Stream &operator<<(char const (&Value)[Size])
             {
                 Queue.Add(Value, Size - 1);
@@ -214,6 +214,35 @@ namespace Core
                 } while (!Stream.Queue.IsEmpty() && Sent);
 
                 return descriptor;
+            }
+
+            ssize_t ReadOnce(Descriptor const &descriptor, size_t Length)
+            {
+                size_t Read = 0;
+                struct iovec Vectors[2];
+                Queue.IncreaseCapacity(Length);
+
+                Read = descriptor.Read(Vectors, Queue.EmptyVector(Vectors) ? 2 : 1);
+
+                Queue.Length(Queue.Length() + Read);
+
+                return Read;
+            }
+
+            // @todo Implement
+            // ReadAll
+            // WriteAll
+            
+            ssize_t WriteOnce(Descriptor const &descriptor)
+            {
+                size_t Read = 0;
+                struct iovec Vectors[2];
+
+                Read = descriptor.Write(Vectors, Queue.DataVector(Vectors) ? 2 : 1);
+
+                Queue.Length(Queue.Length() - Read);
+
+                return Read;
             }
 
             friend Descriptor const &operator>>(Descriptor const &descriptor, Stream &Stream)

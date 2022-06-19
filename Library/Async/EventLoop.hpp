@@ -30,11 +30,13 @@ namespace Core
             using TimeWheelType = TimeWheel<32, 5>;
             using Container = std::list<Entry>;
             using CallbackType = std::function<void(EventLoop *, ePoll::Entry &, Entry &)>;
+            using EndCallbackType = std::function<void(EventLoop *, Entry &)>;
 
             struct Entry
             {
                 Descriptor File;
                 CallbackType Callback;
+                EndCallbackType End;
                 Container::iterator Iterator;
 
                 // @todo Remove Buffer and Parser from here and put it in the callback handler
@@ -46,6 +48,7 @@ namespace Core
             {
                 Descriptor File;
                 CallbackType Callback;
+                EndCallbackType End;
                 Duration Interval;
             };
 
@@ -72,10 +75,11 @@ namespace Core
                             {
                                 auto Des = This->Queue.Take();
 
-                                This->Insert(std::move(Des.File), std::move(Des.Callback), std::move(Des.Interval));
+                                This->Insert(std::move(Des.File), std::move(Des.Callback), std::move(Des.End), std::move(Des.Interval));
                             }
                         }
                     },
+                    nullptr,
                     {0, 0});
 
                 // Assgin interrupt event
@@ -93,6 +97,7 @@ namespace Core
                         Ev.Listen();
                         This->Wheel.Tick();
                     },
+                    nullptr,
                     {0, 0});
 
                 // Assign expire event
@@ -122,15 +127,6 @@ namespace Core
                 Self.Timer = Wheel.Add(Interval, std::move(Callback));
             }
 
-            void Remove(Container::iterator Iterator)
-            {
-                AssertPersmission();
-
-                _Poll.Delete(Iterator->File);
-                Wheel.Remove(Iterator->Timer);
-                Handlers.erase(Iterator);
-            }
-
             /**
              * @brief Only removes the connection handler
              * @param Iterator
@@ -138,6 +134,9 @@ namespace Core
             void RemoveHandler(Container::iterator Iterator)
             {
                 AssertPersmission();
+
+                if (Iterator->End)
+                    Iterator->End(this, *Iterator);
 
                 _Poll.Delete(Iterator->File);
                 Handlers.erase(Iterator);
@@ -150,16 +149,22 @@ namespace Core
                 Wheel.Remove(Iterator->Timer);
             }
 
+            void Remove(Container::iterator Iterator)
+            {
+                RemoveHandler(Iterator);
+                Wheel.Remove(Iterator->Timer);
+            }
+
             void Modify(Entry &Self, ePoll::Event Events)
             {
                 _Poll.Modify(Self.File, Events, (size_t)&Self);
             }
 
-            void Assign(Descriptor &&Client, CallbackType &&Callback, Duration const &Interval = {0, 0})
+            void Assign(Descriptor &&Client, CallbackType &&Callback, EndCallbackType &&End = nullptr, Duration const &Interval = {0, 0})
             {
                 if (HasPermission())
                 {
-                    Insert(std::move(Client), std::move(Callback), Interval);
+                    Insert(std::move(Client), std::move(Callback), std::move(End), Interval);
                 }
                 else
                 {
@@ -168,10 +173,9 @@ namespace Core
                     {
                         std::unique_lock lock(QueueMutex);
 
-                        if (Client.INode() < 0)
-                            throw std::runtime_error("Invalid file descriptor");
+                        // @todo Check max connections
 
-                        Queue.Add({std::move(Client), std::move(Callback), Interval});
+                        Queue.Add({std::move(Client), std::move(Callback), std::move(End), Interval});
                     }
 
                     Notify();
@@ -225,9 +229,9 @@ namespace Core
             }
 
         private:
-            Container::iterator Insert(Descriptor &&descriptor, CallbackType &&handler, Duration const &Timeout)
+            Container::iterator Insert(Descriptor &&descriptor, CallbackType &&handler, EndCallbackType &&end, Duration const &Timeout)
             {
-                auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), {}, {}});
+                auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), std::move(end), {}, {}});
                 // auto Iterator = Handlers.emplace(std::move(descriptor), std::move(handler), Handlers.end(), Wheel.end());
                 Iterator->Iterator = Iterator;
 

@@ -4,6 +4,7 @@
 #include <tuple>
 #include <memory>
 #include <variant>
+#include <future>
 
 #include <Event.hpp>
 #include <Duration.hpp>
@@ -24,198 +25,6 @@ namespace Core
     {
         namespace HTTP
         {
-
-            template <typename TServer>
-            struct ConnectionHandler
-            {
-                Duration Timeout;
-                Network::EndPoint Target;
-                // Iterable::Queue<char> IBuffer;
-                Iterable::Queue<std::tuple<Iterable::Queue<char>, std::shared_ptr<File>>> OBuffer;
-                TServer &CTServer;
-
-                HTTP::Parser Parser;
-                bool ShouldClose = false;
-
-                ConnectionHandler(Duration const &Timeout, Network::EndPoint const &Target, TServer &Server)
-                    : Timeout(Timeout),
-                      Target(Target),
-                      CTServer(Server)
-                {
-                }
-
-                void AppendResponse(HTTP::Response const &Response)
-                {
-                    OBuffer.Add(
-                        {Iterable::Queue<char>(1024),
-                         std::holds_alternative<std::shared_ptr<File>>(Response.Content) ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr});
-
-                    Format::Stream Ser(std::get<0>(OBuffer.Last()));
-
-                    Ser << Response;
-                }
-
-                void operator()(Async::EventLoop *Loop, ePoll::Entry &Item, Async::EventLoop::Entry &Self)
-                {
-                    Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
-
-                    if (Item.Happened(ePoll::In) | Item.Happened(ePoll::UrgentIn))
-                    {
-                        if (!Client.Received())
-                        {
-                            Loop->Remove(Self.Iterator);
-                            return;
-                        }
-
-                        Loop->Reschedual(Self, Timeout);
-
-                        OnRead(Loop, Item, Self);
-                    }
-
-                    if (Item.Happened(ePoll::Out))
-                    {
-                        OnWrite(Loop, Item, Self);
-                    }
-
-                    if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error))
-                    {
-                        Loop->Remove(Self.Iterator);
-                    }
-                }
-
-                void OnRead(Async::EventLoop *Loop, ePoll::Entry &, Async::EventLoop::Entry &Self)
-                {
-                    Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
-
-                    try
-                    {
-                        if (Parser.IsStarted())
-                        {
-                            Parser.Continue();
-                        }
-                        else
-                        {
-                            Parser.Start(&Client);
-                        }
-
-                        if (Parser.IsFinished())
-                        {
-                            // Process request
-
-                            // @todo Optimize Info passing
-
-                            Network::HTTP::Response Response = CTServer.OnRequest(Target, Parser.Result, Loop->Storage);
-
-                            // Decide if we should keep the connection
-
-                            auto It = Parser.Result.Headers.find("Connection");
-                            auto End = Parser.Result.Headers.end();
-
-                            // @todo Fix case sensitivity of header values
-
-                            if (Parser.Result.Version == HTTP::HTTP10)
-                            {
-                                if ((It != End && It->second == "Keep-Alive"))
-                                {
-
-                                    Response.Headers.insert_or_assign("Connection", "Keep-Alive");
-                                }
-                                else
-                                {
-                                    ShouldClose = true;
-                                }
-                            }
-                            else if (Parser.Result.Version == HTTP::HTTP11 && It != End && It->second == "close")
-                            {
-                                ShouldClose = true;
-                            }
-
-                            // If we should close the connection, stop reading data from client
-
-                            if (ShouldClose)
-                            {
-                                Client.ShutDown(Network::Socket::Read);
-                            }
-
-                            // Append response to buffer
-
-                            AppendResponse(Response);
-
-                            // Modify events
-
-                            Loop->Modify(Self, ShouldClose ? ePoll::Out : ePoll::In | ePoll::Out);
-
-                            // Reset Parser
-
-                            Parser.Reset();
-                        }
-                    }
-                    catch (HTTP::Response const &Response)
-                    {
-                        AppendResponse(Response);
-
-                        ShouldClose = true;
-                    }
-                }
-
-                void OnWrite(Async::EventLoop *Loop, ePoll::Entry &, Async::EventLoop::Entry &Self)
-                {
-                    Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
-
-                    if (OBuffer.IsEmpty())
-                    {
-                        if (ShouldClose)
-                        {
-                            Loop->Remove(Self.Iterator);
-                            return;
-                        }
-
-                        OBuffer.Free();
-
-                        Loop->Modify(Self, ePoll::In);
-                        return;
-                    }
-
-                    auto &CurBuf = OBuffer.First();
-
-                    // Write data
-
-                    Format::Stream Ser(std::get<0>(CurBuf));
-
-                    // @todo Make socket non-blocking and improve this
-
-                    Self.File << Ser;
-
-                    if (Ser.Queue.IsEmpty())
-                    {
-                        if (std::get<1>(CurBuf))
-                        {
-                            // @todo Optimize getting size
-
-                            auto Size = std::get<1>(CurBuf)->Size();
-
-                            // @todo Implement size limitation for file
-
-                            // if(Size > MaxFileSize)
-
-                            Client.SendFile(*std::get<1>(CurBuf), Size);
-                        }
-
-                        OBuffer.Take();
-                    }
-                }
-            };
-        }
-    }
-}
-/*
-namespace Core
-{
-    namespace Network
-    {
-        namespace HTTP
-        {
-
             template <typename TServer>
             struct ConnectionHandler
             {
@@ -223,7 +32,7 @@ namespace Core
                 {
                     Iterable::Queue<char> Buffer;
                     std::shared_ptr<File> FilePtr;
-                    size_t ContentLength;
+                    size_t FileContentLength;
                     bool SendFile;
                 };
 
@@ -233,9 +42,8 @@ namespace Core
                 Iterable::Queue<OutEntry> OBuffer;
                 TServer &CTServer;
 
-                static constexpr size_t SendFileThreshold = 10 * 1024;
-
-                HTTP::Parser Parser;
+                // @todo Fix this limitations
+                HTTP::Parser Parser{CTServer.Settings.MaxHeaderSize, CTServer.Settings.MaxBodySize};
                 bool ShouldClose = false;
 
                 ConnectionHandler(Duration const &Timeout, Network::EndPoint const &Target, TServer &Server)
@@ -245,16 +53,26 @@ namespace Core
                 {
                 }
 
-                void AppendResponse(HTTP::Response const &Response)
+                void AppendResponse(HTTP::Response &Response)
                 {
                     bool HasFile = std::holds_alternative<std::shared_ptr<File>>(Response.Content);
-                    size_t Length = HasFile ? std::get<std::shared_ptr<File>>(Response.Content)->Size() : std::get<std::string>(Response.Content).length();
+                    size_t FileLength = 0;
+                    size_t StringLength = 0;
+
+                    HasFile ? FileLength =
+                                  std::min(std::get<std::shared_ptr<File>>(Response.Content)->Size(), CTServer.Settings.MaxFileSize)
+                            : StringLength = std::min(std::get<std::string>(Response.Content).length(), CTServer.Settings.MaxBodySize);
+
+                    // Trim content if its too big
+
+                    Response.Headers.insert_or_assign("Content-Length", std::to_string(HasFile ? FileLength : StringLength));
 
                     OBuffer.Construct(
                         Iterable::Queue<char>(1024),
+                        // @todo Remove pointer
                         HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
-                        Length,
-                        HasFile && Length > SendFileThreshold);
+                        FileLength,
+                        CTServer.Settings.SendFileThreshold && HasFile && FileLength > CTServer.Settings.SendFileThreshold);
 
                     Format::Stream Ser(OBuffer.Last().Buffer);
 
@@ -308,8 +126,6 @@ namespace Core
                         {
                             // Process request
 
-                            // @todo Optimize Info passing
-
                             Network::HTTP::Response Response = CTServer.OnRequest(Target, Parser.Result, Loop->Storage);
 
                             // Decide if we should keep the connection
@@ -356,9 +172,11 @@ namespace Core
                             Parser.Reset();
                         }
                     }
-                    catch (HTTP::Response const &Response)
+                    catch (HTTP::Response &Response)
                     {
                         AppendResponse(Response);
+
+                        Loop->Modify(Self, ShouldClose ? ePoll::Out : ePoll::In | ePoll::Out);
 
                         ShouldClose = true;
                     }
@@ -385,19 +203,14 @@ namespace Core
                     }
 
                     auto &Item = OBuffer.First();
+                    Format::Stream Ser(Item.Buffer);
 
-                    // Append data in file
+                    // Append file content
 
-                    // if(Item.FilePtr && !Item.SendFile && Item.ContentLength)
-                    // {
-                    //     // @todo Move this to the top
-
-                    //     auto str = Item.FilePtr->ReadAllString();
-
-                    //     Item.Buffer.Add(str.data(), str.length());
-
-                    //     Item.ContentLength = 0;
-                    // }
+                    if (Item.FileContentLength && !Item.SendFile)
+                    {
+                        Item.FileContentLength -= Ser.ReadOnce(*Item.FilePtr, Item.FileContentLength);
+                    }
 
                     // Send data in buffer
 
@@ -405,23 +218,23 @@ namespace Core
                     {
                         // Write data
 
-                        Format::Stream Ser(Item.Buffer);
-
                         // @todo Make socket non-blocking and improve this
 
                         Self.File << Ser;
+
+                        return;
                     }
 
                     // Send file
 
-                    if (Item.Buffer.IsEmpty() && Item.SendFile && Item.ContentLength)
+                    if (Item.FileContentLength && Item.SendFile)
                     {
-                        Item.ContentLength -= Client.SendFile(*Item.FilePtr, Item.ContentLength);
+                        Item.FileContentLength -= Client.SendFile(*Item.FilePtr, Item.FileContentLength);
                     }
 
-                    // Pop buffer if we are done
+                    // Pop buffer if we're done
 
-                    if (Item.Buffer.IsEmpty() && (!Item.FilePtr || !Item.ContentLength))
+                    if (Item.Buffer.IsEmpty() && !Item.FileContentLength)
                     {
                         OBuffer.Take();
                     }
@@ -429,4 +242,4 @@ namespace Core
             };
         }
     }
-}*/
+}
