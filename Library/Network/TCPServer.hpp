@@ -42,7 +42,7 @@ namespace Core
 
                         auto [Client, Info] = Server.Accept();
 
-                        if (ConnectionCount.fetch_add(1, std::memory_order_relaxed) > MaxConnections)
+                        if (ConnectionCount.fetch_add(1, std::memory_order_relaxed) > Settings.MaxConnectionCount)
                         {
                             ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
                             return;
@@ -54,14 +54,18 @@ namespace Core
 
                         // Set NoDelay
 
-                        Client.SetOptions(IPPROTO_TCP, TCP_NODELAY, static_cast<int>(1));
+                        if (Settings.NoDelay)
+                            Client.SetOptions(IPPROTO_TCP, TCP_NODELAY, static_cast<int>(1));
 
                         auto &Turn = Pool[Counter];
 
                         Turn.Assign(
-                            std::move(Client), HandlerBuilder(Info),
+                            std::move(Client),
+                            HandlerBuilder(Info),
                             [this](Async::EventLoop *, Async::EventLoop::Entry &)
-                            { ConnectionCount.fetch_sub(1, std::memory_order_relaxed); },
+                            {
+                                ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
+                            },
                             Timeout);
 
                         Counter = (Counter + 1) % Pool.Length();
@@ -107,15 +111,25 @@ namespace Core
 
             void MaxConnectionCount(size_t Max)
             {
-                MaxConnections = Max;
+                Settings.MaxConnectionCount = Max;
+            }
+
+            void NoDelay(bool Enable)
+            {
+                Settings.NoDelay = Enable;
             }
 
         private:
             // @todo Since Poll is shared, Make it immutable
 
             Async::ThreadPool Pool;
-            size_t MaxConnections = 1024;
             std::atomic<size_t> ConnectionCount{0};
+
+            struct
+            {
+                size_t MaxConnectionCount;
+                bool NoDelay;
+            } Settings{1024, true};
         };
     }
 }

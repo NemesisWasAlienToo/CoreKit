@@ -13,288 +13,282 @@
 
 // @todo Limit the number of clients
 
-namespace Core
+namespace Core::Network::HTTP
 {
-    namespace Network
+    struct Parser : Machine<void(Network::Socket const *)>
     {
-        namespace HTTP
+        size_t HeaderLimit = 16 * 1024;
+        size_t ContentLimit = 8 * 1024 * 1024;
+
+        Parser() = default;
+        Parser(size_t headerLimit, size_t contentLimit) : HeaderLimit(headerLimit), ContentLimit(contentLimit) {}
+
+        Iterable::Queue<char> Queue = Iterable::Queue<char>(1024);
+
+        size_t ContetLength = 0;
+        size_t lenPos = 0;
+
+        size_t bodyPos = 0;
+        size_t bodyPosTmp = 0;
+
+        HTTP::Request Result;
+        std::unordered_map<std::string, std::string>::iterator Iterator;
+
+        void Reset()
         {
-            struct Parser : Machine<void(Network::Socket const *)>
+            // Crop buffer's content
+
+            Machine::Reset();
+            Queue.Free(bodyPos + ContetLength);
+
+            // @todo Optimize Resize
+
+            if (Queue.Length())
+                Queue.Resize(Queue.Capacity());
+
+            ContetLength = 0;
+            lenPos = 0;
+
+            bodyPos = 0;
+            bodyPosTmp = 0;
+
+            // Clean request
+
+            // Result = HTTP::Request();
+
             {
-                size_t HeaderLimit = 16 * 1024;
-                size_t ContentLimit = 8 * 1024 * 1024;
+                Result.Headers.clear();
+                Queue.Resize(1024);
+            }
 
-                Parser() = default;
-                Parser(size_t headerLimit, size_t contentLimit) : HeaderLimit(headerLimit), ContentLimit(contentLimit) {}
+            Iterator = Result.Headers.end();
+        }
 
-                Iterable::Queue<char> Queue = Iterable::Queue<char>(1024);
+        void Clear()
+        {
+            Machine::Reset();
+            Queue.Free();
 
-                size_t ContetLength = 0;
-                size_t lenPos = 0;
+            ContetLength = 0;
+            lenPos = 0;
 
-                size_t bodyPos = 0;
-                size_t bodyPosTmp = 0;
+            bodyPos = 0;
+            bodyPosTmp = 0;
 
-                HTTP::Request Result;
-                std::unordered_map<std::string, std::string>::iterator Iterator;
+            Result = HTTP::Request();
+            Iterator = Result.Headers.end();
+        }
 
-                void Reset()
+        // @todo Make this asynchronus
+
+        void Continue100()
+        {
+            const auto &Client = *Argument<0>();
+
+            auto ExpectIterator = Result.Headers.find("Expect");
+
+            if (ExpectIterator != Result.Headers.end() && ExpectIterator->second == "100-continue")
+            {
+                // Ensure version is HTTP 1.1
+
+                if (Result.Version[5] == '1' && Result.Version[7] == '0')
                 {
-                    // Crop buffer's content
-
-                    Machine::Reset();
-                    Queue.Free(bodyPos + ContetLength);
-
-                    // @todo Optimize Resize
-
-                    if (Queue.Length())
-                        Queue.Resize(Queue.Capacity());
-
-                    ContetLength = 0;
-                    lenPos = 0;
-
-                    bodyPos = 0;
-                    bodyPosTmp = 0;
-
-                    // Clean request
-
-                    // Result = HTTP::Request();
-
-                    {
-                        Result.Headers.clear();
-                        Queue.Resize(1024);
-                    }
-
-                    Iterator = Result.Headers.end();
+                    throw HTTP::Response::From(Result.Version, HTTP::Status::ExpectationFailed, {{"Connection", "close"}}, "");
                 }
 
-                void Clear()
+                if (ContetLength == 0)
                 {
-                    Machine::Reset();
-                    Queue.Free();
-
-                    ContetLength = 0;
-                    lenPos = 0;
-
-                    bodyPos = 0;
-                    bodyPosTmp = 0;
-
-                    Result = HTTP::Request();
-                    Iterator = Result.Headers.end();
+                    throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
                 }
 
-                // @todo Make this asynchronus
+                // Respond to 100-continue
 
-                void Continue100()
+                // @todo Maybe hanlde HTTP 2.0 later too?
+
+                constexpr auto ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
+
+                Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
+                Format::Stream ContinueStream(Temp);
+
+                Temp.Add(ContinueResponse, sizeof(ContinueResponse));
+
+                // Send the response
+
+                while (Temp.Length() > 0)
                 {
-                    const auto &Client = *Argument<0>();
-
-                    auto ExpectIterator = Result.Headers.find("Expect");
-
-                    if (ExpectIterator != Result.Headers.end() && ExpectIterator->second == "100-continue")
-                    {
-                        // Ensure version is HTTP 1.1
-
-                        if (Result.Version[5] == '1' && Result.Version[7] == '0')
-                        {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::ExpectationFailed, {{"Connection", "close"}}, "");
-                        }
-
-                        if (ContetLength == 0)
-                        {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
-                        }
-
-                        // Respond to 100-continue
-
-                        // @todo Maybe hanlde HTTP 2.0 later too?
-
-                        constexpr auto ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
-
-                        Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
-                        Format::Stream ContinueStream(Temp);
-
-                        Temp.Add(ContinueResponse, sizeof(ContinueResponse));
-
-                        // Send the response
-
-                        while (Temp.Length() > 0)
-                        {
-                            Client << ContinueStream;
-                        }
-                    }
+                    Client << ContinueStream;
                 }
+            }
+        }
 
-                void operator()()
+        void operator()()
+        {
+            const auto &Client = *Argument<0>();
+
+            {
+                Format::Stream Stream(Queue);
+
+                Client >> Stream;
+            }
+
+            auto [Pointer, Size] = Queue.Chunk();
+
+            std::string_view Message{Pointer, Size};
+
+            CO_START;
+
+            // Take all the header
+
+            // @todo Optimize this
+            // @todo Set limit for header size
+
+            // while (bodyPos == 0 && Queue.Length() < HeaderLimit)
+            // Queue.Length() < HeaderLimit -> BadRequest
+
+            while (bodyPos == 0)
+            {
+                bodyPosTmp = Message.find("\r\n\r\n", bodyPosTmp);
+
+                if (bodyPosTmp == std::string::npos)
                 {
-                    const auto &Client = *Argument<0>();
-
-                    {
-                        Format::Stream Stream(Queue);
-
-                        Client >> Stream;
-                    }
-
-                    auto [Pointer, Size] = Queue.Chunk();
-
-                    std::string_view Message{Pointer, Size};
-
-                    CO_START;
-
-                    // Take all the header
-
                     // @todo Optimize this
-                    // @todo Set limit for header size
+                    // Check header size
 
-                    // while (bodyPos == 0 && Queue.Length() < HeaderLimit)
-                    // Queue.Length() < HeaderLimit -> BadRequest
-
-                    while (bodyPos == 0)
+                    if (Message.length() > HeaderLimit)
                     {
-                        bodyPosTmp = Message.find("\r\n\r\n", bodyPosTmp);
-
-                        if (bodyPosTmp == std::string::npos)
-                        {
-                            // @todo Optimize this
-                            // Check header size
-
-                            if(Message.length() > HeaderLimit)
-                            {
-                                throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
-                            }
-
-                            bodyPosTmp = Message.length() - 3;
-                        }
-                        else
-                        {
-                            bodyPos = bodyPosTmp + 4;
-
-                            if(bodyPos > HeaderLimit)
-                            {
-                                throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
-                            }
-
-                            break;
-                        }
-
-                        CO_YIELD();
+                        throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
                     }
 
-                    // Parse first line and headers
+                    bodyPosTmp = Message.length() - 3;
+                }
+                else
+                {
+                    bodyPos = bodyPosTmp + 4;
 
+                    if (bodyPos > HeaderLimit)
                     {
-                        size_t TempIndex = 0;
-
-                        // @todo Remove try catch
-
-                        try
-                        {
-                            TempIndex = Result.ParseFirstLine(Message);
-                        }
-                        catch (...)
-                        {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
-                        }
-
-                        // Check for version
-
-                        if (Result.Version[0] != '1' || (Result.Version[2] != '0' && Result.Version[2] != '1'))
-                        {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::HTTPVersionNotSupported, {{"Connection", "close"}}, "");
-                        }
-
-                        Result.ParseHeaders(Message, TempIndex, bodyPos);
+                        throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
                     }
 
-                    // Check for content length
+                    break;
+                }
 
-                    Iterator = Result.Headers.find("Content-Length");
+                CO_YIELD();
+            }
 
-                    if (Iterator != Result.Headers.end() && !Iterator->second.empty())
-                    {
-                        // Get the length of content
+            // Parse first line and headers
 
-                        try
-                        {
-                            ContetLength = std::stoull(Iterator->second);
-                        }
-                        catch (...)
-                        {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
-                        }
+            {
+                size_t TempIndex = 0;
 
-                        // Check if the length is in valid range
+                // @todo Remove try catch
 
-                        if (ContetLength > ContentLimit)
-                        {
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
-                        }
+                try
+                {
+                    TempIndex = Result.ParseFirstLine(Message);
+                }
+                catch (...)
+                {
+                    throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
+                }
 
-                        // Handle 100-continue
+                // Check for version
 
-                        Continue100();
+                if (Result.Version[0] != '1' || (Result.Version[2] != '0' && Result.Version[2] != '1'))
+                {
+                    throw HTTP::Response::From(Result.Version, HTTP::Status::HTTPVersionNotSupported, {{"Connection", "close"}}, "");
+                }
 
-                        // Get the content
+                Result.ParseHeaders(Message, TempIndex, bodyPos);
+            }
 
-                        while (Message.length() - bodyPos < ContetLength)
-                        {
-                            CO_YIELD();
-                        }
+            // Check for content length
 
-                        // fill the content
+            Iterator = Result.Headers.find("Content-Length");
 
-                        Result.Content = Message.substr(bodyPos, ContetLength);
-                    }
-                    else
-                    {
-                        // Read the transfer encoding
+            if (Iterator != Result.Headers.end() && !Iterator->second.empty())
+            {
+                // Get the length of content
 
-                        Iterator = Result.Headers.find("Transfer-Encoding");
+                try
+                {
+                    ContetLength = std::stoull(Iterator->second);
+                }
+                catch (...)
+                {
+                    throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
+                }
 
-                        if (Iterator == Result.Headers.end())
-                        {
-                            Continue100();
+                // Check if the length is in valid range
 
-                            CO_TERMINATE();
-                        }
+                if (ContetLength > ContentLimit)
+                {
+                    throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
+                }
 
-                        // @todo Maybe parse weighted encoding too?
+                // Handle 100-continue
 
-                        else if (Iterator->second == "chunked")
-                        {
-                            // Read the body chunks untill the end
+                Continue100();
 
-                            // @todo Implement later
-                            // @todo Check content length to be in the acceptable range
-                            // throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
+                // Get the content
 
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
-                        }
-                        else if (Iterator->second == "gzip")
-                        {
-                            // Read the body chinks till the end
+                while (Message.length() - bodyPos < ContetLength)
+                {
+                    CO_YIELD();
+                }
 
-                            // @todo Implement later
-                            // @todo Check content length to be in the acceptable range
-                            // throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
+                // fill the content
 
-                            // @todo Implement later
+                Result.Content = Message.substr(bodyPos, ContetLength);
+            }
+            else
+            {
+                // Read the transfer encoding
 
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
-                        }
-                        else
-                        {
-                            // Not implemented
+                Iterator = Result.Headers.find("Transfer-Encoding");
 
-                            throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
-                        }
-                    }
+                if (Iterator == Result.Headers.end())
+                {
+                    Continue100();
 
                     CO_TERMINATE();
-
-                    CO_END;
                 }
-            };
+
+                // @todo Maybe parse weighted encoding too?
+
+                else if (Iterator->second == "chunked")
+                {
+                    // Read the body chunks untill the end
+
+                    // @todo Implement later
+                    // @todo Check content length to be in the acceptable range
+                    // throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
+
+                    throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
+                }
+                else if (Iterator->second == "gzip")
+                {
+                    // Read the body chinks till the end
+
+                    // @todo Implement later
+                    // @todo Check content length to be in the acceptable range
+                    // throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
+
+                    // @todo Implement later
+
+                    throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
+                }
+                else
+                {
+                    // Not implemented
+
+                    throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
+                }
+            }
+
+            CO_TERMINATE();
+
+            CO_END;
         }
-    }
+    };
 }

@@ -66,9 +66,10 @@ namespace Core
                     // Trim content if its too big
 
                     Response.Headers.insert_or_assign("Content-Length", std::to_string(HasFile ? FileLength : StringLength));
+                    Response.Headers.insert_or_assign("Host", CTServer.Settings.HostName);
 
                     OBuffer.Construct(
-                        Iterable::Queue<char>(1024),
+                        Iterable::Queue<char>(CTServer.Settings.RequestBufferSize),
                         // @todo Remove pointer
                         HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
                         FileLength,
@@ -125,6 +126,8 @@ namespace Core
                         if (Parser.IsFinished())
                         {
                             // Process request
+
+                            // @todo Maybe check Host tag?
 
                             Network::HTTP::Response Response = CTServer.OnRequest(Target, Parser.Result, Loop->Storage);
 

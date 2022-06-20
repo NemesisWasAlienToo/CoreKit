@@ -131,3 +131,54 @@ public:
             });
     }
 };
+
+// Router v2
+
+// template <typename>
+// struct Router2
+// {
+// };
+
+// template <typename TRet, typename... TArgs>
+// class Router2<TRet(TArgs...)>
+// {
+// protected:
+//     using TDefault = std::function<TRet(TArgs...)>;
+//     using TMatcher = std::function<TRet(std::string_view, Network::HTTP::Methods, TArgs...)>;
+
+//     TMatcher Matcher;
+
+// public:
+//     TDefault Default;
+
+//     Router2() = default;
+//     Router2(TDefault &&_Default) : Default(std::move(_Default)) {}
+//     Router2(TDefault const &_Default) : Default(_Default) {}
+
+//     // Had to redefine args to enable universal refrence
+
+//     template <typename... RTArgs>
+//     TRet Match(Network::HTTP::Methods Method, std::string_view Path, RTArgs &&...Args) const
+//     {
+//         return Matcher(Path, Method, Args...);
+//     }
+
+//     template <ctll::fixed_string TSigniture, bool Group = false, typename TCallback>
+//     void Add(Network::HTTP::Methods M, TCallback &&Callback)
+//     {
+//         using T = Route<TSigniture, Group>;
+
+//         Matcher = [this, M, Next = std::move(Matcher), CB = std::forward<TCallback>(Callback)](std::string_view Path, Network::HTTP::Methods Method, TArgs &&...Args)
+//         {
+//             if (M == Network::HTTP::Methods::Any || (Method == M && (auto Match = ctre::match<T::Regex>(Path))))
+//             {
+//                 return T::Apply(Match, CB, std::forward<TArgs>(Args)...);
+//             }
+
+//             if (Next)
+//                 return Next(Path, Method, std::forward<TArgs>(Args)...);
+            
+//             return Default(std::forward<TArgs>(Args)...);
+//         };
+//     }
+// };

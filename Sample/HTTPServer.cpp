@@ -83,6 +83,9 @@ int main(int, char const *[])
         .MaxHeaderSize(1024 * 1024 * 2)
         .MaxBodySize(1024 * 1024 * 10)
         .MaxConnectionCount(1024)
+        .RequestBufferSize(512)
+        .NoDelay(true)
+        .HostName("Benchmark")
         .Run()
         .GetInPool();
 

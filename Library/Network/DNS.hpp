@@ -68,7 +68,7 @@ namespace Core
                 return endPoint;
             }
 
-            Iterable::List<Address> Resolve(const std::string &Domain, Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP)
+            Iterable::List<Address> Resolve(const std::string &Domain, Address::AddressFamily Family = Address::Unspecified, Socket::SocketType Type = Socket::TCP)
             {
                 struct addrinfo hints, *res, *p;
                 int status;
@@ -101,7 +101,7 @@ namespace Core
                 return addresses;
             }
 
-            Address ResolveSingle(const std::string &Domain, Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP)
+            Address ResolveSingle(const std::string &Domain, Address::AddressFamily Family = Address::Unspecified, Socket::SocketType Type = Socket::TCP)
             {
                 struct addrinfo hints, *res;
                 int status;
@@ -169,7 +169,7 @@ namespace Core
                 return serv;
             }
 
-            Iterable::List<EndPoint> Host(const std::string &Service = "", Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP, bool Passive = false)
+            Iterable::List<EndPoint> Host(const std::string &Service = "", Address::AddressFamily Family = Address::Unspecified, Socket::SocketType Type = Socket::TCP, bool Passive = false)
             {
                 struct addrinfo hints, *res, *p;
                 int status;
@@ -195,7 +195,7 @@ namespace Core
                 return endPoints;
             }
 
-            Iterable::List<Address> Host(Address::AddressFamily Family = Address::AnyFamily, Socket::SocketType Type = Socket::TCP, bool Passive = false)
+            Iterable::List<Address> Host(Address::AddressFamily Family = Address::Unspecified, Socket::SocketType Type = Socket::TCP, bool Passive = false)
             {
                 struct addrinfo hints, *res, *p;
                 int status;
