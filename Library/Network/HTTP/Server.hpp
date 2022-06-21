@@ -142,7 +142,7 @@ namespace Core::Network::HTTP
                 Filters = Builder(
                     [this](Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> &Storage)
                     {
-                        return _Router.Match(Request.Method, Request.Path, Target, Request, Storage);
+                        return _Router.Match(Request, Target, Request, Storage);
                     });
 
                 return *this;
@@ -256,7 +256,7 @@ namespace Core::Network::HTTP
         inline HTTP::Response OnRequest(Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> &Storage) const
         {
             if (!Filters)
-                return _Router.Match(Request.Method, Request.Path, Target, Request, Storage);
+                return _Router.Match(Request, Target, Request, Storage);
 
             return Filters(Target, Request, Storage);
         }

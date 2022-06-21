@@ -98,14 +98,16 @@ public:
     // Had to redefine args to enable universal refrence
 
     template <typename... RTArgs>
-    TRet Match(Network::HTTP::Methods Method, std::string_view Path, RTArgs &&...Args) const
+    TRet Match(Network::HTTP::Request &Request, RTArgs &&...Args) const
     {
+        std::string_view Path{Request.Path};
+
         for (size_t i = 0; i < Routes.Length(); i++)
         {
             auto &RouteMethod = std::get<0>(Routes[i]);
             auto &Route = std::get<1>(Routes[i]);
 
-            if(RouteMethod == Network::HTTP::Methods::Any || RouteMethod == Method)
+            if (RouteMethod == Network::HTTP::Methods::Any || RouteMethod == Request.Method)
             {
                 if (auto Result = Route(Path, std::forward<RTArgs>(Args)...))
                 {
@@ -113,6 +115,11 @@ public:
                 }
             }
         }
+
+        // @todo Should this exist?
+        
+        if (!Default)
+            throw Network::HTTP::Response::From(Request.Version, Network::HTTP::Status::NotFound, {}, "");
 
         return Default(Args...);
     }
@@ -177,7 +184,7 @@ public:
 
 //             if (Next)
 //                 return Next(Path, Method, std::forward<TArgs>(Args)...);
-            
+
 //             return Default(std::forward<TArgs>(Args)...);
 //         };
 //     }
