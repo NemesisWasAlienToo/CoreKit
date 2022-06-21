@@ -129,7 +129,7 @@ namespace Core
             {
                 size_t MaxConnectionCount;
                 bool NoDelay;
-            } Settings{1024, true};
+            } Settings{1024, false};
         };
     }
 }

@@ -153,10 +153,25 @@ namespace Core::Network::HTTP
             return *this;
         }
 
+        template <typename TBuildCallback>
+        inline Server &MiddlewareFrom(TBuildCallback &&Builder)
+        {
+            _Router.Default = Builder(std::move(_Router.Default));
+
+            return *this;
+        }
+
         template <typename TCallback>
         inline Server &InitStorages(TCallback &&Callback)
         {
             TCP.InitStorages(Callback);
+            return *this;
+        }
+
+        template <typename TCallback>
+        inline Server &OnError(TCallback &&Callback)
+        {
+            Settings.OnError = std::forward<TCallback>(Callback);
             return *this;
         }
 
@@ -214,7 +229,7 @@ namespace Core::Network::HTTP
 
     private:
         TCPServer TCP;
-        Router<HTTP::Response(Network::EndPoint const &, Network::HTTP::Request const &, std::shared_ptr<void> &)> _Router;
+        Router<HTTP::Response(Network::EndPoint const &, Network::HTTP::Request &, std::shared_ptr<void> &)> _Router;
         Duration Timeout;
 
         TFilter Filters = nullptr;
@@ -228,13 +243,15 @@ namespace Core::Network::HTTP
             size_t SendFileThreshold;
             size_t RequestBufferSize;
             std::string HostName;
+            std::function<void(Network::EndPoint const &, Network::HTTP::Response &, std::shared_ptr<void> &)> OnError;
         } Settings{
             1024 * 1024 * 1,
             1024 * 1024 * 5,
             1024 * 1024 * 5,
             1024 * 10,
             1024,
-            Network::DNS::HostName()};
+            Network::DNS::HostName(),
+            nullptr};
 
         inline HTTP::Response OnRequest(Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> &Storage) const
         {

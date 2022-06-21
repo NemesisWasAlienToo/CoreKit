@@ -240,13 +240,11 @@ namespace Core::Network::HTTP
         {
             Response response;
             response.Status = Status;
+            response.Brief = StatusMessage.at(Status);
             response.Version = Version;
-
-            Headers.emplace("Content-Length", std::to_string(Content.length()));
 
             response.Headers = std::move(Headers);
             response.Content = std::move(Content);
-            response.Brief = StatusMessage.at(Status);
             return response;
         }
 
@@ -254,11 +252,10 @@ namespace Core::Network::HTTP
         {
             Response response;
             response.Status = Status;
+            response.Brief = StatusMessage.at(Status);
             response.Version = Version;
 
             response.Headers = std::move(Headers);
-            response.Brief = StatusMessage.at(Status);
-
             response.Content = std::make_shared<File>(std::move(Content));
 
             return response;

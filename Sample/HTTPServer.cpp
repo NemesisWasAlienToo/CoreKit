@@ -20,20 +20,6 @@ int main(int, char const *[])
     Server.SetDefault(
         [](EndPoint const &, HTTP::Request const &Request, std::shared_ptr<void> &)
         {
-            auto FileName = std::string_view{Request.Path}.substr(1);
-
-            try
-            {
-                if (File::IsRegular(FileName))
-                {
-                    return HTTP::Response::FromPath(Request.Version, HTTP::Status::OK, FileName);
-                }
-            }
-            catch (const std::system_error &e)
-            {
-                std::cout << FileName << " does not exist" << std::endl;
-            }
-
             return HTTP::Response::HTML(Request.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>");
         });
 
@@ -70,6 +56,31 @@ int main(int, char const *[])
         {
             return [Next = std::move(Next)](Network::EndPoint const &Target, HTTP::Request &Request, std::shared_ptr<void> &Storage)
             {
+                return Next(Target, Request, Storage);
+            };
+        });
+
+    // A simple middleware
+
+    Server.MiddlewareFrom(
+        [](auto &&Next)
+        {
+            return [Next = std::move(Next)](Network::EndPoint const &Target, HTTP::Request &Request, std::shared_ptr<void> &Storage)
+            {
+                auto FileName = std::string_view{Request.Path}.substr(1);
+
+                try
+                {
+                    if (File::IsRegular(FileName))
+                    {
+                        return HTTP::Response::FromPath(Request.Version, HTTP::Status::OK, FileName);
+                    }
+                }
+                catch (std::system_error const &e)
+                {
+                    std::cout << FileName << " does not exist" << std::endl;
+                }
+
                 return Next(Target, Request, Storage);
             };
         });

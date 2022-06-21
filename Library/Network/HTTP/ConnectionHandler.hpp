@@ -63,6 +63,8 @@ namespace Core
                                   std::min(std::get<std::shared_ptr<File>>(Response.Content)->Size(), CTServer.Settings.MaxFileSize)
                             : StringLength = std::min(std::get<std::string>(Response.Content).length(), CTServer.Settings.MaxBodySize);
 
+                    bool UseSendFile = CTServer.Settings.SendFileThreshold && HasFile && FileLength > CTServer.Settings.SendFileThreshold;
+
                     // Trim content if its too big
 
                     Response.Headers.insert_or_assign("Content-Length", std::to_string(HasFile ? FileLength : StringLength));
@@ -73,7 +75,7 @@ namespace Core
                         // @todo Remove pointer
                         HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
                         FileLength,
-                        CTServer.Settings.SendFileThreshold && HasFile && FileLength > CTServer.Settings.SendFileThreshold);
+                        UseSendFile);
 
                     Format::Stream Ser(OBuffer.Last().Buffer);
 
@@ -177,12 +179,30 @@ namespace Core
                     }
                     catch (HTTP::Response &Response)
                     {
+                        if (CTServer.Settings.OnError)
+                            CTServer.Settings.OnError(Target, Response, Loop->Storage);
+
                         AppendResponse(Response);
+
+                        // Set tcp no push if enabled bu user
 
                         Loop->Modify(Self, ShouldClose ? ePoll::Out : ePoll::In | ePoll::Out);
 
                         ShouldClose = true;
                     }
+                    // catch (HTTP::Status const Method)
+                    // {
+                    //     auto Response = HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, "");
+
+                    //     // if (CTServer.Settings.OnError)
+                    //     //     CTServer.Settings.OnError(Target, Response, Loop->Storage);
+
+                    //     AppendResponse(Response);
+
+                    //     Loop->Modify(Self, ShouldClose ? ePoll::Out : ePoll::In | ePoll::Out);
+
+                    //     ShouldClose = true;
+                    // }
                 }
 
                 void OnWrite(Async::EventLoop *Loop, ePoll::Entry &, Async::EventLoop::Entry &Self)
@@ -225,7 +245,8 @@ namespace Core
 
                         Self.File << Ser;
 
-                        return;
+                        if (!Item.Buffer.IsEmpty())
+                            return;
                     }
 
                     // Send file
