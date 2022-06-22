@@ -85,14 +85,14 @@ namespace Core
 
         // ### Static functions
 
-        static inline bool Exist(std::string_view const &Name, int Tests = F_OK)
+        static inline bool Exist(std::string const &Name, int Tests = F_OK)
         {
-            return (access(Name.begin(), Tests) != -1);
+            return (access(Name.c_str(), Tests) != -1);
         }
 
-        static File Create(std::string_view const &Path, uint32_t Permissions = DefaultPermission)
+        static File Create(std::string const &Path, uint32_t Permissions = DefaultPermission)
         {
-            int Result = creat(Path.begin(), Permissions);
+            int Result = creat(Path.c_str(), Permissions);
 
             if (Result < 0)
             {
@@ -102,9 +102,9 @@ namespace Core
             return Result;
         }
 
-        static File Open(std::string_view const &Path, int Flags = 0, uint32_t Permissions = DefaultPermission)
+        static File Open(std::string const &Path, int Flags = 0, uint32_t Permissions = DefaultPermission)
         {
-            int Result = open(Path.begin(), Flags, Permissions);
+            int Result = open(Path.c_str(), Flags, Permissions);
 
             if (Result < 0)
             {
@@ -114,9 +114,9 @@ namespace Core
             return Result;
         }
 
-        static void Remove(std::string_view const &Path)
+        static void Remove(std::string const &Path)
         {
-            int Result = remove(Path.begin());
+            int Result = remove(Path.c_str());
 
             if (Result < 0)
             {
@@ -154,7 +154,7 @@ namespace Core
             return buffer;
         }
 
-        static Iterable::Span<char> ReadAll(std::string_view const &Path)
+        static Iterable::Span<char> ReadAll(std::string const &Path)
         {
             auto file = Open(Path, ReadOnly);
 
@@ -172,7 +172,7 @@ namespace Core
             return buffer;
         }
 
-        static std::string ReadAllString(std::string_view const &Path)
+        static std::string ReadAllString(std::string const &Path)
         {
             auto file = Open(Path, ReadOnly);
 
@@ -191,7 +191,7 @@ namespace Core
             return buffer;
         }
 
-        static void WriteAll(std::string_view const &Path, std::string_view const &Content, bool Create = true, uint32_t Permissions = DefaultPermission)
+        static void WriteAll(std::string const &Path, std::string_view const &Content, bool Create = true, uint32_t Permissions = DefaultPermission)
         {
             int flags = WriteOnly;
 
@@ -211,7 +211,7 @@ namespace Core
             file.Close();
         }
 
-        static void AppendAll(std::string_view const &Path, std::string_view const &Content)
+        static void AppendAll(std::string const &Path, std::string_view const &Content)
         {
             auto file = Open(Path, WriteOnly | Append);
 
@@ -240,11 +240,11 @@ namespace Core
             return static_cast<size_t>(Result);
         }
 
-        static struct stat Stat(std::string_view const &Path)
+        static struct stat Stat(std::string const &Path)
         {
             struct stat st;
 
-            int Result = stat(Path.begin(), &st);
+            int Result = stat(Path.c_str(), &st);
 
             if (Result < 0)
             {
@@ -254,42 +254,42 @@ namespace Core
             return st;
         }
 
-        inline static bool IsDirectory(std::string_view const &Path)
+        inline static bool IsDirectory(std::string const &Path)
         {
             return S_ISDIR(Stat(Path).st_mode);
         }
 
-        inline static bool IsChar(std::string_view const &Path)
+        inline static bool IsChar(std::string const &Path)
         {
             return S_ISCHR(Stat(Path).st_mode);
         }
 
-        inline static bool IsBulk(std::string_view const &Path)
+        inline static bool IsBulk(std::string const &Path)
         {
             return S_ISBLK(Stat(Path).st_mode);
         }
 
-        inline static bool IsFIFO(std::string_view const &Path)
+        inline static bool IsFIFO(std::string const &Path)
         {
             return S_ISFIFO(Stat(Path).st_mode);
         }
 
-        inline static bool IsLink(std::string_view const &Path)
+        inline static bool IsLink(std::string const &Path)
         {
             return S_ISLNK(Stat(Path).st_mode);
         }
 
-        inline static bool IsSocket(std::string_view const &Path)
+        inline static bool IsSocket(std::string const &Path)
         {
             return S_ISSOCK(Stat(Path).st_mode);
         }
 
-        inline static bool IsRegular(std::string_view const &Path)
+        inline static bool IsRegular(std::string const &Path)
         {
             return S_ISREG(Stat(Path).st_mode);
         }
 
-        inline static size_t SizeOf(std::string_view const &Path)
+        inline static size_t SizeOf(std::string const &Path)
         {
             return Stat(Path).st_size;
         }

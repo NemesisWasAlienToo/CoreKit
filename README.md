@@ -9,7 +9,6 @@ Core Kit is general purpose c++ 20 library with focus on networking specially co
 
 - Library : Contains CoreKit library files
 - Sample : Sample source codes
-- Source : Main.cpp including main function containing most recent feature example
 
 ## Dependencies
 
@@ -42,11 +41,12 @@ Checked items are implemented completly at the moment and unchecked items are to
 - [x] Event : Linux Eventfd based event mechanism
 - [x] Timer : Linux Timerfd based timer mechanism
 - [x] Coroutine : Linux implementation of a stackful asymmetric coroutine
-- [ ] Machine : Linux implementation of a duff device state machine coroutine
+- [x] Machine : Linux implementation of a duff's device state machine coroutine
 - [x] Foramt:
     - [x] Base64 : Base64 Encoding
     - [x] Hex : Hexadecimal String Encoding
     - [x] Serializer : Data serializer and deserializer for network data packing
+    - [x] Stream : Data stream
 
 - [ ] Storage:
     - [ ] Sqlite3 : Sqlite3 wrapper class
@@ -69,10 +69,11 @@ Checked items are implemented completly at the moment and unchecked items are to
     - [ ] Http:
         - [x] : Request
         - [x] : Response
-        - [ ] : Server
+        - [x] : Server
+        - [ ] : Controller
 
-    - [ ] DHT : Distributed Hash Table runners and tools
-        - [ ] Cache : Peer cache policy
+    - [x] DHT : Distributed Hash Table runners and tools
+        - [x] Cache : Peer cache policy
         - [x] Handler : _Request_ to _Function_ Mapper for handling incomming new or pending requests
         - [x] Key : N-Byte key (id)
         - [x] Node
@@ -87,21 +88,10 @@ Checked items are implemented completly at the moment and unchecked items are to
 
 ## To do
 
-- Coroutine
-    - Prohibit moving of an already started coroutine
-
-- Descriptor
-    - Define what a const Descriptor must be able to perform
-
-- File
-    - Standardize default permissions
-
 - Format
-    - Seperate serializer and deserializer
     - Optmize bit-copy-able objects Add and Take
 
 - Iterable:
-    - Poll Put CPoll inside Poll and seperate Poll from Iterable
     - Add Linked-List
     - Add Map
     - Add (red-black & AVL) binary search trees
@@ -112,11 +102,7 @@ Checked items are implemented completly at the moment and unchecked items are to
     - RSA Error handling
 
 - Http:
-    - Optimize HTTP Server event loop
-
-- Socket:
-    - Error string from errno
-    - Define what a const Socket must be able to perform
+    - Add Controller
 
 - DHT:
     - Task queue between Runner and Server-Handler

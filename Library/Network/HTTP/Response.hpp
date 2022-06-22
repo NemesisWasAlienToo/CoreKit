@@ -290,7 +290,7 @@ namespace Core::Network::HTTP
             return From(Version, Status, {{"Content-Type", std::string{ContentType}}}, std::move(Content));
         }
 
-        static Response FromPath(std::string_view const &Version, HTTP::Status Status, std::string_view const &Path)
+        static Response FromPath(std::string_view const &Version, HTTP::Status Status, std::string const &Path)
         {
             return Type(Version, Status, GetContentType(GetExtension(Path)), File::Open(Path));
         }
