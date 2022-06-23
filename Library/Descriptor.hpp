@@ -245,6 +245,12 @@ namespace Core
 
             int Result = close(_INode);
 
+            // @todo This should be moved after error checking in order to be able to
+            // read the correct inode in the case of an exception
+            // but due to gcc's bug it's here for now
+
+            _INode = -1;
+            
             // Error handling here
 
             if (Result < 0)
@@ -252,7 +258,8 @@ namespace Core
                 throw std::system_error(errno, std::generic_category());
             }
 
-            _INode = -1;
+            // @todo the actual invalidation must happen here
+            // _INode = -1;
         }
 
         ssize_t SendFile(Descriptor const &Other, size_t Size, off_t Offset) const

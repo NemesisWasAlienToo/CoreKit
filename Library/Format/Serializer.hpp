@@ -19,413 +19,410 @@
 
 // @todo Seperate serializer and deserializer IMPORTANT
 
-namespace Core
+namespace Core::Format
 {
-    namespace Format
+    class Serializer
     {
-        class Serializer
-        {
-        public:
+    public:
 #if BYTE_ORDER == NETWORK_BYTE_ORDER
 
-            template <typename T>
-            static std::void_t<std::enable_if<std::is_integral<T>::value>> static void Order(const T &Source, T &Destination)
-            {
-                Destination = Source;
-            }
+        template <typename T>
+        static std::void_t<std::enable_if<std::is_integral<T>::value>> static void Order(const T &Source, T &Destination)
+        {
+            Destination = Source;
+        }
 #else
-            template <typename T>
-            static std::void_t<std::enable_if<std::is_integral_v<T>>>
-            Order(const T &Source, T &Destination)
-            {
-                const char *SourcePointer = (char *)&Source;
-                char *DestinationPointer = (char *)&Destination;
+        template <typename T>
+        static std::void_t<std::enable_if<std::is_integral_v<T>>>
+        Order(const T &Source, T &Destination)
+        {
+            const char *SourcePointer = (char *)&Source;
+            char *DestinationPointer = (char *)&Destination;
 
-                for (size_t i = 0; i < sizeof(T); i++)
-                {
-                    DestinationPointer[i] = SourcePointer[(sizeof(T) - 1) - i];
-                }
+            for (size_t i = 0; i < sizeof(T); i++)
+            {
+                DestinationPointer[i] = SourcePointer[(sizeof(T) - 1) - i];
             }
+        }
 #endif
-            template <typename T>
-            static T Order(const T &Source)
+        template <typename T>
+        static T Order(const T &Source)
+        {
+            T Res;
+
+            Order(Source, Res);
+
+            return Res;
+        }
+
+        // Public variables
+
+        Iterable::Queue<char> &Queue;
+
+        // Constructors
+
+        Serializer(Iterable::Queue<char> &queue) : Queue(queue) {}
+
+        Serializer(const Serializer &) = delete;
+
+        ~Serializer() = default;
+
+        // Peroperties
+
+        inline size_t Length()
+        {
+            return Queue.Length();
+        }
+
+        void Realign()
+        {
+            Queue.Resize(Queue.Capacity());
+        }
+
+        void Clear()
+        {
+            Queue = Iterable::Queue<char>(Queue.Capacity());
+        }
+
+        void Clear(size_t NewSize)
+        {
+            Queue = Iterable::Queue<char>(NewSize);
+        }
+
+        inline Serializer &Add(const char *Data, size_t Size)
+        {
+            Queue.Add(Data, Size);
+
+            return *this;
+        }
+
+        template <class T>
+        inline Serializer &Add(const T &Object)
+        {
+            *this << Object;
+            return *this;
+        }
+
+        template <class T>
+        inline T Take()
+        {
+            T t;
+            *this >> t;
+            return t;
+        }
+
+        template <typename T>
+        T &Modify(size_t Index)
+        {
+            char *Pointer = &Queue[Index];
+
+            if (Queue.Capacity() == 0 || (static_cast<size_t>((&Queue.Content()[Queue.Capacity() - 1] - Pointer)) < sizeof(T)))
+                throw std::out_of_range("Size would access out of bound memory");
+
+            return *(reinterpret_cast<T *>(Pointer));
+        }
+
+        Iterable::Span<char> Dump()
+        {
+            Iterable::Span<char> Result(Queue.Length());
+
+            Queue.Take(Result.Content(), Queue.Length());
+
+            return Result;
+        }
+
+        // Input operators
+
+        template <typename T>
+        std::enable_if_t<std::is_integral_v<T>, Serializer &>
+        operator<<(T Value)
+        {
+            T _Value;
+
+            Order(Value, _Value);
+
+            Queue.Add((char *)&_Value, sizeof(_Value));
+
+            return *this;
+        }
+
+        Serializer &operator<<(char Value)
+        {
+            Queue.Add(Value);
+
+            return *this;
+        }
+
+        template <typename TValue>
+        Serializer &operator<<(const Iterable::Iterable<TValue> &Value)
+        {
+            *this << Value.Length();
+
+            for (size_t i = 0; i < Value.Length(); i++)
             {
-                T Res;
-
-                Order(Source, Res);
-
-                return Res;
+                *this << Value[i];
             }
 
-            // Public variables
+            return *this;
+        }
 
-            Iterable::Queue<char> &Queue;
+        // @todo Remove this after unifiying iterable and span
 
-            // Constructors
+        template <typename TValue>
+        Serializer &operator<<(const Iterable::Span<TValue> &Value)
+        {
+            *this << Value.Length();
 
-            Serializer(Iterable::Queue<char> &queue) : Queue(queue) {}
-
-            Serializer(const Serializer &) = delete;
-
-            ~Serializer() = default;
-
-            // Peroperties
-
-            inline size_t Length()
+            for (size_t i = 0; i < Value.Length(); i++)
             {
-                return Queue.Length();
+                *this << Value[i];
             }
 
-            void Realign()
+            return *this;
+        }
+
+        Serializer &operator<<(const Iterable::Span<char> &Value)
+        {
+            *this << Value.Length();
+
+            Queue.Add(Value.Content(), Value.Length());
+
+            return *this;
+        }
+
+        Serializer &operator<<(const std::string &Value)
+        {
+            Queue.Add(Value.c_str(), Value.length() + 1);
+
+            return *this;
+        }
+
+        Serializer &operator<<(const Cryptography::Key &Value)
+        {
+            *this << Value.Size;
+
+            Queue.Add((char *)Value.Data, Value.Size);
+
+            return *this;
+        }
+
+        Serializer &operator<<(const Network::Address &Value)
+        {
+            Network::Address::AddressFamily _Family = Order(Value.Family());
+
+            Queue.Add((char *)&_Family, sizeof(_Family));
+
+            Queue.Add((char *)Value.Content(), 16);
+
+            return *this;
+        }
+
+        Serializer &operator<<(const Network::EndPoint &Value)
+        {
+            return *this << Value.Address() << Order(Value.Port()) << Order(Value.Flow()) << Order(Value.Scope());
+        }
+
+        Serializer &operator<<(const Network::DHT::Node &Value)
+        {
+            return *this << Value.Id << Value.EndPoint;
+        }
+
+        // Output operators
+
+        template <typename T>
+        std::enable_if_t<std::is_integral_v<T>, Serializer &>
+        operator>>(T &Value)
+        {
+            T _Value;
+
+            Queue.Take(reinterpret_cast<char *>(&_Value), sizeof(_Value));
+
+            Order(_Value, Value);
+
+            return *this;
+        }
+
+        Serializer &operator>>(char &Value)
+        {
+            Value = Queue.Take();
+
+            return *this;
+        }
+
+        template <typename TValue>
+        Serializer &operator>>(Iterable::Iterable<TValue> &Value)
+        {
+            size_t Size = this->Take<size_t>();
+
+            Value = Iterable::Iterable<TValue>(Size);
+
+            // @todo Optimize when serializer and deserializer are seperated
+            // Cuz we know there is no data inserted when taking data and
+            // thus the queue hasn't wrapped around
+
+            // if constexpr (std::is_integral_v<TValue>)
+
+            for (size_t i = 0; i < Size; i++)
             {
-                Queue.Resize(Queue.Capacity());
+                Value.Add(this->Take<TValue>());
             }
 
-            void Clear()
+            return *this;
+        }
+
+        template <typename TValue>
+        Serializer &operator>>(Iterable::Span<TValue> &Value)
+        {
+            size_t Size = this->Take<size_t>();
+
+            Value = Iterable::Span<TValue>(Size);
+
+            // @todo Optimize when serializer and deserializer are seperated
+            // Cuz we know there is no data inserted when taking data and
+            // thus the queue hasn't wrapped around
+
+            // if constexpr (std::is_integral_v<TValue>)
+
+            for (size_t i = 0; i < Size; i++)
             {
-                Queue = Iterable::Queue<char>(Queue.Capacity());
+                Value[i] = this->Take<TValue>();
             }
 
-            void Clear(size_t NewSize)
+            return *this;
+        }
+
+        Serializer &operator>>(Iterable::Span<char> &Value)
+        {
+            // @todo Optimize when serializer and deserializer are seperated
+            // Cuz we know there is no data inserted when taking data and
+            // thus the queue hasn't wrapped around
+
+            Value = Iterable::Span<char>(this->Take<size_t>());
+
+            for (size_t i = 0; i < Value.Length(); i++)
             {
-                Queue = Iterable::Queue<char>(NewSize);
+                Value[i] = Queue[i];
             }
 
-            inline Serializer &Add(const char *Data, size_t Size)
-            {
-                Queue.Add(Data, Size);
+            Queue.Free(Value.Length());
 
-                return *this;
+            return *this;
+        }
+
+        // @todo Optimize and fix this this
+
+        Serializer &operator>>(std::string &Value)
+        {
+            while (!Queue.IsEmpty() && Queue.Last() != '0')
+            {
+                Value += Queue.Take();
             }
 
-            template <class T>
-            inline Serializer &Add(const T &Object)
+            if (!Queue.IsEmpty())
+                Queue.Take();
+
+            return *this;
+        }
+
+        Serializer &operator>>(Cryptography::Key &Value)
+        {
+            size_t Size = this->Take<size_t>();
+
+            if (Value.Size != Size)
+                Value = Cryptography::Key(Size);
+
+            Queue.Take((char *)Value.Data, Value.Size);
+
+            return *this;
+        }
+
+        Serializer &operator>>(Network::Address &Value)
+        {
+            Network::Address::AddressFamily _Family;
+
+            Queue.Take((char *)&_Family, sizeof(_Family));
+
+            Value.Family() = Order(_Family);
+
+            Queue.Take((char *)Value.Content(), 16);
+
+            return *this;
+        }
+
+        Serializer &operator>>(Network::EndPoint &Value)
+        {
+            *this >> Value.Address();
+            Value.Port(Order(this->Take<unsigned short>()));
+            Value.Flow(Order(this->Take<int>()));
+            Value.Scope(Order(this->Take<int>()));
+
+            return *this;
+        }
+
+        Serializer &operator>>(Network::DHT::Node &Value)
+        {
+            return *this >> Value.Id >> Value.EndPoint;
+        }
+
+        friend std::ostream &operator<<(std::ostream &os, Serializer &Serializer)
+        {
+            while (!Serializer.Queue.IsEmpty())
             {
-                *this << Object;
-                return *this;
+                os << Serializer.Queue.Take();
             }
 
-            template <class T>
-            inline T Take()
-            {
-                T t;
-                *this >> t;
-                return t;
-            }
+            return os;
+        }
 
-            template <typename T>
-            T &Modify(size_t Index)
-            {
-                char *Pointer = &Queue[Index];
+        friend std::istream &operator>>(std::istream &is, Serializer &Serializer)
+        {
+            std::string Inpt;
 
-                if (Queue.Capacity() == 0 || (static_cast<size_t>((&Queue.Content()[Queue.Capacity() - 1] - Pointer)) < sizeof(T)))
-                    throw std::out_of_range("Size would access out of bound memory");
+            is >> Inpt;
 
-                return *(reinterpret_cast<T *>(Pointer));
-            }
+            Serializer.Add(Inpt.c_str(), Inpt.length());
 
-            Iterable::Span<char> Dump()
-            {
-                Iterable::Span<char> Result(Queue.Length());
+            return is;
+        }
 
-                Queue.Take(Result.Content(), Queue.Length());
+        friend Descriptor &operator<<(Descriptor &descriptor, Serializer &Serializer)
+        {
+            auto [Pointer, Size] = Serializer.Queue.Chunk();
 
-                return Result;
-            }
+            Serializer.Queue.Free(descriptor.Write(Pointer, Size));
+            return descriptor;
+        }
 
-            // Input operators
+        friend Descriptor const &operator<<(Descriptor const &descriptor, Serializer &Serializer)
+        {
+            auto [Pointer, Size] = Serializer.Queue.Chunk();
 
-            template <typename T>
-            std::enable_if_t<std::is_integral_v<T>, Serializer &>
-            operator<<(T Value)
-            {
-                T _Value;
+            Serializer.Queue.Free(descriptor.Write(Pointer, Size));
+            return descriptor;
+        }
 
-                Order(Value, _Value);
+        friend Descriptor &operator>>(Descriptor &descriptor, Serializer &Serializer)
+        {
+            // @todo Optimize when NoWrap was implemented in iterable resize
 
-                Queue.Add((char *)&_Value, sizeof(_Value));
+            auto Data = descriptor.Read(descriptor.Received());
+            Serializer.Queue.Add(Data.Content(), Data.Length());
+            // Serializer.Queue.Add(Data);
 
-                return *this;
-            }
+            return descriptor;
+        }
 
-            Serializer &operator<<(char Value)
-            {
-                Queue.Add(Value);
+        friend Descriptor const &operator>>(Descriptor const &descriptor, Serializer &Serializer)
+        {
+            // @todo Optimize when NoWrap was implemented in iterable resize
 
-                return *this;
-            }
+            auto Data = descriptor.Read(descriptor.Received());
+            Serializer.Queue.Add(Data.Content(), Data.Length());
+            // Serializer.Queue.Add(Data);
 
-            template <typename TValue>
-            Serializer &operator<<(const Iterable::Iterable<TValue> &Value)
-            {
-                *this << Value.Length();
+            return descriptor;
+        }
 
-                for (size_t i = 0; i < Value.Length(); i++)
-                {
-                    *this << Value[i];
-                }
-
-                return *this;
-            }
-
-            // @todo Remove this after unifiying iterable and span
-
-            template <typename TValue>
-            Serializer &operator<<(const Iterable::Span<TValue> &Value)
-            {
-                *this << Value.Length();
-
-                for (size_t i = 0; i < Value.Length(); i++)
-                {
-                    *this << Value[i];
-                }
-
-                return *this;
-            }
-
-            Serializer &operator<<(const Iterable::Span<char> &Value)
-            {
-                *this << Value.Length();
-
-                Queue.Add(Value.Content(), Value.Length());
-
-                return *this;
-            }
-
-            Serializer &operator<<(const std::string &Value)
-            {
-                Queue.Add(Value.c_str(), Value.length() + 1);
-
-                return *this;
-            }
-
-            Serializer &operator<<(const Cryptography::Key &Value)
-            {
-                *this << Value.Size;
-
-                Queue.Add((char *)Value.Data, Value.Size);
-
-                return *this;
-            }
-
-            Serializer &operator<<(const Network::Address &Value)
-            {
-                Network::Address::AddressFamily _Family = Order(Value.Family());
-
-                Queue.Add((char *)&_Family, sizeof(_Family));
-
-                Queue.Add((char *)Value.Content(), 16);
-
-                return *this;
-            }
-
-            Serializer &operator<<(const Network::EndPoint &Value)
-            {
-                return *this << Value.Address() << Order(Value.Port()) << Order(Value.Flow()) << Order(Value.Scope());
-            }
-
-            Serializer &operator<<(const Network::DHT::Node &Value)
-            {
-                return *this << Value.Id << Value.EndPoint;
-            }
-
-            // Output operators
-
-            template <typename T>
-            std::enable_if_t<std::is_integral_v<T>, Serializer &>
-            operator>>(T &Value)
-            {
-                T _Value;
-
-                Queue.Take(reinterpret_cast<char *>(&_Value), sizeof(_Value));
-
-                Order(_Value, Value);
-
-                return *this;
-            }
-
-            Serializer &operator>>(char &Value)
-            {
-                Value = Queue.Take();
-
-                return *this;
-            }
-
-            template <typename TValue>
-            Serializer &operator>>(Iterable::Iterable<TValue> &Value)
-            {
-                size_t Size = this->Take<size_t>();
-
-                Value = Iterable::Iterable<TValue>(Size);
-
-                // @todo Optimize when serializer and deserializer are seperated
-                // Cuz we know there is no data inserted when taking data and
-                // thus the queue hasn't wrapped around
-
-                // if constexpr (std::is_integral_v<TValue>)
-
-                for (size_t i = 0; i < Size; i++)
-                {
-                    Value.Add(this->Take<TValue>());
-                }
-
-                return *this;
-            }
-
-            template <typename TValue>
-            Serializer &operator>>(Iterable::Span<TValue> &Value)
-            {
-                size_t Size = this->Take<size_t>();
-
-                Value = Iterable::Span<TValue>(Size);
-
-                // @todo Optimize when serializer and deserializer are seperated
-                // Cuz we know there is no data inserted when taking data and
-                // thus the queue hasn't wrapped around
-
-                // if constexpr (std::is_integral_v<TValue>)
-
-                for (size_t i = 0; i < Size; i++)
-                {
-                    Value[i] = this->Take<TValue>();
-                }
-
-                return *this;
-            }
-
-            Serializer &operator>>(Iterable::Span<char> &Value)
-            {
-                // @todo Optimize when serializer and deserializer are seperated
-                // Cuz we know there is no data inserted when taking data and
-                // thus the queue hasn't wrapped around
-
-                Value = Iterable::Span<char>(this->Take<size_t>());
-
-                for (size_t i = 0; i < Value.Length(); i++)
-                {
-                    Value[i] = Queue[i];
-                }
-
-                Queue.Free(Value.Length());
-
-                return *this;
-            }
-
-            // @todo Optimize and fix this this
-
-            Serializer &operator>>(std::string &Value)
-            {
-                while (!Queue.IsEmpty() && Queue.Last() != '0')
-                {
-                    Value += Queue.Take();
-                }
-
-                if (!Queue.IsEmpty())
-                    Queue.Take();
-
-                return *this;
-            }
-
-            Serializer &operator>>(Cryptography::Key &Value)
-            {
-                size_t Size = this->Take<size_t>();
-
-                if (Value.Size != Size)
-                    Value = Cryptography::Key(Size);
-
-                Queue.Take((char *)Value.Data, Value.Size);
-
-                return *this;
-            }
-
-            Serializer &operator>>(Network::Address &Value)
-            {
-                Network::Address::AddressFamily _Family;
-
-                Queue.Take((char *)&_Family, sizeof(_Family));
-
-                Value.Family() = Order(_Family);
-
-                Queue.Take((char *)Value.Content(), 16);
-
-                return *this;
-            }
-
-            Serializer &operator>>(Network::EndPoint &Value)
-            {
-                *this >> Value.Address();
-                Value.Port(Order(this->Take<unsigned short>()));
-                Value.Flow(Order(this->Take<int>()));
-                Value.Scope(Order(this->Take<int>()));
-
-                return *this;
-            }
-
-            Serializer &operator>>(Network::DHT::Node &Value)
-            {
-                return *this >> Value.Id >> Value.EndPoint;
-            }
-
-            friend std::ostream &operator<<(std::ostream &os, Serializer &Serializer)
-            {
-                while (!Serializer.Queue.IsEmpty())
-                {
-                    os << Serializer.Queue.Take();
-                }
-
-                return os;
-            }
-
-            friend std::istream &operator>>(std::istream &is, Serializer &Serializer)
-            {
-                std::string Inpt;
-
-                is >> Inpt;
-
-                Serializer.Add(Inpt.c_str(), Inpt.length());
-
-                return is;
-            }
-
-            friend Descriptor &operator<<(Descriptor &descriptor, Serializer &Serializer)
-            {
-                auto [Pointer, Size] = Serializer.Queue.Chunk();
-
-                Serializer.Queue.Free(descriptor.Write(Pointer, Size));
-                return descriptor;
-            }
-
-            friend Descriptor const &operator<<(Descriptor const &descriptor, Serializer &Serializer)
-            {
-                auto [Pointer, Size] = Serializer.Queue.Chunk();
-
-                Serializer.Queue.Free(descriptor.Write(Pointer, Size));
-                return descriptor;
-            }
-
-            friend Descriptor &operator>>(Descriptor &descriptor, Serializer &Serializer)
-            {
-                // @todo Optimize when NoWrap was implemented in iterable resize
-
-                auto Data = descriptor.Read();
-                Serializer.Queue.Add(Data.Content(), Data.Length());
-                // Serializer.Queue.Add(Data);
-
-                return descriptor;
-            }
-
-            friend Descriptor const &operator>>(Descriptor const &descriptor, Serializer &Serializer)
-            {
-                // @todo Optimize when NoWrap was implemented in iterable resize
-
-                auto Data = descriptor.Read();
-                Serializer.Queue.Add(Data.Content(), Data.Length());
-                // Serializer.Queue.Add(Data);
-
-                return descriptor;
-            }
-
-            Serializer &operator=(const Serializer &) = delete;
-        };
-    }
+        Serializer &operator=(const Serializer &) = delete;
+    };
 }

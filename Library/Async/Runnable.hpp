@@ -1,23 +1,28 @@
-class Runnable
+#pragma once
+
+namespace Core::Async
 {
-protected:
-    volatile bool Running{false};
-
-    inline void Run()
+    class Runnable
     {
-        Running = true;
-    }
+    protected:
+        volatile bool Running{false};
 
-    inline void Stop()
-    {
-        Running = false;
-    }
+        inline void Run()
+        {
+            Running = true;
+        }
 
-    inline bool IsRunning()
-    {
-        return Running;
-    }
-};
+        inline void Stop()
+        {
+            Running = false;
+        }
+
+        inline bool IsRunning()
+        {
+            return Running;
+        }
+    };
+}
 
 // #include <atomic>
 

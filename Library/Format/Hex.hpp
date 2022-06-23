@@ -7,83 +7,80 @@
 
 #include <Iterable/Span.hpp>
 
-namespace Core
+namespace Core::Format
 {
-    namespace Format
+    namespace Hex
     {
-        namespace Hex
+        inline unsigned char Digit(char HexChar, bool Upper = false)
         {
-            inline unsigned char Digit(char HexChar, bool Upper = false)
+            return HexChar - (HexChar > '9' ? ((Upper ? 'A' : 'a') - 10) : '0');
+        }
+
+        inline unsigned char Number(const unsigned char Big, const unsigned char Small, bool Upper = false)
+        {
+            return ((Digit(Big) << 4) + Digit(Small));
+        }
+
+        inline int PlainSize(int Size)
+        {
+            return Size / 2;
+        }
+
+        inline int CypherSize(int Size)
+        {
+            return 2 * Size;
+        }
+
+        std::string From(const unsigned char *Data, size_t Size)
+        {
+            std::stringstream ss;
+
+            for (size_t i = 0; i < Size; i++)
             {
-                return HexChar - (HexChar > '9' ? ((Upper ? 'A' : 'a') - 10) : '0');
+                // @ todo optimize this
+
+                ss << std::hex << std::setw(2) << std::setfill('0') << ((short)Data[i] & 0xff);
             }
 
-            inline unsigned char Number(const unsigned char Big, const unsigned char Small, bool Upper = false)
+            return ss.str();
+        }
+
+        std::string From(const Iterable::Span<char> &Data)
+        {
+            std::stringstream ss;
+
+            for (size_t i = 0; i < Data.Length(); i++)
             {
-                return ((Digit(Big) << 4) + Digit(Small));
+                // @ todo optimize this
+
+                ss << std::hex << std::setw(2) << std::setfill('0') << ((short)Data[i] & 0xff);
             }
 
-            inline int PlainSize(int Size)
+            return ss.str();
+        }
+
+        size_t Bytes(const std::string &HexString, char *Data, bool Upper = false)
+        {
+            size_t Len = HexString.length() / 2;
+
+            for (size_t i = 0; i < Len; i++)
             {
-                return Size / 2;
+                Data[i] = Number(HexString[2 * i], HexString[(2 * i) + 1], Upper);
             }
 
-            inline int CypherSize(int Size)
+            return Len;
+        }
+
+        Iterable::Span<char> Bytes(const std::string &HexString, bool Upper = false)
+        {
+            Iterable::Span<char> Data(HexString.length() / 2);
+
+            for (size_t i = 0; i < Data.Length(); i++)
             {
-                return 2 * Size;
+                Data[i] = Number(HexString[2 * i], HexString[(2 * i) + 1], Upper);
             }
 
-            std::string From(const unsigned char *Data, size_t Size)
-            {
-                std::stringstream ss;
-
-                for (size_t i = 0; i < Size; i++)
-                {
-                    // @ todo optimize this
-
-                    ss << std::hex << std::setw(2) << std::setfill('0') << ((short)Data[i] & 0xff);
-                }
-
-                return ss.str();
-            }
-
-            std::string From(const Iterable::Span<char> &Data)
-            {
-                std::stringstream ss;
-
-                for (size_t i = 0; i < Data.Length(); i++)
-                {
-                    // @ todo optimize this
-
-                    ss << std::hex << std::setw(2) << std::setfill('0') << ((short)Data[i] & 0xff);
-                }
-
-                return ss.str();
-            }
-
-            size_t Bytes(const std::string &HexString, char *Data, bool Upper = false)
-            {
-                size_t Len = HexString.length() / 2;
-
-                for (size_t i = 0; i < Len; i++)
-                {
-                    Data[i] = Number(HexString[2 * i], HexString[(2 * i) + 1], Upper);
-                }
-
-                return Len;
-            }
-
-            Iterable::Span<char> Bytes(const std::string &HexString, bool Upper = false)
-            {
-                Iterable::Span<char> Data(HexString.length() / 2);
-
-                for (size_t i = 0; i < Data.Length(); i++)
-                {
-                    Data[i] = Number(HexString[2 * i], HexString[(2 * i) + 1], Upper);
-                }
-
-                return Data;
-            }
+            return Data;
         }
     }
 }

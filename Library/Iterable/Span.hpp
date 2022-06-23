@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <initializer_list>
 
 namespace Core
@@ -12,16 +13,6 @@ namespace Core
         private:
             size_t _Length = 0;
             T *_Content = nullptr;
-
-            inline T &_ElementAt(size_t Index)
-            {
-                return this->_Content[Index];
-            }
-
-            inline const T &_ElementAt(size_t Index) const
-            {
-                return this->_Content[Index];
-            }
 
         public:
             Span() = default;
@@ -73,123 +64,7 @@ namespace Core
                 _Content = nullptr;
             }
 
-            inline T *Content()
-            {
-                return _Content;
-            }
-
-            inline const T *Content() const
-            {
-                return _Content;
-            }
-
-            inline size_t Length() const
-            {
-                return _Length;
-            }
-
-            inline void Length(size_t Length)
-            {
-                _Length = Length;
-            }
-
-            T &First()
-            {
-                return this->operator[](0);
-            }
-
-            T &Last()
-            {
-                return this->operator[](_Length - 1);
-            }
-
-            T const &First() const
-            {
-                return this->operator[](0);
-            }
-
-            T const &Last() const
-            {
-                return this->operator[](_Length - 1);
-            }
-
-            void Resize(size_t NewSize)
-            {
-                auto NewData = new T[NewSize];
-                auto Bound = std::min(NewSize, _Length);
-
-                for (size_t i = 0; i < Bound; i++)
-                {
-                    NewData[i] = _Content[i];
-                }
-
-                delete[] _Content;
-
-                _Length = NewSize;
-
-                _Content = NewData;
-            }
-
-            bool Contains(const T &Item) const
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    if (_ElementAt(i) == Item)
-                        return true;
-                }
-
-                return false;
-            }
-
-            bool Contains(const T &Item, int &Index) const
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    if (_ElementAt(i) == Item)
-                    {
-                        Index = i;
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            template <typename TCallback>
-            void ForEach(TCallback Action)
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    Action(_ElementAt(i));
-                }
-            }
-
-            template <typename TCallback>
-            void ForEach(TCallback Action) const
-            {
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    Action(_ElementAt(i));
-                }
-            }
-
-            T &operator[](const size_t &Index)
-            {
-                if (Index >= _Length)
-                    throw std::out_of_range("");
-
-                return _ElementAt(Index);
-            }
-
-            const T &operator[](const size_t &Index) const
-            {
-                if (Index >= _Length)
-                    throw std::out_of_range("");
-
-                return _ElementAt(Index);
-            }
-
-            Span &operator=(const Span &Other)
+            Span &operator=(Span const &Other)
             {
                 if (this != &Other)
                 {
@@ -223,34 +98,102 @@ namespace Core
                 return *this;
             }
 
-            // Operators
-
-            bool operator==(const Span &Other) noexcept
+            inline T *Content()
             {
-                if (_Content == Other._Content)
-                    return true;
-
-                for (size_t i = 0; i < _Length; i++)
-                {
-                    if (_Content[i] != Other._Content[i])
-                        return false;
-                }
-
-                return true;
+                return _Content;
             }
 
-            bool operator!=(const Span &Other) noexcept
+            inline T const *Content() const
             {
-                if (_Content != Other._Content)
-                    return true;
+                return _Content;
+            }
 
-                for (size_t i = 0; i < _Length; i++)
+            inline size_t Length() const
+            {
+                return _Length;
+            }
+
+            T &First()
+            {
+                return this->operator[](0);
+            }
+
+            T &Last()
+            {
+                return this->operator[](_Length - 1);
+            }
+
+            T const &First() const
+            {
+                return this->operator[](0);
+            }
+
+            T const &Last() const
+            {
+                return this->operator[](_Length - 1);
+            }
+
+            void Resize(size_t const NewSize)
+            {
+                auto NewData = new T[NewSize];
+                auto Bound = std::min(NewSize, _Length);
+
+                for (size_t i = 0; i < Bound; i++)
                 {
-                    if (_Content[i] == Other._Content[i])
-                        return false;
+                    NewData[i] = _Content[i];
                 }
 
-                return true;
+                delete[] _Content;
+
+                _Length = NewSize;
+
+                _Content = NewData;
+            }
+
+            template <typename TCallback>
+            std::optional<size_t> Contains(TCallback Callback) const
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    if (Callback(_Content[i]))
+                        return i;
+                }
+
+                return std::nullopt;
+            }
+
+            template <typename TCallback>
+            void ForEach(TCallback Action)
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    Action(_Content[i]);
+                }
+            }
+
+            template <typename TCallback>
+            void ForEach(TCallback Action) const
+            {
+                for (size_t i = 0; i < _Length; i++)
+                {
+                    Action(_Content[i]);
+                }
+            }
+
+            T &operator[](size_t const Index)
+            {
+                if (Index >= _Length)
+                    throw std::out_of_range("");
+
+                return _Content[Index];
+            }
+
+            T const &operator[](size_t const Index) const
+            {
+                if (Index >= _Length)
+                    throw std::out_of_range("");
+
+                return _Content[Index];
             }
         };
     }

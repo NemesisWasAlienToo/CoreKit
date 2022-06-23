@@ -12,187 +12,184 @@
 
 // ## Add SHA3
 
-namespace Core
+namespace Core::Cryptography
 {
-    namespace Cryptography
+    template <typename TState>
+    struct Functionality
     {
-        template <typename TState>
-        struct Functionality
+        typedef TState StateType;
+        typedef unsigned char *(*TName)(const unsigned char *, size_t, unsigned char *);
+        typedef int (*TInit)(TState *);
+        typedef int (*TUpdate)(TState *, const void *, size_t);
+        typedef int (*TFinal)(unsigned char *, TState *);
+    };
+
+    template <typename Scheme>
+    class Digest
+    {
+    private:
+        Scheme _State;
+
+    public:
+        Digest()
         {
-            typedef TState StateType;
-            typedef unsigned char *(*TName)(const unsigned char *, size_t, unsigned char *);
-            typedef int (*TInit)(TState *);
-            typedef int (*TUpdate)(TState *, const void *, size_t);
-            typedef int (*TFinal)(unsigned char *, TState *);
-        };
+            Scheme::Init(&_State);
+        }
 
-        template <typename Scheme>
-        class Digest
+        Digest(const Digest &Other) = delete;
+
+        ~Digest() = default;
+
+        int Add(unsigned char *Data, size_t Size)
         {
-        private:
-            Scheme _State;
+            return Scheme::Update(&_State, Data, Size);
+        }
 
-        public:
-            Digest()
-            {
-                Scheme::Init(&_State);
-            }
+        int Add(const Iterable::Span<char> Data)
+        {
+            return Scheme::Update(&_State, Data.Content(), Data.Length());
+        }
 
-            Digest(const Digest &Other) = delete;
+        void Bytes(unsigned char *Data)
+        {
+            Scheme::Final(Data, &_State);
+        }
 
-            ~Digest() = default;
+        Iterable::Span<char> Bytes()
+        {
+            Iterable::Span<char> Res(Scheme::Lenght);
 
-            int Add(unsigned char *Data, size_t Size)
-            {
-                return Scheme::Update(&_State, Data, Size);
-            }
+            Scheme::Final(Res.Content(), &_State);
 
-            int Add(const Iterable::Span<char> Data)
-            {
-                return Scheme::Update(&_State, Data.Content(), Data.Length());
-            }
+            return Res;
+        }
 
-            void Bytes(unsigned char *Data)
-            {
-                Scheme::Final(Data, &_State);
-            }
+        // Static funtions
 
-            Iterable::Span<char> Bytes()
-            {
-                Iterable::Span<char> Res(Scheme::Lenght);
+        inline static constexpr size_t Size()
+        {
+            return Scheme::Lenght;
+        }
 
-                Scheme::Final(Res.Content(), &_State);
+        static void Bytes(const unsigned char *Data, size_t Size, unsigned char *Digest)
+        {
+            Scheme::Name(Data, Size, Digest);
+        }
 
-                return Res;
-            }
+        static Iterable::Span<char> Bytes(const unsigned char *Data, size_t Size)
+        {
+            Iterable::Span<char> Res(Scheme::Lenght);
 
-            // Static funtions
+            Scheme::Name(Data, Size, reinterpret_cast<unsigned char *>(Res.Content()));
 
-            inline static constexpr size_t Size()
-            {
-                return Scheme::Lenght;
-            }
+            return Res;
+        }
 
-            static void Bytes(const unsigned char *Data, size_t Size, unsigned char *Digest)
-            {
-                Scheme::Name(Data, Size, Digest);
-            }
+        static Iterable::Span<char> Bytes(const Iterable::Span<char> &Data)
+        {
+            Iterable::Span<char> Res(Scheme::Lenght);
 
-            static Iterable::Span<char> Bytes(const unsigned char *Data, size_t Size)
-            {
-                Iterable::Span<char> Res(Scheme::Lenght);
+            Scheme::Name(reinterpret_cast<const unsigned char *>(Data.Content()), Data.Length(), Res);
 
-                Scheme::Name(Data, Size, reinterpret_cast<unsigned char *>(Res.Content()));
+            return Res;
+        }
 
-                return Res;
-            }
+        // Operators
 
-            static Iterable::Span<char> Bytes(const Iterable::Span<char> &Data)
-            {
-                Iterable::Span<char> Res(Scheme::Lenght);
+        Digest &operator=(const Digest &Other) = delete;
+    };
 
-                Scheme::Name(reinterpret_cast<const unsigned char *>(Data.Content()), Data.Length(), Res);
-
-                return Res;
-            }
-
-            // Operators
-
-            Digest &operator=(const Digest &Other) = delete;
-        };
-
-        // SHA
+    // SHA
 
 #ifndef OPENSSL_NO_SHA1
-        struct SHA1Functionality : Functionality<SHA_CTX>
-        {
-            static constexpr size_t Lenght = SHA_DIGEST_LENGTH;
-            static constexpr TName Name = ::SHA1;
-            static constexpr TInit Init = ::SHA1_Init;
-            static constexpr TUpdate Update = ::SHA1_Update;
-            static constexpr TFinal Final = ::SHA1_Final;
-        };
+    struct SHA1Functionality : Functionality<SHA_CTX>
+    {
+        static constexpr size_t Lenght = SHA_DIGEST_LENGTH;
+        static constexpr TName Name = ::SHA1;
+        static constexpr TInit Init = ::SHA1_Init;
+        static constexpr TUpdate Update = ::SHA1_Update;
+        static constexpr TFinal Final = ::SHA1_Final;
+    };
 
-        typedef Digest<SHA1Functionality> SHA1;
+    typedef Digest<SHA1Functionality> SHA1;
 #endif
 
 #ifndef OPENSSL_NO_SHA224
-        struct SHA224Functionality : Functionality<SHA256_CTX>
-        {
-            static constexpr size_t Lenght = SHA224_DIGEST_LENGTH;
-            static constexpr TName Name = ::SHA224;
-            static constexpr TInit Init = ::SHA224_Init;
-            static constexpr TUpdate Update = ::SHA224_Update;
-            static constexpr TFinal Final = ::SHA224_Final;
-        };
+    struct SHA224Functionality : Functionality<SHA256_CTX>
+    {
+        static constexpr size_t Lenght = SHA224_DIGEST_LENGTH;
+        static constexpr TName Name = ::SHA224;
+        static constexpr TInit Init = ::SHA224_Init;
+        static constexpr TUpdate Update = ::SHA224_Update;
+        static constexpr TFinal Final = ::SHA224_Final;
+    };
 
-        typedef Digest<SHA224Functionality> SHA224;
+    typedef Digest<SHA224Functionality> SHA224;
 #endif
 
 #ifndef OPENSSL_NO_SHA256
-        struct SHA256Functionality : Functionality<SHA256_CTX>
-        {
-            static constexpr size_t Lenght = SHA256_DIGEST_LENGTH;
-            static constexpr TName Name = ::SHA256;
-            static constexpr TInit Init = ::SHA256_Init;
-            static constexpr TUpdate Update = ::SHA256_Update;
-            static constexpr TFinal Final = ::SHA256_Final;
-        };
+    struct SHA256Functionality : Functionality<SHA256_CTX>
+    {
+        static constexpr size_t Lenght = SHA256_DIGEST_LENGTH;
+        static constexpr TName Name = ::SHA256;
+        static constexpr TInit Init = ::SHA256_Init;
+        static constexpr TUpdate Update = ::SHA256_Update;
+        static constexpr TFinal Final = ::SHA256_Final;
+    };
 
-        typedef Digest<SHA256Functionality> SHA256;
+    typedef Digest<SHA256Functionality> SHA256;
 #endif
 
 #ifndef OPENSSL_NO_SHA384
-        struct SHA384Functionality : Functionality<SHA512_CTX>
-        {
-            static constexpr size_t Lenght = SHA384_DIGEST_LENGTH;
-            static constexpr TName Name = ::SHA384;
-            static constexpr TInit Init = ::SHA384_Init;
-            static constexpr TUpdate Update = ::SHA384_Update;
-            static constexpr TFinal Final = ::SHA384_Final;
-        };
+    struct SHA384Functionality : Functionality<SHA512_CTX>
+    {
+        static constexpr size_t Lenght = SHA384_DIGEST_LENGTH;
+        static constexpr TName Name = ::SHA384;
+        static constexpr TInit Init = ::SHA384_Init;
+        static constexpr TUpdate Update = ::SHA384_Update;
+        static constexpr TFinal Final = ::SHA384_Final;
+    };
 
-        typedef Digest<SHA384Functionality> SHA384;
+    typedef Digest<SHA384Functionality> SHA384;
 #endif
 
 #ifndef OPENSSL_NO_SHA512
-        struct SHA512Functionality : Functionality<SHA512_CTX>
-        {
-            static constexpr size_t Lenght = SHA512_DIGEST_LENGTH;
-            static constexpr TName Name = ::SHA512;
-            static constexpr TInit Init = ::SHA512_Init;
-            static constexpr TUpdate Update = ::SHA512_Update;
-            static constexpr TFinal Final = ::SHA512_Final;
-        };
+    struct SHA512Functionality : Functionality<SHA512_CTX>
+    {
+        static constexpr size_t Lenght = SHA512_DIGEST_LENGTH;
+        static constexpr TName Name = ::SHA512;
+        static constexpr TInit Init = ::SHA512_Init;
+        static constexpr TUpdate Update = ::SHA512_Update;
+        static constexpr TFinal Final = ::SHA512_Final;
+    };
 
-        typedef Digest<SHA512Functionality> SHA512;
+    typedef Digest<SHA512Functionality> SHA512;
 #endif
-        // ## MD
+    // ## MD
 
 #ifndef OPENSSL_NO_MD5
-        struct MD5Functionality : Functionality<MD5_CTX>
-        {
-            static constexpr size_t Lenght = MD5_DIGEST_LENGTH;
-            static constexpr TName Name = ::MD5;
-            static constexpr TInit Init = ::MD5_Init;
-            static constexpr TUpdate Update = ::MD5_Update;
-            static constexpr TFinal Final = ::MD5_Final;
-        };
+    struct MD5Functionality : Functionality<MD5_CTX>
+    {
+        static constexpr size_t Lenght = MD5_DIGEST_LENGTH;
+        static constexpr TName Name = ::MD5;
+        static constexpr TInit Init = ::MD5_Init;
+        static constexpr TUpdate Update = ::MD5_Update;
+        static constexpr TFinal Final = ::MD5_Final;
+    };
 
-        typedef Digest<MD5Functionality> MD5;
+    typedef Digest<MD5Functionality> MD5;
 #endif
 
 #ifndef OPENSSL_NO_MD4
-        struct MD4Functionality : Functionality<MD4_CTX>
-        {
-            static constexpr size_t Lenght = MD4_DIGEST_LENGTH;
-            static constexpr TName Name = ::MD4;
-            static constexpr TInit Init = ::MD4_Init;
-            static constexpr TUpdate Update = ::MD4_Update;
-            static constexpr TFinal Final = ::MD4_Final;
-        };
+    struct MD4Functionality : Functionality<MD4_CTX>
+    {
+        static constexpr size_t Lenght = MD4_DIGEST_LENGTH;
+        static constexpr TName Name = ::MD4;
+        static constexpr TInit Init = ::MD4_Init;
+        static constexpr TUpdate Update = ::MD4_Update;
+        static constexpr TFinal Final = ::MD4_Final;
+    };
 
-        typedef Digest<MD4Functionality> MD4;
+    typedef Digest<MD4Functionality> MD4;
 #endif
-    }
 }

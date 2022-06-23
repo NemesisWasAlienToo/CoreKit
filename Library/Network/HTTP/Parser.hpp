@@ -110,7 +110,8 @@ namespace Core::Network::HTTP
                 Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
                 Format::Stream ContinueStream(Temp);
 
-                Temp.Add(ContinueResponse, sizeof(ContinueResponse));
+                // Temp.Copy(ContinueResponse, sizeof(ContinueResponse));
+                Temp.CopyFrom(ContinueResponse, sizeof(ContinueResponse));
 
                 // Send the response
 
@@ -131,7 +132,7 @@ namespace Core::Network::HTTP
                 Client >> Stream;
             }
 
-            auto [Pointer, Size] = Queue.Chunk();
+            auto [Pointer, Size] = Queue.DataChunk();
 
             std::string_view Message{Pointer, Size};
 

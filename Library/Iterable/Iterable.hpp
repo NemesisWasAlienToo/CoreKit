@@ -144,22 +144,22 @@ namespace Core
 
             inline size_t IsFree() noexcept { return _Capacity - _Length; }
 
-            T &First()
+            T &Head()
             {
                 return this->operator[](0);
             }
 
-            T &Last()
+            T &Tail()
             {
                 return this->operator[](_Length - 1);
             }
 
-            T const &First() const
+            T const &Head() const
             {
                 return this->operator[](0);
             }
 
-            T const &Last() const
+            T const &Tail() const
             {
                 return *this[_Length - 1];
             }

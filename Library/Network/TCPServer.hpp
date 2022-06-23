@@ -12,7 +12,7 @@ namespace Core
 {
     namespace Network
     {
-        class TCPServer : public Runnable
+        class TCPServer : public Async::Runnable
         {
         public:
             TCPServer() = default;
@@ -78,12 +78,12 @@ namespace Core
 
             void Run()
             {
-                Runnable::Run();
+                Async::Runnable::Run();
 
                 Pool.Run(
                     [this]
                     {
-                        return Runnable::IsRunning();
+                        return Async::Runnable::IsRunning();
                     });
             }
 
@@ -92,13 +92,13 @@ namespace Core
                 Pool.GetInPool(
                     [this]
                     {
-                        return Runnable::IsRunning();
+                        return Async::Runnable::IsRunning();
                     });
             }
 
             void Stop()
             {
-                Runnable::Stop();
+                Async::Runnable::Stop();
 
                 Pool.Stop();
             }

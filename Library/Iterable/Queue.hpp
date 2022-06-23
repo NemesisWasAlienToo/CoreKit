@@ -1,345 +1,553 @@
 #pragma once
 
+#include <tuple>
+#include <memory>
+#include <initializer_list>
+#include <Iterable/Span.hpp>
 #include <sys/uio.h>
-#include "Iterable/Span.hpp"
-#include "Iterable/Iterable.hpp"
 
-namespace Core
+namespace Core::Iterable
 {
-    namespace Iterable
+    template <typename T>
+    class Queue final
     {
-        template <typename T>
-        class Queue : public Iterable<T>
+    public:
+        // Constructors
+
+        Queue() = default;
+        Queue(size_t Size, bool Growable = true) : _Content(Size), _First(0), _Length(0), _Growable(Growable) {}
+        Queue(std::initializer_list<T> list) : _Content(list), _First(0), _Length(list.size()), _Growable(true) {}
+
+        Queue(Queue const &Other) : _Content(Other._Content), _First(Other._First), _Length(Other._Length), _Growable(Other._Growable) {}
+        Queue(Queue &&Other) : _Content(std::move(Other._Content)), _First(Other._First), _Length(Other._Length), _Growable(Other._Growable)
         {
+            Other._First = 0;
+            Other._Length = 0;
+            Other._Growable = true;
+        }
 
-        protected:
-            // ### Private variables
+        // Operators
 
-            size_t _First = 0;
-
-            // ### Private Functions
-
-            inline T &_ElementAt(size_t Index) override
+        Queue &operator=(Queue const &Other)
+        {
+            if (this != &Other)
             {
-                return this->_Content[(_First + Index) % this->_Capacity];
+                _Content = Other._Content;
+                _First = Other._First;
+                _Length = Other._Length;
+                _Growable = Other._Growable;
             }
 
-            inline const T &_ElementAt(size_t Index) const override
+            return *this;
+        }
+
+        Queue &operator=(Queue &&Other)
+        {
+            if (this != &Other)
             {
-                return this->_Content[(_First + Index) % this->_Capacity];
-            }
+                _Content = std::move(Other._Content);
+                _First = Other._First;
+                _Length = Other._Length;
+                _Growable = Other._Growable;
 
-        public:
-            // ### Constructors
-
-            Queue() = default;
-
-            Queue(size_t Capacity, bool Growable = true) : Iterable<T>(Capacity, Growable), _First(0) {}
-
-            Queue(T *Array, int Count, bool Growable = true) : Iterable<T>(Array, Count, Growable), _First(0) {}
-
-            Queue(const Queue &Other) : Iterable<T>(Other), _First(0) {}
-
-            Queue(Queue &&Other) noexcept : Iterable<T>(std::move(Other)), _First(Other._First)
-            {
                 Other._First = 0;
+                Other._Length = 0;
+                Other._Growable = true;
             }
 
-            Queue(std::initializer_list<T> list) : Iterable<T>(list), _First(0) {}
+            return *this;
+        }
 
-            // ### Destructor
+        T &operator[](size_t Index)
+        {
+            if (Index >= _Length)
+                throw std::out_of_range("Index out of range");
 
-            ~Queue() = default;
+            return _Content.Content()[(_First + Index) % Capacity()];
+        }
 
-            // ### Properties
+        T const &operator[](size_t Index) const
+        {
+            if (Index >= _Length)
+                throw std::out_of_range("Index out of range");
 
-            std::tuple<const T *, size_t> Chunk(size_t Start = 0) const
+            return _Content.Content()[(_First + Index) % Capacity()];
+        }
+
+        // Peroperties
+
+        inline size_t Capacity() const
+        {
+            return _Content.Length();
+        }
+
+        inline size_t Length() const
+        {
+            return _Length;
+        }
+
+        // inline void Length(size_t Lenght)
+        // {
+        //     _Length = Lenght;
+        // }
+
+        inline bool Growable() const
+        {
+            return _Growable;
+        }
+
+        inline void Growable(bool Enable)
+        {
+            _Growable = Enable;
+        }
+
+        inline T *Content()
+        {
+            return _Content.Content();
+        }
+
+        inline T const *Content() const
+        {
+            return _Content.Content();
+        }
+
+        inline bool IsWrapped() const
+        {
+            return _First + _Length > Capacity();
+        }
+
+        inline bool IsEmpty() noexcept { return _Length == 0; }
+
+        inline bool IsFull() noexcept { return _Length == Capacity(); }
+
+        inline size_t IsFree() noexcept { return Capacity() - _Length; }
+
+        // Helper functions
+
+        inline T &Head()
+        {
+            AssertNotEmpty();
+
+            return _Content.Content()[_First];
+        }
+
+        inline T const &Head() const
+        {
+            AssertNotEmpty();
+
+            return _Content.Content()[_First];
+        }
+
+        inline T &Tail()
+        {
+            AssertNotEmpty();
+
+            return _ElementAt(_Length - 1);
+        }
+
+        inline T const &Tail() const
+        {
+            AssertNotEmpty();
+
+            return _ElementAt(_Length - 1);
+        }
+
+        std::tuple<T *, size_t> DataChunk(size_t Start = 0)
+        {
+            return std::make_tuple(&_ElementAt(Start), std::min((Capacity() - ((_First + Start) % Capacity())), _Length - Start));
+        }
+
+        std::tuple<T *, size_t> EmptyChunk(size_t Start = 0)
+        {
+            size_t FirstEmpty = (_First + _Length + Start) % Capacity();
+
+            return std::make_tuple(_Content.Content() + FirstEmpty, _First <= FirstEmpty ? Capacity() - (FirstEmpty) : FirstEmpty - _First);
+        }
+
+        bool DataVector(struct iovec *Vector)
+        {
+            auto [FPointer, FSize] = DataChunk();
+
+            Vector[0].iov_base = reinterpret_cast<void *>(FPointer);
+            Vector[0].iov_len = FSize;
+
+            if (IsWrapped())
             {
-                return std::make_tuple(&_ElementAt(Start), std::min((this->_Capacity - (this->_First + Start)), this->_Length - Start));
+                auto [SPointer, SSize] = DataChunk(FSize);
+
+                Vector[1].iov_base = reinterpret_cast<void *>(SPointer);
+                Vector[1].iov_len = SSize;
+
+                return true;
             }
 
-            // @todo Unit test these
+            return false;
+        }
 
-            std::tuple<T *, size_t> Chunk(size_t Start = 0)
+        bool EmptyVector(struct iovec *Vector)
+        {
+            auto [FPointer, FSize] = EmptyChunk();
+
+            Vector[0].iov_base = reinterpret_cast<void *>(FPointer);
+            Vector[0].iov_len = FSize;
+
+            if (!this->IsEmpty() && this->_First != 0 && this->_First + this->_Length != this->Capacity())
             {
-                return std::make_tuple(&_ElementAt(Start), std::min((this->_Capacity - (this->_First + Start)), this->_Length - Start));
+                auto [SPointer, SSize] = EmptyChunk(FSize);
+
+                Vector[1].iov_base = reinterpret_cast<void *>(SPointer);
+                Vector[1].iov_len = SSize;
+
+                return true;
             }
 
-            std::tuple<T *, size_t> EmptyChunk(size_t Start = 0)
+            return false;
+        }
+
+        // Helper Functions
+
+        void Resize(size_t Size)
+        {
+            // If size is the same and we can realign the content just do it withtout reallocating
+
+            if (Size == Capacity() && Size == this->_Length && !IsWrapped())
             {
-                size_t FirstEmpty = (_First + this->_Length + Start) % this->_Capacity;
-
-                return std::make_tuple(this->_Content + FirstEmpty, _First <= FirstEmpty ? this->_Capacity - (FirstEmpty) : FirstEmpty - this->_First);
-            }
-
-            bool DataVector(struct iovec *Vector)
-            {
-                auto [FPointer, FSize] = Chunk();
-
-                Vector[0].iov_base = reinterpret_cast<void *>(FPointer);
-                Vector[0].iov_len = FSize;
-
-                if (IsWrapped())
+                for (size_t i = 0; i < this->_Length; i++)
                 {
-                    auto [SPointer, SSize] = Chunk(FSize);
+                    // Because it will not wrap around we can ignore modulo indexing
 
-                    Vector[1].iov_base = reinterpret_cast<void *>(SPointer);
-                    Vector[1].iov_len = SSize;
-
-                    return true;
+                    this->_Content[i] = std::move(this->_Content[this->_First + i]);
                 }
-
-                return false;
             }
-
-            bool EmptyVector(struct iovec *Vector)
+            else
             {
-                auto [FPointer, FSize] = EmptyChunk();
+                // Allocate new buffer
 
-                Vector[0].iov_base = reinterpret_cast<void *>(FPointer);
-                Vector[0].iov_len = FSize;
+                auto NewContent = Span<T>(Size);
 
-                if (!this->IsEmpty() && this->_First != 0 && this->_First + this->_Length != this->_Capacity)
-                {
-                    auto [SPointer, SSize] = EmptyChunk(FSize);
-
-                    Vector[1].iov_base = reinterpret_cast<void *>(SPointer);
-                    Vector[1].iov_len = SSize;
-
-                    return true;
-                }
-
-                return false;
-            }
-
-            template<typename ...TArgs>
-            void Construct(TArgs &&...Args)
-            {
-                if (this->_Length == this->_Capacity)
-                    this->_IncreaseCapacity();
-
-                std::construct_at(&_ElementAt(this->_Length), std::forward<TArgs>(Args)...);
-                this->_Length++;
-            }
-
-            void Add(T &&Item)
-            {
-                this->_IncreaseCapacity();
-
-                _ElementAt(this->_Length) = std::move(Item);
-                (this->_Length)++;
-            }
-
-            void Add(const T &Item)
-            {
-                this->_IncreaseCapacity();
-
-                _ElementAt(this->_Length) = Item;
-                (this->_Length)++;
-            }
-
-            void Add(T *Items, size_t Count)
-            {
-                this->_IncreaseCapacity(Count);
+                // Copy old content to new buffer
 
                 size_t Index = 0;
+                size_t Size = 0;
 
-                while (Index < Count)
+                while (Index < _Length)
                 {
-                    auto [Pointer, Size] = EmptyChunk();
+                    auto [Pointer, _Size] = DataChunk(Size);
 
-                    Size = std::min(Size, Count);
+                    Size = std::min(_Size, _Length);
 
                     for (size_t i = 0; i < Size; i++)
                     {
-                        Pointer[i] = std::move(Items[Index++]);
+                        NewContent[Index++] = std::move(Pointer[i]);
                     }
                 }
 
-                this->_Length += Count;
+                _Content = std::move(NewContent);
             }
 
-            void Add(const T *Items, size_t Count)
+            _First = 0;
+        }
+
+        void IncreaseCapacity(size_t Minimum = 1)
+        {
+            if (IsFree() >= Minimum)
+                return;
+
+            if (!_Growable)
+                throw std::out_of_range("");
+
+            Resize(_CalculateNewSize(Minimum - (Capacity() - _Length)));
+        }
+
+        inline void AdvanceHead(size_t Count = 1)
+        {
+            _Length -= Count;
+            _First = (_First + Count) % Capacity();
+        }
+
+        inline void AdvanceTail(size_t Count = 1)
+        {
+            _Length += Count;
+        }
+
+        // Iteration functions
+
+        template <class TCallback>
+        void ForEach(TCallback Action)
+        {
+            size_t Index = 0;
+
+            while (Index < _Length)
             {
-                this->_IncreaseCapacity(Count);
+                auto [Pointer, Size] = DataChunk(Index);
 
-                size_t Index = 0;
-
-                while (Index < Count)
+                for (size_t i = 0; i < Size; i++)
                 {
-                    auto [Pointer, Size] = EmptyChunk();
+                    Action(Pointer[i]);
+                }
 
-                    Size = std::min(Size, Count);
+                Index += Size;
+            }
+        }
 
-                    for (size_t i = 0; i < Size; i++)
+        template <class TCallback>
+        void ForEach(TCallback Action) const
+        {
+            size_t Index = 0;
+
+            while (Index < _Length)
+            {
+                auto [Pointer, Size] = DataChunk(Index);
+
+                for (size_t i = 0; i < Size; i++)
+                {
+                    Action(Pointer[i]);
+                }
+
+                Index += Size;
+            }
+        }
+
+        template <typename TCallback>
+        std::optional<size_t> Contains(TCallback Callback) const
+        {
+            size_t Index = 0;
+
+            while (Index < _Length)
+            {
+                auto [Pointer, Size] = DataChunk();
+
+                for (size_t i = 0; i < Size; i++)
+                {
+                    if (Callback(Pointer[i]))
+                        return i;
+                }
+
+                Index += Size;
+            }
+
+            return std::nullopt;
+        }
+
+        // Adding functionality
+
+        template <typename... TArgs>
+        void Add(TArgs &&...Args)
+        {
+            IncreaseCapacity();
+
+            std::construct_at(&_ElementAt(_Length++), std::forward<TArgs>(Args)...);
+        }
+
+        template <class TCallback>
+        void AddRange(size_t Count, TCallback Action)
+        {
+            IncreaseCapacity(Count);
+
+            size_t Index = 0;
+
+            while (Index < Count)
+            {
+                auto [Pointer, Size] = EmptyChunk(Index);
+
+                for (size_t i = 0; i < Size && Index < Count; i++)
+                {
+                    Action(Pointer[i], Index++);
+                }
+            }
+
+            AdvanceTail(Count);
+        }
+
+        void MoveFrom(T *Data, size_t Count)
+        {
+            IncreaseCapacity(Count);
+
+            size_t Index = 0;
+
+            while (Index < Count)
+            {
+                auto [Pointer, Size] = EmptyChunk(Index);
+
+                for (size_t i = 0; i < Size && Index < Count; i++)
+                {
+                    std::construct_at(&Pointer[i], std::move(Data[Index++]));
+                }
+            }
+
+            AdvanceTail(Count);
+        }
+
+        void CopyFrom(T const *Data, size_t Count)
+        {
+            IncreaseCapacity(Count);
+
+            size_t Index = 0;
+
+            while (Index < Count)
+            {
+                auto [Pointer, Size] = EmptyChunk(Index);
+
+                for (size_t i = 0; i < Size && Index < Count; i++)
+                {
+                    Pointer[i] = Data[Index++];
+                }
+            }
+
+            AdvanceTail(Count);
+        }
+
+        // Take functionality
+
+        T Take()
+        {
+            T Item = std::move(Head());
+
+            AdvanceHead();
+
+            return Item;
+        }
+
+        template <typename TCallback>
+        void TakeRange(size_t Count, TCallback Callback)
+        {
+            if (Count > IsFree())
+                throw std::out_of_range("Take count exceeds the available data");
+
+            size_t Index = 0;
+
+            while (Index < Count)
+            {
+                auto [Pointer, Size] = DataChunk(Index);
+
+                for (size_t i = 0; i < Size && Index < Count; i++)
+                {
+                    Callback(Pointer[i], Index++);
+                }
+            }
+
+            AdvanceHead(Count);
+        }
+
+        void MoveTo(T *Data, size_t Count)
+        {
+            if (Count > IsFree())
+                throw std::out_of_range("Take count exceeds the available data");
+
+            size_t Index = 0;
+
+            while (Index < Count)
+            {
+                auto [Pointer, Size] = DataChunk(Index);
+
+                for (size_t i = 0; i < Size && Index < Count; i++)
+                {
+                    Data[Index++] = std::move(Pointer[i]);
+                }
+            }
+
+            AdvanceHead(Count);
+        }
+
+        void CopyTo(T *Data, size_t Count)
+        {
+            if (Count > IsFree())
+                throw std::out_of_range("Take count exceeds the available data");
+
+            size_t Index = 0;
+
+            while (Index < Count)
+            {
+                auto [Pointer, Size] = DataChunk(Index);
+
+                for (size_t i = 0; i < Size && Index < Count; i++)
+                {
+                    Data[Index++] = Pointer[i];
+                }
+            }
+
+            // @todo What shold i do about this?
+
+            // AdvanceHead(Count);
+        }
+
+        // Remove functionality
+
+        void Pop()
+        {
+            std::destroy_at(std::addressof(Head()));
+
+            AdvanceHead();
+        }
+
+        void Free()
+        {
+            if constexpr (!std::is_trivially_destructible_v<T>)
+            {
+                ForEach(
+                    [](T &Item)
                     {
-                        Pointer[i] = Items[Index++];
-                    }
-                }
-
-                this->_Length += Count;
+                        std::destroy_at(&Item);
+                    });
             }
 
-            inline T &First()
+            this->_Length = 0;
+            this->_First = 0;
+        }
+
+        // @todo Optimize this later
+
+        void Free(size_t Count)
+        {
+            if (this->_Length < Count)
+                throw std::out_of_range("");
+
+            if constexpr (!std::is_trivially_destructible_v<T>)
             {
-                return _ElementAt(0);
-            }
-
-            inline T const &First() const
-            {
-                return _ElementAt(0);
-            }
-
-            // ### Public Functions
-
-            inline bool IsWrapped() const
-            {
-                return this->_First + this->_Length > this->_Capacity;
-            }
-
-            void Resize(size_t Size) override
-            {
-                // Only if the capacity is the same and buffer did not wrap around
-
-                if (Size == this->_Length && !IsWrapped())
-                {
-                    for (size_t i = 0; i < this->_Length; i++)
-                    {
-                        // Because it will not wrap around we can ignore modulo indexing
-
-                        this->_Content[i] = std::move(this->_Content[this->_First + i]);
-                    }
-                }
-                else
-                {
-                    Iterable<T>::Resize(Size);
-                }
-
-                _First = 0;
-            }
-
-            // due to a bug in gcc, if optimization flags are present
-            // this function will act in an undefined manner
-
-            // void Pop()
-            // {
-            //     if (this->IsEmpty())
-            //         throw std::out_of_range("");
-
-            //     std::destroy_at(&First());
-
-            //     _First = (_First + 1) % this->_Capacity;
-            //     this->_Length--;
-            // }
-
-            void Take(T &Item)
-            {
-                if (this->IsEmpty())
-                    throw std::out_of_range("");
-
-                Item = std::move(_ElementAt(0)); // OK?
-                this->_Length--;
-                _First = (_First + 1) % this->_Capacity;
-            }
-
-            // @todo Optimize this
-
-            T Take()
-            {
-                T Item;
-                Take(Item);
-                return Item;
-            }
-
-            void Take(T *Items, size_t Count)
-            {
-                if (this->_Length < Count)
-                    throw std::out_of_range("");
+                // @todo Optimize this
 
                 for (size_t i = 0; i < Count; i++)
                 {
-                    Items[i] = std::move(_ElementAt(i));
-                }
-
-                _First = (_First + Count) % this->_Capacity;
-                this->_Length -= Count;
-            }
-
-            void Free()
-            {
-                if constexpr (!std::is_arithmetic<T>::value)
-                {
-                    for (size_t i = 0; i < this->_Length; i++)
-                    {
-                        _ElementAt(i).~T();
-                    }
-                }
-
-                this->_Length = 0;
-                this->_First = 0;
-            }
-
-            void Free(size_t Count)
-            {
-                if (this->_Length < Count)
-                    throw std::out_of_range("");
-
-                if constexpr (!std::is_arithmetic<T>::value)
-                {
-                    for (size_t i = 0; i < Count; i++)
-                    {
-                        _ElementAt(i).~T();
-                    }
-                }
-
-                this->_Length -= Count;
-
-                if (this->_Length == 0)
-                {
-                    this->_First = 0;
-                }
-                else
-                {
-                    _First = (_First + Count) % this->_Capacity;
+                    std::destroy_at(&_ElementAt(i));
                 }
             }
 
-            void Rewind(size_t Steps)
-            {
-                if constexpr (std::is_integral_v<T>)
-                {
-                    throw std::runtime_error("You cannot rewind an unitegral queue.");
-                }
+            this->_Length -= Count;
 
-                if (this->_Capacity < Steps)
-                    throw std::out_of_range("");
+            this->_First = this->_Length == 0 ? 0 : (_First + Count) % this->Capacity();
+        }
 
-                _First = (this->_Capacity - Steps + _First) % this->_Capacity;
+    private:
+        Core::Iterable::Span<T> _Content;
+        size_t _First = 0;
+        size_t _Length = 0;
+        bool _Growable = true;
 
-                this->_Length += Steps;
-            }
+        inline void AssertNotEmpty()
+        {
+            if (IsEmpty())
+                throw std::out_of_range("Instance is empty");
+        }
 
-            // ### Operators
+        inline void AssertIndex(size_t Index)
+        {
+            if (Index >= _Length)
+                throw std::out_of_range("Index out of range");
+        }
 
-            Queue &operator=(const Queue &Other) = default;
+        inline T &_ElementAt(size_t Index)
+        {
+            return this->_Content[(_First + Index) % Capacity()];
+        }
 
-            Queue &operator=(Queue &&Other) noexcept = default;
+        inline const T &_ElementAt(size_t Index) const
+        {
+            return this->_Content[(_First + Index) % Capacity()];
+        }
 
-            T &operator[](const size_t &Index)
-            {
-                if (Index >= this->_Length)
-                    throw std::out_of_range("");
-
-                return _ElementAt(Index);
-            }
-
-            Queue &operator>>(T &Item)
-            {
-
-                Item = Take();
-
-                return *this;
-            }
-        };
-    }
+        inline size_t _CalculateNewSize(size_t Minimum)
+        {
+            return (Capacity() * 2) + Minimum;
+        }
+    };
 }

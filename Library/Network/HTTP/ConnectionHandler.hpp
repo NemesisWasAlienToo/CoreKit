@@ -70,14 +70,15 @@ namespace Core
                     Response.Headers.insert_or_assign("Content-Length", std::to_string(HasFile ? FileLength : StringLength));
                     Response.Headers.insert_or_assign("Host", CTServer.Settings.HostName);
 
-                    OBuffer.Construct(
+                    OBuffer.Add(
+                    // OBuffer.Construct(
                         Iterable::Queue<char>(CTServer.Settings.RequestBufferSize),
                         // @todo Remove pointer
                         HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
                         FileLength,
                         UseSendFile);
 
-                    Format::Stream Ser(OBuffer.Last().Buffer);
+                    Format::Stream Ser(OBuffer.Tail().Buffer);
 
                     Ser << Response;
                 }
@@ -190,19 +191,19 @@ namespace Core
 
                         ShouldClose = true;
                     }
-                    // catch (HTTP::Status const Method)
-                    // {
-                    //     auto Response = HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, "");
+                    catch (HTTP::Status Method)
+                    {
+                        auto Response = HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, "");
 
-                    //     // if (CTServer.Settings.OnError)
-                    //     //     CTServer.Settings.OnError(Target, Response, Loop->Storage);
+                        // if (CTServer.Settings.OnError)
+                        //     CTServer.Settings.OnError(Target, Response, Loop->Storage);
 
-                    //     AppendResponse(Response);
+                        AppendResponse(Response);
 
-                    //     Loop->Modify(Self, ShouldClose ? ePoll::Out : ePoll::In | ePoll::Out);
+                        Loop->Modify(Self, ShouldClose ? ePoll::Out : ePoll::In | ePoll::Out);
 
-                    //     ShouldClose = true;
-                    // }
+                        ShouldClose = true;
+                    }
                 }
 
                 void OnWrite(Async::EventLoop *Loop, ePoll::Entry &, Async::EventLoop::Entry &Self)
@@ -225,7 +226,7 @@ namespace Core
                         return;
                     }
 
-                    auto &Item = OBuffer.First();
+                    auto &Item = OBuffer.Head();
                     Format::Stream Ser(Item.Buffer);
 
                     // Append file content
