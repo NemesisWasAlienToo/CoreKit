@@ -2,14 +2,13 @@
 
 #include <tuple>
 #include <initializer_list>
-#include <Iterable/Span.hpp>
 #include <sys/uio.h>
 
 #include <Iterable/MemoryHolder.hpp>
 
 namespace Core::Iterable
 {
-    template <typename T>
+    template <typename T, typename TAllocator = std::allocator<T>>
     class Queue final
     {
     public:
@@ -447,7 +446,7 @@ namespace Core::Iterable
 
                 for (size_t i = 0; i < Size && Index < Count; i++)
                 {
-                    Pointer[i] = Data[Index++];
+                    std::construct_at(&Pointer[i], Data[Index++]);
                 }
             }
 
@@ -559,7 +558,7 @@ namespace Core::Iterable
         }
 
     private:
-        Core::Iterable::MemoryHolder<T> _Content;
+        Core::Iterable::MemoryHolder<T, TAllocator> _Content;
         size_t _First = 0;
         size_t _Length = 0;
 

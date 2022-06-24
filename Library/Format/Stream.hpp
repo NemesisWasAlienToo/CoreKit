@@ -84,17 +84,6 @@ namespace Core::Format
             return *this;
         }
 
-        template <typename TValue>
-        Stream &operator<<(const Iterable::Iterable<TValue> &Value)
-        {
-            for (size_t i = 0; i < Value.Length(); i++)
-            {
-                *this << Value[i];
-            }
-
-            return *this;
-        }
-
         // @todo Remove this after unifiying iterable and span
 
         template <typename TValue>

@@ -129,8 +129,7 @@ public:
     {
         using T = Route<TSigniture, Group>;
 
-        // Routes.Add(
-        Routes.Construct(
+        Routes.Add(
             Method,
             [CB = std::forward<TCallback>(Callback)](std::string_view Path, TArgs &&...Args)
             {
