@@ -1,10 +1,11 @@
 #pragma once
 
 #include <tuple>
-#include <memory>
 #include <initializer_list>
 #include <Iterable/Span.hpp>
 #include <sys/uio.h>
+
+#include <Iterable/MemoryHolder.hpp>
 
 namespace Core::Iterable
 {
@@ -16,14 +17,37 @@ namespace Core::Iterable
 
         Queue() = default;
         Queue(size_t Size, bool Growable = true) : _Content(Size), _First(0), _Length(0), _Growable(Growable) {}
-        Queue(std::initializer_list<T> list) : _Content(list), _First(0), _Length(list.size()), _Growable(true) {}
+        Queue(std::initializer_list<T> list) : _Content(list.size()), _First(0), _Length(list.size()), _Growable(true)
+        {
+            for (auto &Item : list)
+                Add(Item);
+        }
 
-        Queue(Queue const &Other) : _Content(Other._Content), _First(Other._First), _Length(Other._Length), _Growable(Other._Growable) {}
+        Queue(Queue const &Other) : _Content(Other._Content), _First(0), _Length(Other._Length), _Growable(Other._Growable)
+        {
+            size_t Index = 0;
+
+            while (Index < _Length)
+            {
+                auto [Pointer, Size] = Other.DataChunk(Index);
+
+                for (size_t i = 0; i < Size; i++)
+                {
+                    _Content[Index++] = Pointer[i];
+                }
+            }
+        }
+
         Queue(Queue &&Other) : _Content(std::move(Other._Content)), _First(Other._First), _Length(Other._Length), _Growable(Other._Growable)
         {
             Other._First = 0;
             Other._Length = 0;
             Other._Growable = true;
+        }
+
+        ~Queue()
+        {
+            Free();
         }
 
         // Operators
@@ -33,9 +57,21 @@ namespace Core::Iterable
             if (this != &Other)
             {
                 _Content = Other._Content;
-                _First = Other._First;
+                _First = 0;
                 _Length = Other._Length;
                 _Growable = Other._Growable;
+
+                size_t Index = 0;
+
+                while (Index < _Length)
+                {
+                    auto [Pointer, Size] = Other.DataChunk(Index);
+
+                    for (size_t i = 0; i < Size; i++)
+                    {
+                        _Content[Index++] = Pointer[i];
+                    }
+                }
             }
 
             return *this;
@@ -63,7 +99,7 @@ namespace Core::Iterable
             if (Index >= _Length)
                 throw std::out_of_range("Index out of range");
 
-            return _Content.Content()[(_First + Index) % Capacity()];
+            return _Content[(_First + Index) % Capacity()];
         }
 
         T const &operator[](size_t Index) const
@@ -71,7 +107,7 @@ namespace Core::Iterable
             if (Index >= _Length)
                 throw std::out_of_range("Index out of range");
 
-            return _Content.Content()[(_First + Index) % Capacity()];
+            return _Content[(_First + Index) % Capacity()];
         }
 
         // Peroperties
@@ -85,11 +121,6 @@ namespace Core::Iterable
         {
             return _Length;
         }
-
-        // inline void Length(size_t Lenght)
-        // {
-        //     _Length = Lenght;
-        // }
 
         inline bool Growable() const
         {
@@ -116,11 +147,11 @@ namespace Core::Iterable
             return _First + _Length > Capacity();
         }
 
-        inline bool IsEmpty() noexcept { return _Length == 0; }
+        inline bool IsEmpty() const noexcept { return _Length == 0; }
 
-        inline bool IsFull() noexcept { return _Length == Capacity(); }
+        inline bool IsFull() const noexcept { return _Length == Capacity(); }
 
-        inline size_t IsFree() noexcept { return Capacity() - _Length; }
+        inline size_t IsFree() const noexcept { return Capacity() - _Length; }
 
         // Helper functions
 
@@ -128,14 +159,14 @@ namespace Core::Iterable
         {
             AssertNotEmpty();
 
-            return _Content.Content()[_First];
+            return _Content[_First];
         }
 
         inline T const &Head() const
         {
             AssertNotEmpty();
 
-            return _Content.Content()[_First];
+            return _Content[_First];
         }
 
         inline T &Tail()
@@ -157,11 +188,23 @@ namespace Core::Iterable
             return std::make_tuple(&_ElementAt(Start), std::min((Capacity() - ((_First + Start) % Capacity())), _Length - Start));
         }
 
+        std::tuple<T const *, size_t> DataChunk(size_t Start = 0) const
+        {
+            return std::make_tuple(&_ElementAt(Start), std::min((Capacity() - ((_First + Start) % Capacity())), _Length - Start));
+        }
+
         std::tuple<T *, size_t> EmptyChunk(size_t Start = 0)
         {
             size_t FirstEmpty = (_First + _Length + Start) % Capacity();
 
-            return std::make_tuple(_Content.Content() + FirstEmpty, _First <= FirstEmpty ? Capacity() - (FirstEmpty) : FirstEmpty - _First);
+            return std::make_tuple(&_Content[FirstEmpty], _First <= FirstEmpty ? Capacity() - (FirstEmpty) : _First - FirstEmpty);
+        }
+
+        std::tuple<T const *, size_t> EmptyChunk(size_t Start = 0) const
+        {
+            size_t FirstEmpty = (_First + _Length + Start) % Capacity();
+
+            return std::make_tuple(&_Content[FirstEmpty], _First <= FirstEmpty ? Capacity() - (FirstEmpty) : _First - FirstEmpty);
         }
 
         bool DataVector(struct iovec *Vector)
@@ -206,45 +249,47 @@ namespace Core::Iterable
 
         // Helper Functions
 
+        bool Realign()
+        {
+            if (IsWrapped())
+                return false;
+
+            for (size_t i = 0; i < this->_Length; i++)
+            {
+                // Because it will not wrap around we can ignore modulo indexing
+
+                this->_Content[i] = std::move(this->_Content[this->_First + i]);
+            }
+
+            _First = 0;
+
+            return true;
+        }
+
         void Resize(size_t Size)
         {
             // If size is the same and we can realign the content just do it withtout reallocating
 
-            if (Size == Capacity() && Size == this->_Length && !IsWrapped())
-            {
-                for (size_t i = 0; i < this->_Length; i++)
-                {
-                    // Because it will not wrap around we can ignore modulo indexing
+            if (Size == Capacity() && Realign())
+                return;
 
-                    this->_Content[i] = std::move(this->_Content[this->_First + i]);
+            auto NewContent = MemoryHolder<T>(Size);
+
+            // Copy old content to new buffer
+
+            size_t Index = 0;
+
+            while (Index < _Length)
+            {
+                auto [Pointer, _Size] = DataChunk(Index);
+
+                for (size_t i = 0; i < _Size; i++)
+                {
+                    std::construct_at(&NewContent[Index++], std::move(Pointer[i]));
                 }
             }
-            else
-            {
-                // Allocate new buffer
 
-                auto NewContent = Span<T>(Size);
-
-                // Copy old content to new buffer
-
-                size_t Index = 0;
-                size_t Size = 0;
-
-                while (Index < _Length)
-                {
-                    auto [Pointer, _Size] = DataChunk(Size);
-
-                    Size = std::min(_Size, _Length);
-
-                    for (size_t i = 0; i < Size; i++)
-                    {
-                        NewContent[Index++] = std::move(Pointer[i]);
-                    }
-                }
-
-                _Content = std::move(NewContent);
-            }
-
+            _Content = std::move(NewContent);
             _First = 0;
         }
 
@@ -271,6 +316,38 @@ namespace Core::Iterable
         }
 
         // Iteration functions
+
+        template <class TCallback>
+        void For(TCallback Action)
+        {
+            size_t Index = 0;
+
+            while (Index < _Length)
+            {
+                auto [Pointer, Size] = DataChunk(Index);
+
+                for (size_t i = 0; i < Size; i++)
+                {
+                    Action(Pointer[i], Index++);
+                }
+            }
+        }
+
+        template <class TCallback>
+        void For(TCallback Action) const
+        {
+            size_t Index = 0;
+
+            while (Index < _Length)
+            {
+                auto [Pointer, Size] = DataChunk(Index);
+
+                for (size_t i = 0; i < Size; i++)
+                {
+                    Action(Pointer[i], Index++);
+                }
+            }
+        }
 
         template <class TCallback>
         void ForEach(TCallback Action)
@@ -315,7 +392,7 @@ namespace Core::Iterable
 
             while (Index < _Length)
             {
-                auto [Pointer, Size] = DataChunk();
+                auto [Pointer, Size] = DataChunk(Index);
 
                 for (size_t i = 0; i < Size; i++)
                 {
@@ -337,26 +414,6 @@ namespace Core::Iterable
             IncreaseCapacity();
 
             std::construct_at(&_ElementAt(_Length++), std::forward<TArgs>(Args)...);
-        }
-
-        template <class TCallback>
-        void AddRange(size_t Count, TCallback Action)
-        {
-            IncreaseCapacity(Count);
-
-            size_t Index = 0;
-
-            while (Index < Count)
-            {
-                auto [Pointer, Size] = EmptyChunk(Index);
-
-                for (size_t i = 0; i < Size && Index < Count; i++)
-                {
-                    Action(Pointer[i], Index++);
-                }
-            }
-
-            AdvanceTail(Count);
         }
 
         void MoveFrom(T *Data, size_t Count)
@@ -408,27 +465,6 @@ namespace Core::Iterable
             return Item;
         }
 
-        template <typename TCallback>
-        void TakeRange(size_t Count, TCallback Callback)
-        {
-            if (Count > IsFree())
-                throw std::out_of_range("Take count exceeds the available data");
-
-            size_t Index = 0;
-
-            while (Index < Count)
-            {
-                auto [Pointer, Size] = DataChunk(Index);
-
-                for (size_t i = 0; i < Size && Index < Count; i++)
-                {
-                    Callback(Pointer[i], Index++);
-                }
-            }
-
-            AdvanceHead(Count);
-        }
-
         void MoveTo(T *Data, size_t Count)
         {
             if (Count > IsFree())
@@ -475,7 +511,7 @@ namespace Core::Iterable
 
         void Pop()
         {
-            std::destroy_at(std::addressof(Head()));
+            std::destroy_at(&Head());
 
             AdvanceHead();
         }
@@ -504,11 +540,16 @@ namespace Core::Iterable
 
             if constexpr (!std::is_trivially_destructible_v<T>)
             {
-                // @todo Optimize this
+                size_t Index = 0;
 
-                for (size_t i = 0; i < Count; i++)
+                while (Index < Count)
                 {
-                    std::destroy_at(&_ElementAt(i));
+                    auto [Pointer, Size] = DataChunk(Index);
+
+                    for (size_t i = 0; i < Size && Index < Count; i++, Index++)
+                    {
+                        std::destroy_at(&Pointer[i]);
+                    }
                 }
             }
 
@@ -518,9 +559,11 @@ namespace Core::Iterable
         }
 
     private:
-        Core::Iterable::Span<T> _Content;
+        Core::Iterable::MemoryHolder<T> _Content;
         size_t _First = 0;
         size_t _Length = 0;
+
+        // @todo Seperate Queue from fixedQueue
         bool _Growable = true;
 
         inline void AssertNotEmpty()

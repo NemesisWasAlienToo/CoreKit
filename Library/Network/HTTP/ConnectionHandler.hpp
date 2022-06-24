@@ -191,19 +191,19 @@ namespace Core
 
                         ShouldClose = true;
                     }
-                    catch (HTTP::Status Method)
-                    {
-                        auto Response = HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, "");
+                    // catch (HTTP::Status Method)
+                    // {
+                    //     auto Response = HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, "");
 
-                        // if (CTServer.Settings.OnError)
-                        //     CTServer.Settings.OnError(Target, Response, Loop->Storage);
+                    //     if (CTServer.Settings.OnError)
+                    //         CTServer.Settings.OnError(Target, Response, Loop->Storage);
 
-                        AppendResponse(Response);
+                    //     AppendResponse(Response);
 
-                        Loop->Modify(Self, ShouldClose ? ePoll::Out : ePoll::In | ePoll::Out);
+                    //     Loop->Modify(Self, ShouldClose ? ePoll::Out : ePoll::In | ePoll::Out);
 
-                        ShouldClose = true;
-                    }
+                    //     ShouldClose = true;
+                    // }
                 }
 
                 void OnWrite(Async::EventLoop *Loop, ePoll::Entry &, Async::EventLoop::Entry &Self)

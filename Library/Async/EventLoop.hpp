@@ -149,8 +149,8 @@ namespace Core::Async
 
         void Remove(Container::iterator Iterator)
         {
-            RemoveHandler(Iterator);
             Wheel.Remove(Iterator->Timer);
+            RemoveHandler(Iterator);
         }
 
         void Modify(Entry &Self, ePoll::Event Events)

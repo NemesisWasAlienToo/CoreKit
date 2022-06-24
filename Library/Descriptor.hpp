@@ -42,11 +42,9 @@ namespace Core
         Descriptor(int Handler) : _INode(Handler) {}
 
         Descriptor(Descriptor const &) = delete;
-        Descriptor(Descriptor &&Other) noexcept
+        Descriptor(Descriptor &&Other) noexcept : _INode(Other._INode)
         {
-            std::swap(_INode, Other._INode);
-
-            Other.Close();
+            Other._INode = -1;
         }
 
         virtual ~Descriptor()
@@ -245,21 +243,12 @@ namespace Core
 
             int Result = close(_INode);
 
-            // @todo This should be moved after error checking in order to be able to
-            // read the correct inode in the case of an exception
-            // but due to gcc's bug it's here for now
-
-            _INode = -1;
-            
-            // Error handling here
-
             if (Result < 0)
             {
                 throw std::system_error(errno, std::generic_category());
             }
 
-            // @todo the actual invalidation must happen here
-            // _INode = -1;
+            _INode = -1;
         }
 
         ssize_t SendFile(Descriptor const &Other, size_t Size, off_t Offset) const
@@ -308,8 +297,9 @@ namespace Core
         {
             if (this != &Other)
             {
-                std::swap(_INode, Other._INode);
-                Other.Close();
+                Close();
+                _INode = Other._INode;
+                Other._INode = -1;
             }
 
             return *this;

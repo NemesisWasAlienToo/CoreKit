@@ -83,11 +83,6 @@ namespace Core
             _INode = epoll_create1(Flags);
         }
 
-        ~ePoll()
-        {
-            Close();
-        }
-
         void Add(const Descriptor &descriptor, uint32_t Events, uint64_t Data)
         {
             Entry _Entry = Entry::From(Data, Events);
