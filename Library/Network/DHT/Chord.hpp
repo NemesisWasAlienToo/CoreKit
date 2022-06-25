@@ -132,16 +132,16 @@ namespace Core
 
                     auto &Neighbor = Entries[NeighborHood];
 
-                    size_t Index;
-
-                    if (Neighbor.ContainsWhere(
-                            Index,
+                    if (auto Index = Neighbor.Contains(
                             [&node](const Node &Item)
                             {
                                 return Item.EndPoint == node.EndPoint;
                             }))
                     {
-                        Neighbor.Remove(Index);
+                        // For now just swap it with the last element
+
+                        Neighbor[Index.value()] = Neighbor.Take();
+
                         return true;
                     }
 
@@ -170,20 +170,20 @@ namespace Core
 
                 bool Remove(const EndPoint &endPoint)
                 {
-                    size_t Index;
-
                     for (size_t i = 0; i < Entries.Length(); i++)
                     {
                         auto &Neighbor = Entries[i];
 
-                        if (Neighbor.ContainsWhere(
-                                Index,
-                                [&endPoint](Node &Item)
+                        if (auto Index = Neighbor.Contains(
+                                [&endPoint](Node const &Item)
                                 {
                                     return Item.EndPoint == endPoint;
                                 }))
                         {
-                            Neighbor.Remove(Index);
+                            // For now just swap it with the last element
+
+                            Neighbor[Index.value()] = Neighbor.Take();
+
                             return true;
                         }
                     }
@@ -229,7 +229,7 @@ namespace Core
                 void ForEach(TCallback Callback)
                 {
                     // Lock here
-                    
+
                     for (size_t i = 1; i < Entries.Length(); i++)
                     {
                         Callback(Entries[i]);

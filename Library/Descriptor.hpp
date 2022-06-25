@@ -13,6 +13,7 @@
 #include <algorithm>
 
 #include <Iterable/Span.hpp>
+#include <Format/Serializer.hpp>
 
 namespace Core
 {
@@ -330,6 +331,23 @@ namespace Core
         }
 
         // Stream operators
+
+        friend Format::Serializer &operator>>(Format::Serializer &Ser, Descriptor const &descriptor)
+        {
+            size_t Read = 0;
+            struct iovec Vectors[2];
+            Ser.Queue.IncreaseCapacity(descriptor.Received());
+
+            do
+            {
+                Read = descriptor.Read(Vectors, 1 + Ser.Queue.EmptyVector(Vectors));
+
+                Ser.Queue.AdvanceTail(Read);
+
+            } while (Read);
+
+            return Ser;
+        }
     };
 }
 

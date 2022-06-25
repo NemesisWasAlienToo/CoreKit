@@ -1,6 +1,8 @@
 #pragma once
 
 #include <tuple>
+#include <memory>
+#include <optional>
 #include <initializer_list>
 #include <sys/uio.h>
 
@@ -32,7 +34,7 @@ namespace Core::Iterable
 
                 for (size_t i = 0; i < Size; i++)
                 {
-                    _Content[Index++] = Pointer[i];
+                    std::construct_at(&_Content[Index++], Pointer[i]);
                 }
             }
         }
@@ -385,7 +387,7 @@ namespace Core::Iterable
         }
 
         template <typename TCallback>
-        std::optional<size_t> Contains(TCallback Callback) const
+        std::optional<size_t> Contains(TCallback Condition) const
         {
             size_t Index = 0;
 
@@ -395,7 +397,7 @@ namespace Core::Iterable
 
                 for (size_t i = 0; i < Size; i++)
                 {
-                    if (Callback(Pointer[i]))
+                    if (Condition(Pointer[i]))
                         return i;
                 }
 
@@ -466,7 +468,7 @@ namespace Core::Iterable
 
         void MoveTo(T *Data, size_t Count)
         {
-            if (Count > IsFree())
+            if (Count > _Length)
                 throw std::out_of_range("Take count exceeds the available data");
 
             size_t Index = 0;
@@ -486,7 +488,7 @@ namespace Core::Iterable
 
         void CopyTo(T *Data, size_t Count)
         {
-            if (Count > IsFree())
+            if (Count > _Length)
                 throw std::out_of_range("Take count exceeds the available data");
 
             size_t Index = 0;

@@ -33,22 +33,22 @@ namespace Core
                 return *reinterpret_cast<TReturn *>(&Descriptor);
             }
 
-            _FORCE_INLINE inline bool HasEvent()
+            inline bool HasEvent()
             {
                 return bool(Events);
             }
 
-            _FORCE_INLINE inline bool Happened(short int Masks)
+            inline bool Happened(short int Masks)
             {
                 return bool(Events & Masks);
             }
 
-            _FORCE_INLINE inline void Set(short int Masks)
+            inline void Set(short int Masks)
             {
                 Mask |= Masks;
             }
 
-            _FORCE_INLINE inline void Reset(short int Masks)
+            inline void Reset(short int Masks)
             {
                 Mask &= ~Masks;
             }

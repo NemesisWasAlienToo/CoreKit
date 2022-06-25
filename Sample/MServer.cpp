@@ -34,7 +34,7 @@ int main(int argc, char const *argv[])
 
         auto Client = server.Accept(Info);
 
-        std::thread handler(HandleClient, Client, Info);
+        std::thread handler(HandleClient, std::move(Client), Info);
 
         handler.detach();
     }
@@ -88,16 +88,16 @@ void HandleClient(Core::Network::Socket Client, Core::Network::EndPoint Info)
 
     Core::Iterable::Queue<char> Buffer(1024);
 
-    Core::Network::HTTP::Response Res = Core::Network::HTTP::Response::HTML(Core::Network::HTTP::Status::OK, "<h1>Hi</h1>");
+    Core::Network::HTTP::Response Res = Core::Network::HTTP::Response::HTML(Network::HTTP::HTTP11 ,Core::Network::HTTP::Status::OK, "<h1>Hi</h1>");
 
     std::string ResponseText = Res.ToString();
-    Buffer.Add(ResponseText.c_str(), ResponseText.length());
+    Buffer.CopyFrom(ResponseText.c_str(), ResponseText.length());
 
     Format::Serializer Ser(Buffer);
 
     while (!Buffer.IsEmpty())
     {
-        Client << Ser;
+        Ser >> Client;
 
         Client.Await(Core::Network::Socket::Out);
     }

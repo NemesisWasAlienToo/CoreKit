@@ -5,6 +5,7 @@
 
 #include <Format/Hex.hpp>
 #include <Cryptography/Random.hpp>
+#include <Format/Serializer.hpp>
 
 using namespace Core;
 
@@ -581,6 +582,27 @@ namespace Core::Cryptography
             }
 
             return *this;
+        }
+
+        friend Format::Serializer &operator>>(Format::Serializer &Ser, Cryptography::Key &Value)
+        {
+            size_t Size = Ser.Take<size_t>();
+
+            if (Value.Size != Size)
+                Value = Cryptography::Key(Size);
+
+            Ser.Queue.MoveTo((char *)Value.Data, Value.Size);
+
+            return Ser;
+        }
+
+        friend Format::Serializer &operator<<(Format::Serializer &Ser, Cryptography::Key const &Value)
+        {
+            Ser << Value.Size;
+
+            Ser.Queue.CopyFrom((char *)Value.Data, Value.Size);
+
+            return Ser;
         }
 
         // Key operator<<(size_t Count) const

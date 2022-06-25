@@ -2,6 +2,7 @@
 
 #include <tuple>
 #include <memory>
+#include <optional>
 #include <initializer_list>
 #include <sys/uio.h>
 
@@ -27,7 +28,7 @@ namespace Core::Iterable
         {
             for (size_t i = 0; i < _Length; i++)
             {
-                _Content[i] = Other._Content[i];
+                std::construct_at(&_Content[i], Other._Content[i]);
             }
         }
 
@@ -292,11 +293,11 @@ namespace Core::Iterable
         }
 
         template <typename TCallback>
-        std::optional<size_t> Contains(TCallback Callback) const
+        std::optional<size_t> Contains(TCallback Condition) const
         {
             for (size_t i = 0; i < _Length; i++)
             {
-                if (Callback(_Content[i]))
+                if (Condition(_Content[i]))
                     return i;
             }
 
@@ -354,7 +355,7 @@ namespace Core::Iterable
 
         void MoveTo(T *Data, size_t Count)
         {
-            if (Count > IsFree())
+            if (Count > _Length)
                 throw std::out_of_range("Take count exceeds the available data");
 
             auto LastIndex = _Length - 1;
@@ -369,7 +370,7 @@ namespace Core::Iterable
 
         void CopyTo(T *Data, size_t Count)
         {
-            if (Count > IsFree())
+            if (Count > _Length)
                 throw std::out_of_range("Take count exceeds the available data");
 
             auto LastIndex = _Length - 1;

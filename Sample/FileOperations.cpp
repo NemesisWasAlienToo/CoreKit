@@ -16,8 +16,6 @@ int main(int argc, char const *argv[])
 
         std::cout << f.ReadLine() << std::endl;
 
-        f.Close();
-
         File::Remove("testfile.txt");
     }
     else

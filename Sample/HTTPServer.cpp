@@ -67,7 +67,7 @@ int main(int, char const *[])
         {
             return [Next = std::move(Next)](Network::EndPoint const &Target, HTTP::Request &Request, std::shared_ptr<void> &Storage)
             {
-                auto FileName = std::string_view{Request.Path}.substr(1);
+                auto FileName = Request.Path.substr(1);
 
                 try
                 {

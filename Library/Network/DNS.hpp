@@ -33,9 +33,7 @@ namespace Core
                 for (p = res; p != NULL; p = p->ai_next)
                 {
 
-                    EndPoint endPoint(p->ai_addr);
-
-                    endPoints.Add(endPoint);
+                    endPoints.Add(p->ai_addr);
                 }
 
                 freeaddrinfo(res);
@@ -83,17 +81,14 @@ namespace Core
 
                 for (p = res; p != NULL; p = p->ai_next)
                 {
-                    Address address;
                     if (p->ai_family == Network::Address::IPv4)
                     {
-                        address = Address(((struct sockaddr_in *)res->ai_addr)->sin_addr);
+                        addresses.Add(((struct sockaddr_in *)res->ai_addr)->sin_addr);
                     }
                     else
                     {
-                        address = Address(((struct sockaddr_in6 *)res->ai_addr)->sin6_addr);
+                        addresses.Add(((struct sockaddr_in6 *)res->ai_addr)->sin6_addr);
                     }
-
-                    addresses.Add(address);
                 }
 
                 freeaddrinfo(res);
@@ -185,9 +180,7 @@ namespace Core
 
                 for (p = res; p != NULL; p = p->ai_next)
                 {
-                    EndPoint endPoint(p->ai_addr);
-
-                    endPoints.Add(endPoint);
+                    endPoints.Add(p->ai_addr);
                 }
 
                 freeaddrinfo(res);
@@ -211,17 +204,14 @@ namespace Core
 
                 for (p = res; p != NULL; p = p->ai_next)
                 {
-                    Address address;
                     if (p->ai_family == Network::Address::IPv4)
                     {
-                        address = Address(((struct sockaddr_in *)p->ai_addr)->sin_addr);
+                        addresses.Add(((struct sockaddr_in *)p->ai_addr)->sin_addr);
                     }
                     else
                     {
-                        address = Address(((struct sockaddr_in6 *)p->ai_addr)->sin6_addr);
+                        addresses.Add(((struct sockaddr_in6 *)p->ai_addr)->sin6_addr);
                     }
-
-                    addresses.Add(address);
                 }
 
                 freeaddrinfo(res);

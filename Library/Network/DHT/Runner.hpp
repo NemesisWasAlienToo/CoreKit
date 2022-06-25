@@ -377,7 +377,7 @@ namespace Core
                                     // How?!
                                 }
 
-                                QU.Free(Socket.SendTo(&QU.First(), QU.Length(), Peer));
+                                QU.Free(Socket.SendTo(&QU.Head(), QU.Length(), Peer));
 
                                 if (QU.IsEmpty())
                                 {
@@ -396,7 +396,7 @@ namespace Core
                                 return true;
                             }
                         },
-                        };
+                    };
                 }
 
                 template <class TCallback>
@@ -433,7 +433,7 @@ namespace Core
 
                                 Queue = Iterable::Queue<char>(Size - Padding, false);
 
-                                Queue.Add(Data.Content() + Padding, Data.Length() - Padding);
+                                Queue.CopyFrom(Data.Content() + Padding, Data.Length() - Padding);
 
                                 if (Queue.IsFull())
                                 {
@@ -450,7 +450,7 @@ namespace Core
 
                                     // Fill Queue
 
-                                    Queue.Add(Data.Content(), Data.Length());
+                                    Queue.CopyFrom(Data.Content(), Data.Length());
 
                                     if (Queue.IsFull())
                                     {
@@ -519,7 +519,14 @@ namespace Core
                             Node.EndPoint,
                             [this, &key](Format::Serializer &Serializer)
                             {
-                                Serializer << (char)Operations::Response << Cache.Resolve(key);
+                                auto results = Cache.Resolve(key);
+                                Serializer << (char)Operations::Response << results.Length();
+
+                                results.ForEach(
+                                    [&Serializer](auto &Item)
+                                    {
+                                        Serializer << Item;
+                                    });
                             },
                             {});
 
@@ -534,7 +541,7 @@ namespace Core
                     default:
                     {
                         Test::Warn("Unknown command") << Node.Id << "@" << Node.EndPoint << std::endl;
-                        
+
                         break;
                     }
                     }

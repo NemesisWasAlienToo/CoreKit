@@ -13,7 +13,7 @@ using namespace Core;
 int main(int argc, char const *argv[])
 {
     Core::Poll Poll;
-    Iterable::List<Poll::Container> Events;
+    Iterable::List<Poll::Entry> Events;
 
     Network::EndPoint Host(Network::Address::Any(), 8888);
 
@@ -25,14 +25,14 @@ int main(int argc, char const *argv[])
 
     std::cout << Network::DNS::HostName() << " is listenning on " << Host << std::endl;
 
-    Events.Add({server, Poll::In});
+    Events.Add(server, Poll::In);
 
     while (1)
     {
         Poll(Events);
 
         Events.ForEach(
-            [&](Poll::Container &Item)
+            [&](Poll::Entry &Item)
             {
                 if (!Item.HasEvent())
                     return;
@@ -41,7 +41,7 @@ int main(int argc, char const *argv[])
                 {
                     auto [Client, Info] = server.Accept();
 
-                    Events.Add({Client, Poll::In});
+                    Events.Add(Client, Poll::In);
 
                     std::cout << "New client connected: " << Info << std::endl;
                 }

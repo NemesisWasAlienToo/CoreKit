@@ -4,14 +4,9 @@
 #include <string>
 #include <type_traits>
 
-#include <Descriptor.hpp>
 #include <Iterable/Span.hpp>
 #include <Iterable/List.hpp>
 #include <Iterable/Queue.hpp>
-#include <Network/EndPoint.hpp>
-#include <Cryptography/Key.hpp>
-#include <Network/DHT/Node.hpp>
-#include <Network/Socket.hpp>
 
 #ifndef NETWORK_BYTE_ORDER
 #define NETWORK_BYTE_ORDER BIG_ENDIAN
@@ -76,22 +71,17 @@ namespace Core::Format
 
         void Realign()
         {
-            Queue.Resize(Queue.Capacity());
+            Queue.Realign();
         }
 
         void Clear()
         {
-            Queue = Iterable::Queue<char>(Queue.Capacity());
-        }
-
-        void Clear(size_t NewSize)
-        {
-            Queue = Iterable::Queue<char>(NewSize);
+            Queue.Free();
         }
 
         inline Serializer &Add(const char *Data, size_t Size)
         {
-            Queue.Add(Data, Size);
+            Queue.CopyFrom(Data, Size);
 
             return *this;
         }
@@ -126,7 +116,7 @@ namespace Core::Format
         {
             Iterable::Span<char> Result(Queue.Length());
 
-            Queue.Take(Result.Content(), Queue.Length());
+            Queue.MoveTo(Result.Content(), Queue.Length());
 
             return Result;
         }
@@ -141,7 +131,7 @@ namespace Core::Format
 
             Order(Value, _Value);
 
-            Queue.Add((char *)&_Value, sizeof(_Value));
+            Queue.CopyFrom((char *)&_Value, sizeof(_Value));
 
             return *this;
         }
@@ -153,8 +143,10 @@ namespace Core::Format
             return *this;
         }
 
+        // @todo Remove this after unifiying iterable and span
+
         template <typename TValue>
-        Serializer &operator<<(const Iterable::Iterable<TValue> &Value)
+        Serializer &operator<<(const Iterable::List<TValue> &Value)
         {
             *this << Value.Length();
 
@@ -165,8 +157,6 @@ namespace Core::Format
 
             return *this;
         }
-
-        // @todo Remove this after unifiying iterable and span
 
         template <typename TValue>
         Serializer &operator<<(const Iterable::Span<TValue> &Value)
@@ -185,46 +175,16 @@ namespace Core::Format
         {
             *this << Value.Length();
 
-            Queue.Add(Value.Content(), Value.Length());
+            Queue.CopyFrom(Value.Content(), Value.Length());
 
             return *this;
         }
 
         Serializer &operator<<(const std::string &Value)
         {
-            Queue.Add(Value.c_str(), Value.length() + 1);
+            Queue.CopyFrom(Value.c_str(), Value.length() + 1);
 
             return *this;
-        }
-
-        Serializer &operator<<(const Cryptography::Key &Value)
-        {
-            *this << Value.Size;
-
-            Queue.Add((char *)Value.Data, Value.Size);
-
-            return *this;
-        }
-
-        Serializer &operator<<(const Network::Address &Value)
-        {
-            Network::Address::AddressFamily _Family = Order(Value.Family());
-
-            Queue.Add((char *)&_Family, sizeof(_Family));
-
-            Queue.Add((char *)Value.Content(), 16);
-
-            return *this;
-        }
-
-        Serializer &operator<<(const Network::EndPoint &Value)
-        {
-            return *this << Value.Address() << Order(Value.Port()) << Order(Value.Flow()) << Order(Value.Scope());
-        }
-
-        Serializer &operator<<(const Network::DHT::Node &Value)
-        {
-            return *this << Value.Id << Value.EndPoint;
         }
 
         // Output operators
@@ -235,7 +195,7 @@ namespace Core::Format
         {
             T _Value;
 
-            Queue.Take(reinterpret_cast<char *>(&_Value), sizeof(_Value));
+            Queue.MoveTo(reinterpret_cast<char *>(&_Value), sizeof(_Value));
 
             Order(_Value, Value);
 
@@ -250,17 +210,11 @@ namespace Core::Format
         }
 
         template <typename TValue>
-        Serializer &operator>>(Iterable::Iterable<TValue> &Value)
+        Serializer &operator>>(Iterable::List<TValue> &Value)
         {
             size_t Size = this->Take<size_t>();
 
-            Value = Iterable::Iterable<TValue>(Size);
-
-            // @todo Optimize when serializer and deserializer are seperated
-            // Cuz we know there is no data inserted when taking data and
-            // thus the queue hasn't wrapped around
-
-            // if constexpr (std::is_integral_v<TValue>)
+            Value = Iterable::List<TValue>(Size);
 
             for (size_t i = 0; i < Size; i++)
             {
@@ -313,7 +267,7 @@ namespace Core::Format
 
         Serializer &operator>>(std::string &Value)
         {
-            while (!Queue.IsEmpty() && Queue.Last() != '0')
+            while (!Queue.IsEmpty() && Queue.Tail() != '0')
             {
                 Value += Queue.Take();
             }
@@ -322,46 +276,6 @@ namespace Core::Format
                 Queue.Take();
 
             return *this;
-        }
-
-        Serializer &operator>>(Cryptography::Key &Value)
-        {
-            size_t Size = this->Take<size_t>();
-
-            if (Value.Size != Size)
-                Value = Cryptography::Key(Size);
-
-            Queue.Take((char *)Value.Data, Value.Size);
-
-            return *this;
-        }
-
-        Serializer &operator>>(Network::Address &Value)
-        {
-            Network::Address::AddressFamily _Family;
-
-            Queue.Take((char *)&_Family, sizeof(_Family));
-
-            Value.Family() = Order(_Family);
-
-            Queue.Take((char *)Value.Content(), 16);
-
-            return *this;
-        }
-
-        Serializer &operator>>(Network::EndPoint &Value)
-        {
-            *this >> Value.Address();
-            Value.Port(Order(this->Take<unsigned short>()));
-            Value.Flow(Order(this->Take<int>()));
-            Value.Scope(Order(this->Take<int>()));
-
-            return *this;
-        }
-
-        Serializer &operator>>(Network::DHT::Node &Value)
-        {
-            return *this >> Value.Id >> Value.EndPoint;
         }
 
         friend std::ostream &operator<<(std::ostream &os, Serializer &Serializer)
@@ -383,44 +297,6 @@ namespace Core::Format
             Serializer.Add(Inpt.c_str(), Inpt.length());
 
             return is;
-        }
-
-        friend Descriptor &operator<<(Descriptor &descriptor, Serializer &Serializer)
-        {
-            auto [Pointer, Size] = Serializer.Queue.Chunk();
-
-            Serializer.Queue.Free(descriptor.Write(Pointer, Size));
-            return descriptor;
-        }
-
-        friend Descriptor const &operator<<(Descriptor const &descriptor, Serializer &Serializer)
-        {
-            auto [Pointer, Size] = Serializer.Queue.Chunk();
-
-            Serializer.Queue.Free(descriptor.Write(Pointer, Size));
-            return descriptor;
-        }
-
-        friend Descriptor &operator>>(Descriptor &descriptor, Serializer &Serializer)
-        {
-            // @todo Optimize when NoWrap was implemented in iterable resize
-
-            auto Data = descriptor.Read(descriptor.Received());
-            Serializer.Queue.Add(Data.Content(), Data.Length());
-            // Serializer.Queue.Add(Data);
-
-            return descriptor;
-        }
-
-        friend Descriptor const &operator>>(Descriptor const &descriptor, Serializer &Serializer)
-        {
-            // @todo Optimize when NoWrap was implemented in iterable resize
-
-            auto Data = descriptor.Read(descriptor.Received());
-            Serializer.Queue.Add(Data.Content(), Data.Length());
-            // Serializer.Queue.Add(Data);
-
-            return descriptor;
         }
 
         Serializer &operator=(const Serializer &) = delete;

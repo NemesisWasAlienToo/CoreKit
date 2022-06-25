@@ -4,8 +4,9 @@
 #include <string>
 #include <thread>
 
-#include "Network/EndPoint.hpp"
-#include "Cryptography/Key.hpp"
+#include <Network/EndPoint.hpp>
+#include <Cryptography/Key.hpp>
+#include <Format/Serializer.hpp>
 
 using namespace Core;
 
@@ -64,6 +65,16 @@ namespace Core
                 {
                     return Id != Other.Id ||
                            EndPoint != Other.EndPoint;
+                }
+
+                friend Format::Serializer &operator<<(Format::Serializer &Ser, const Network::DHT::Node &Value)
+                {
+                    return Ser << Value.Id << Value.EndPoint;
+                }
+
+                friend Format::Serializer &operator>>(Format::Serializer &Ser, Network::DHT::Node &Value)
+                {
+                    return Ser >> Value.Id >> Value.EndPoint;
                 }
             };
         }

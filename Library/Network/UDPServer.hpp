@@ -17,6 +17,7 @@
 #include <functional>
 #include <unordered_map>
 
+#include "Poll.hpp"
 #include "Test.hpp"
 #include "Event.hpp"
 #include "Timer.hpp"
@@ -26,7 +27,6 @@
 #include "Network/Socket.hpp"
 
 #include "Iterable/List.hpp"
-#include "Iterable/Poll.hpp"
 
 #include <Format/Serializer.hpp>
 #include "Network/DHT/DHT.hpp"
@@ -66,7 +66,8 @@ namespace Core
             Event Interrupt;
             Network::Socket Socket;
 
-            Iterable::Poll Poll;
+            Core::Poll Poll;
+            Iterable::List<Core::Poll::Entry> Events;
 
             std::mutex OLock;
             Queue Outgoing;
@@ -86,13 +87,13 @@ namespace Core
 
             UDPServer() = default;
 
-            UDPServer(const Network::EndPoint &EndPoint, Duration const &Timeout, Duration const &Interval) : TimeOut(Timeout), Expire(Timer::Monotonic, 0), Wheel(Interval), Interrupt(0, 0), Socket(Network::Socket::IPv4, Network::Socket::UDP), Poll(3)
+            UDPServer(const Network::EndPoint &EndPoint, Duration const &Timeout, Duration const &Interval) : TimeOut(Timeout), Expire(Timer::Monotonic, 0), Wheel(Interval), Interrupt(0, 0), Socket(Network::Socket::IPv4, Network::Socket::UDP)
             {
                 Socket.Bind(EndPoint);
 
-                Poll.Add(Socket, Network::Socket::In);
-                Poll.Add(Expire, Timer::In);
-                Poll.Add(Interrupt, Event::In);
+                Events.Add(Socket, Core::Poll::In);
+                Events.Add(Expire, Core::Poll::In);
+                Events.Add(Interrupt, Core::Poll::In);
 
                 // @todo Should it be here?
 
@@ -170,23 +171,23 @@ namespace Core
                 calc:
                     Await();
 
-                    if (Poll[0].HasEvent())
+                    if (Events[0].HasEvent())
                     {
-                        if (Poll[0].Happened(Iterable::Poll::Out))
+                        if (Events[0].Happened(Core::Poll::Out))
                         {
                             OnSend();
                         }
-                        else if (Poll[0].Happened(Iterable::Poll::In))
+                        else if (Events[0].Happened(Core::Poll::In))
                         {
                             OnReceive();
                         }
                     }
-                    else if (Poll[1].HasEvent())
+                    else if (Events[1].HasEvent())
                     {
                         Expire.Listen();
                         Wheel.Tick();
                     }
-                    else if (Poll[2].HasEvent())
+                    else if (Events[2].HasEvent())
                     {
                         if (!Condition())
                         {
@@ -213,7 +214,7 @@ namespace Core
                     return;
                 }
 
-                auto &Last = Outgoing.Last();
+                auto &Last = Outgoing.Tail();
 
                 auto IsReady = Last.Handler(Socket, Last.End);
 
@@ -282,16 +283,16 @@ namespace Core
 
                         ILock.unlock();
 
-                        Ent.Handler({-1}, Ent.End);
+                        Ent.Handler({}, Ent.End);
                     }
                 }
             }
 
             inline void Await()
             {
-                Poll[0].Mask = Outgoing.IsEmpty() ? (Iterable::Poll::In) : (Iterable::Poll::In | Iterable::Poll::Out);
+                Events[0].Mask = Outgoing.IsEmpty() ? (Core::Poll::In) : (Core::Poll::In | Core::Poll::Out);
 
-                Poll();
+                Poll(Events);
             }
         };
     }

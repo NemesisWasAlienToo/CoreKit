@@ -26,14 +26,14 @@ int main(int argc, char const *argv[])
 
     Poll.Add(server, ePoll::In);
 
-    Iterable::List<ePoll::Container> Events(10);
+    Iterable::List<ePoll::Entry> Events(10);
 
     while (1)
     {
         Poll(Events);
 
         Events.ForEach(
-            [&](ePoll::Container &Item)
+            [&](ePoll::Entry &Item)
             {
                 auto Socket = Item.DataAs<Network::Socket>();
 

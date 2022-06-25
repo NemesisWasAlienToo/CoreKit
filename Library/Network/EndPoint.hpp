@@ -2,7 +2,8 @@
 
 #include <sys/socket.h>
 
-#include "Network/Address.hpp"
+#include <Network/Address.hpp>
+#include <Format/Serializer.hpp>
 
 namespace Core
 {
@@ -265,13 +266,28 @@ namespace Core
             {
                 return os << tc._Address << ":" << ntohs(tc._Port);
             }
+
+            friend Format::Serializer &operator>>(Format::Serializer &Ser, Network::EndPoint &Value)
+            {
+                Ser >> Value.Address();
+                Value.Port(Format::Serializer::Order(Ser.Take<unsigned short>()));
+                Value.Flow(Format::Serializer::Order(Ser.Take<int>()));
+                Value.Scope(Format::Serializer::Order(Ser.Take<int>()));
+
+                return Ser;
+            }
+
+            friend Format::Serializer &operator<<(Format::Serializer &Ser, Network::EndPoint const &Value)
+            {
+                return Ser << Value.Address() << Format::Serializer::Order(Value.Port()) << Format::Serializer::Order(Value.Flow()) << Format::Serializer::Order(Value.Scope());
+            }
         };
     }
 }
 
 namespace std
 {
-    template<>
+    template <>
     struct hash<Core::Network::EndPoint>
     {
         size_t operator()(const Core::Network::EndPoint &EndPoint) const

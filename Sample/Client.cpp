@@ -6,7 +6,6 @@
 #include <Network/DNS.hpp>
 #include <Network/Socket.hpp>
 #include <Iterable/Queue.hpp>
-#include <Iterable/Poll.hpp>
 #include <Format/Serializer.hpp>
 
 using namespace Core;
@@ -36,7 +35,7 @@ int main(int argc, char const *argv[])
 
     while (!ser.Queue.IsEmpty())
     {
-        client << ser;
+        ser >> client;
     }
 
     ser.Clear();
@@ -45,7 +44,7 @@ int main(int argc, char const *argv[])
 
     for (client.Await(Network::Socket::In); client.Received() > 0; client.Await(Network::Socket::In))
     {
-        client >> ser;
+        ser >> client;
     }
 
     std::cout << ser;
