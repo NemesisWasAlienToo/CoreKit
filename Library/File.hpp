@@ -102,6 +102,61 @@ namespace Core
             return Result;
         }
 
+        // enum LockFlags
+        // {
+        //     Exclusive = LOCK_EX,
+        //     Shared = LOCK_SH,
+        //     Read = LOCK_READ,
+        //     Write = LOCK_WRITE,
+        //     NonBlocking = LOCK_NB,
+        //     Release = LOCK_UN,
+        // };
+
+        // static bool Lock(File const &file, int Flags)
+        // {
+        //     int Result = ::flock(file._INode, Flags);
+
+        //     if (Result < 0)
+        //     {
+        //         throw std::system_error(errno, std::generic_category());
+        //     }
+        // }
+
+        // static bool Unlock(File const &file)
+        // {
+        //     int Result = flock(file._INode, Release);
+
+        //     if (Result < 0)
+        //     {
+        //         throw std::system_error(errno, std::generic_category());
+        //     }
+        // }
+
+        static void Unlink(std::string &Path)
+        {
+            int Result = unlink(Path.c_str());
+
+            if (Result == -1)
+            {
+                throw std::system_error(errno, std::generic_category());
+            }
+        }
+
+        static File MakeTemp(std::string &Path)
+        {
+            if (!Path.ends_with("XXXXXX"))
+                throw std::invalid_argument("Temp file name must terminate with XXXXXX");
+
+            int Result = mkstemp(&Path[0]);
+
+            if (Result < 0)
+            {
+                throw std::system_error(errno, std::generic_category());
+            }
+
+            return Result;
+        }
+
         static File Open(std::string const &Path, int Flags = 0, uint32_t Permissions = DefaultPermission)
         {
             int Result = open(Path.c_str(), Flags, Permissions);
@@ -112,6 +167,16 @@ namespace Core
             }
 
             return Result;
+        }
+
+        static void Rename(std::string const &Old, std::string const &New)
+        {
+            int Result = rename(Old.c_str(), New.c_str());
+
+            if (Result < 0)
+            {
+                throw std::system_error(errno, std::generic_category());
+            }
         }
 
         static void Remove(std::string const &Path)

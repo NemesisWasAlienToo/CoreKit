@@ -38,7 +38,7 @@ namespace Core
 
                 Duration Timeout;
                 Network::EndPoint Target;
-                // Iterable::Queue<char> IBuffer;
+                Iterable::Queue<HTTP::Request> IBuffer;
                 Iterable::Queue<OutEntry> OBuffer;
                 TServer &CTServer;
 
@@ -82,6 +82,16 @@ namespace Core
                     Ser << Response;
                 }
 
+                void Pause(Async::EventLoop *Loop, Async::EventLoop::Entry &Self)
+                {
+                    Loop->Modify(Self, ePoll::Out);
+                }
+
+                void Resume(Async::EventLoop *Loop, Async::EventLoop::Entry &Self)
+                {
+                    Loop->Reschedual(Self, Timeout);
+                }
+
                 void operator()(Async::EventLoop *Loop, ePoll::Entry &Item, Async::EventLoop::Entry &Self)
                 {
                     Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
@@ -96,12 +106,12 @@ namespace Core
 
                         Loop->Reschedual(Self, Timeout);
 
-                        OnRead(Loop, Item, Self);
+                        OnRead(Loop, Self);
                     }
 
                     if (Item.Happened(ePoll::Out))
                     {
-                        OnWrite(Loop, Item, Self);
+                        OnWrite(Loop, Self);
                     }
 
                     if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error))
@@ -110,7 +120,7 @@ namespace Core
                     }
                 }
 
-                void OnRead(Async::EventLoop *Loop, ePoll::Entry &, Async::EventLoop::Entry &Self)
+                void OnRead(Async::EventLoop *Loop, Async::EventLoop::Entry &Self)
                 {
                     Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
 
@@ -138,23 +148,41 @@ namespace Core
                             auto It = Parser.Result.Headers.find("Connection");
                             auto End = Parser.Result.Headers.end();
 
-                            // @todo Fix case sensitivity of header values
+                            // @todo Optimize this
 
-                            if (Parser.Result.Version == HTTP::HTTP10)
                             {
-                                if ((It != End && It->second == "Keep-Alive"))
-                                {
+                                std::string ConnectionValue;
 
-                                    Response.Headers.insert_or_assign("Connection", "Keep-Alive");
+                                if (It != End)
+                                {
+                                    ConnectionValue.resize(It->second.length());
+
+                                    std::transform(
+                                        It->second.begin(),
+                                        It->second.end(),
+                                        ConnectionValue.begin(),
+                                        [](auto c)
+                                        {
+                                            return std::tolower(c);
+                                        });
                                 }
-                                else
+
+                                if (Parser.Result.Version == HTTP::HTTP10)
+                                {
+                                    if (ConnectionValue == "keep-alive")
+                                    {
+
+                                        Response.Headers.insert_or_assign("Connection", "keep-alive");
+                                    }
+                                    else
+                                    {
+                                        ShouldClose = true;
+                                    }
+                                }
+                                else if (Parser.Result.Version == HTTP::HTTP11 && ConnectionValue == "close")
                                 {
                                     ShouldClose = true;
                                 }
-                            }
-                            else if (Parser.Result.Version == HTTP::HTTP11 && It != End && It->second == "close")
-                            {
-                                ShouldClose = true;
                             }
 
                             // If we should close the connection, stop reading data from client
@@ -205,7 +233,7 @@ namespace Core
                     // }
                 }
 
-                void OnWrite(Async::EventLoop *Loop, ePoll::Entry &, Async::EventLoop::Entry &Self)
+                void OnWrite(Async::EventLoop *Loop, Async::EventLoop::Entry &Self)
                 {
                     Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
 
