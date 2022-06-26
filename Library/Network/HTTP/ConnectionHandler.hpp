@@ -43,7 +43,7 @@ namespace Core
                 TServer &CTServer;
 
                 // @todo Fix this limitations
-                HTTP::Parser Parser{CTServer.Settings.MaxHeaderSize, CTServer.Settings.MaxBodySize};
+                HTTP::Parser Parser{CTServer.Settings.MaxHeaderSize, CTServer.Settings.MaxBodySize, CTServer.Settings.RequestBufferSize};
                 bool ShouldClose = false;
 
                 ConnectionHandler(Duration const &Timeout, Network::EndPoint const &Target, TServer &Server)
@@ -71,8 +71,7 @@ namespace Core
                     Response.Headers.insert_or_assign("Host", CTServer.Settings.HostName);
 
                     OBuffer.Add(
-                    // OBuffer.Construct(
-                        Iterable::Queue<char>(CTServer.Settings.RequestBufferSize),
+                        Iterable::Queue<char>(CTServer.Settings.ResponseBufferSize),
                         // @todo Remove pointer
                         HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
                         FileLength,

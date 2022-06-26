@@ -11,17 +11,16 @@
 #include <Network/Socket.hpp>
 #include <Network/HTTP/Request.hpp>
 
-// @todo Limit the number of clients
-
 namespace Core::Network::HTTP
 {
     struct Parser : Machine<void(Network::Socket const *)>
     {
         size_t HeaderLimit = 16 * 1024;
         size_t ContentLimit = 8 * 1024 * 1024;
+        size_t ResponseBufferSize = 1024;
 
         Parser() = default;
-        Parser(size_t headerLimit, size_t contentLimit) : HeaderLimit(headerLimit), ContentLimit(contentLimit) {}
+        Parser(size_t headerLimit, size_t contentLimit, size_t SendBufferSize) : HeaderLimit(headerLimit), ContentLimit(contentLimit), ResponseBufferSize(SendBufferSize) {}
 
         Iterable::Queue<char> Queue = Iterable::Queue<char>(1024);
 

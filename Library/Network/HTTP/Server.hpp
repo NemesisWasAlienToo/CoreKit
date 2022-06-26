@@ -227,6 +227,12 @@ namespace Core::Network::HTTP
             return *this;
         }
 
+        inline Server &ResponseBufferSize(size_t Size)
+        {
+            Settings.ResponseBufferSize = Size;
+            return *this;
+        }
+
     private:
         TCPServer TCP;
         Router<HTTP::Response(Network::EndPoint const &, Network::HTTP::Request &, std::shared_ptr<void> &)> _Router;
@@ -242,6 +248,7 @@ namespace Core::Network::HTTP
             size_t MaxFileSize;
             size_t SendFileThreshold;
             size_t RequestBufferSize;
+            size_t ResponseBufferSize;
             std::string HostName;
             std::function<void(Network::EndPoint const &, Network::HTTP::Response &, std::shared_ptr<void> &)> OnError;
         } Settings{
@@ -249,6 +256,7 @@ namespace Core::Network::HTTP
             1024 * 1024 * 5,
             1024 * 1024 * 5,
             1024 * 10,
+            1024,
             1024,
             Network::DNS::HostName(),
             nullptr};

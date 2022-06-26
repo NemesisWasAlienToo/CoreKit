@@ -120,8 +120,6 @@ namespace Core
             }
 
         private:
-            // @todo Since Poll is shared, Make it immutable
-
             Async::ThreadPool Pool;
             std::atomic<size_t> ConnectionCount{0};
 
@@ -129,7 +127,9 @@ namespace Core
             {
                 size_t MaxConnectionCount;
                 bool NoDelay;
-            } Settings{1024, false};
+            } Settings{
+                1024,
+                false};
         };
     }
 }
