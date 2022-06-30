@@ -55,7 +55,7 @@ namespace Core::Network
             WaitAll = MSG_WAITALL,
         };
 
-        enum ShutDown
+        enum ShutDownHow
         {
             Read = SHUT_RD,
             Write = SHUT_WR,

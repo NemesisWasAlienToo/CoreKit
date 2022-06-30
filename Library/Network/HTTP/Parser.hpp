@@ -13,16 +13,16 @@
 
 namespace Core::Network::HTTP
 {
-    struct Parser : Machine<void(Network::Socket const *)>
+    struct Parser : Machine<void(Network::Socket const &)>
     {
         size_t HeaderLimit = 16 * 1024;
         size_t ContentLimit = 8 * 1024 * 1024;
-        size_t ResponseBufferSize = 1024;
+        size_t RequestBufferSize = 1024;
 
         Parser() = default;
-        Parser(size_t headerLimit, size_t contentLimit, size_t SendBufferSize) : HeaderLimit(headerLimit), ContentLimit(contentLimit), ResponseBufferSize(SendBufferSize) {}
+        Parser(size_t headerLimit, size_t contentLimit, size_t SendBufferSize) : Machine(), HeaderLimit(headerLimit), ContentLimit(contentLimit), RequestBufferSize(SendBufferSize), Queue(RequestBufferSize) {}
 
-        Iterable::Queue<char> Queue = Iterable::Queue<char>(1024);
+        Iterable::Queue<char> Queue;
 
         size_t ContetLength = 0;
         size_t lenPos = 0;
@@ -80,10 +80,8 @@ namespace Core::Network::HTTP
 
         // @todo Make this asynchronus
 
-        void Continue100()
+        void Continue100(Network::Socket const &Client)
         {
-            const auto &Client = *Argument<0>();
-
             auto ExpectIterator = Result.Headers.find("Expect");
 
             if (ExpectIterator != Result.Headers.end() && ExpectIterator->second == "100-continue")
@@ -109,7 +107,6 @@ namespace Core::Network::HTTP
                 Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
                 Format::Stream ContinueStream(Temp);
 
-                // Temp.Copy(ContinueResponse, sizeof(ContinueResponse));
                 Temp.CopyFrom(ContinueResponse, sizeof(ContinueResponse));
 
                 // Send the response
@@ -121,10 +118,8 @@ namespace Core::Network::HTTP
             }
         }
 
-        void operator()()
+        void operator()(Network::Socket const &Client) override
         {
-            const auto &Client = *Argument<0>();
-
             {
                 Format::Stream Stream(Queue);
 
@@ -138,12 +133,6 @@ namespace Core::Network::HTTP
             CO_START;
 
             // Take all the header
-
-            // @todo Optimize this
-            // @todo Set limit for header size
-
-            // while (bodyPos == 0 && Queue.Length() < HeaderLimit)
-            // Queue.Length() < HeaderLimit -> BadRequest
 
             while (bodyPos == 0)
             {
@@ -228,7 +217,7 @@ namespace Core::Network::HTTP
 
                 // Handle 100-continue
 
-                Continue100();
+                Continue100(Client);
 
                 // Get the content
 
@@ -249,7 +238,7 @@ namespace Core::Network::HTTP
 
                 if (Iterator == Result.Headers.end())
                 {
-                    Continue100();
+                    Continue100(Client);
 
                     CO_TERMINATE();
                 }

@@ -25,7 +25,19 @@ namespace Core
     {
         namespace HTTP
         {
-            template <typename TServer>
+            struct ConnectionSettings
+            {
+                size_t MaxHeaderSize;
+                size_t MaxBodySize;
+                size_t MaxFileSize;
+                size_t SendFileThreshold;
+                size_t RequestBufferSize;
+                size_t ResponseBufferSize;
+                std::string HostName;
+                std::function<void(Network::EndPoint const &, Network::HTTP::Response &, std::shared_ptr<void> &)> OnError;
+            };
+
+            template <typename TCallback>
             struct ConnectionHandler
             {
                 struct OutEntry
@@ -40,38 +52,51 @@ namespace Core
                 Network::EndPoint Target;
                 Iterable::Queue<HTTP::Request> IBuffer;
                 Iterable::Queue<OutEntry> OBuffer;
-                TServer &CTServer;
+                ConnectionSettings const &Settings;
+                TCallback OnRequest;
 
                 // @todo Fix this limitations
-                HTTP::Parser Parser{CTServer.Settings.MaxHeaderSize, CTServer.Settings.MaxBodySize, CTServer.Settings.RequestBufferSize};
+                HTTP::Parser Parser{Settings.MaxHeaderSize, Settings.MaxBodySize, Settings.RequestBufferSize};
                 bool ShouldClose = false;
 
-                ConnectionHandler(Duration const &Timeout, Network::EndPoint const &Target, TServer &Server)
+                ConnectionHandler(Duration const &Timeout, Network::EndPoint const &Target, ConnectionSettings const &settings, TCallback &&CB)
                     : Timeout(Timeout),
                       Target(Target),
-                      CTServer(Server)
+                      Settings(settings),
+                      OnRequest(std::forward<TCallback>(CB))
                 {
                 }
 
                 void AppendResponse(HTTP::Response &Response)
                 {
+                    // Handle keep-alive
+
+                    if (!ShouldClose && Response.Version == HTTP::HTTP10)
+                    {
+                        Response.Headers.insert_or_assign("Connection", "keep-alive");
+                    }
+                    else if (ShouldClose && Response.Version == HTTP::HTTP11)
+                    {
+                        Response.Headers.insert_or_assign("Connection", "close");
+                    }
+
                     bool HasFile = std::holds_alternative<std::shared_ptr<File>>(Response.Content);
                     size_t FileLength = 0;
                     size_t StringLength = 0;
 
                     HasFile ? FileLength =
-                                  std::min(std::get<std::shared_ptr<File>>(Response.Content)->Size(), CTServer.Settings.MaxFileSize)
-                            : StringLength = std::min(std::get<std::string>(Response.Content).length(), CTServer.Settings.MaxBodySize);
+                                  std::min(std::get<std::shared_ptr<File>>(Response.Content)->Size(), Settings.MaxFileSize)
+                            : StringLength = std::min(std::get<std::string>(Response.Content).length(), Settings.MaxBodySize);
 
-                    bool UseSendFile = CTServer.Settings.SendFileThreshold && HasFile && FileLength > CTServer.Settings.SendFileThreshold;
+                    bool UseSendFile = Settings.SendFileThreshold && HasFile && FileLength > Settings.SendFileThreshold;
 
                     // Trim content if its too big
 
                     Response.Headers.insert_or_assign("Content-Length", std::to_string(HasFile ? FileLength : StringLength));
-                    Response.Headers.insert_or_assign("Host", CTServer.Settings.HostName);
+                    Response.Headers.insert_or_assign("Host", Settings.HostName);
 
                     OBuffer.Add(
-                        Iterable::Queue<char>(CTServer.Settings.ResponseBufferSize),
+                        Iterable::Queue<char>(Settings.ResponseBufferSize),
                         // @todo Remove pointer
                         HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
                         FileLength,
@@ -126,22 +151,14 @@ namespace Core
 
                     try
                     {
-                        if (Parser.IsStarted())
-                        {
-                            Parser.Continue();
-                        }
-                        else
-                        {
-                            Parser.Start(&Client);
-                        }
+                        Parser(Client);
 
                         if (Parser.IsFinished())
                         {
                             // Process request
 
-                            // @todo Maybe check Host tag?
-
-                            Network::HTTP::Response Response = CTServer.OnRequest(Target, Parser.Result, Loop->Storage);
+                            Network::HTTP::Response Response = OnRequest(Target, Parser.Result, Loop->Storage);
+                            // Network::HTTP::Response Response = OnRequest(Loop, Self, Target, Parser.Result);
 
                             // Decide if we should keep the connection
 
@@ -155,6 +172,8 @@ namespace Core
 
                                 if (It != End)
                                 {
+                                    // @todo Optimize this
+
                                     ConnectionValue.resize(It->second.length());
 
                                     std::transform(
@@ -167,17 +186,11 @@ namespace Core
                                         });
                                 }
 
-                                if (Parser.Result.Version == HTTP::HTTP10)
-                                {
-                                    if (ConnectionValue == "keep-alive")
-                                    {
+                                // @todo Optimize this
 
-                                        Response.Headers.insert_or_assign("Connection", "keep-alive");
-                                    }
-                                    else
-                                    {
-                                        ShouldClose = true;
-                                    }
+                                if (Parser.Result.Version == HTTP::HTTP10 && ConnectionValue != "keep-alive")
+                                {
+                                    ShouldClose = true;
                                 }
                                 else if (Parser.Result.Version == HTTP::HTTP11 && ConnectionValue == "close")
                                 {
@@ -207,8 +220,8 @@ namespace Core
                     }
                     catch (HTTP::Response &Response)
                     {
-                        if (CTServer.Settings.OnError)
-                            CTServer.Settings.OnError(Target, Response, Loop->Storage);
+                        if (Settings.OnError)
+                            Settings.OnError(Target, Response, Loop->Storage);
 
                         AppendResponse(Response);
 
@@ -222,8 +235,8 @@ namespace Core
                     // {
                     //     auto Response = HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, "");
 
-                    //     if (CTServer.Settings.OnError)
-                    //         CTServer.Settings.OnError(Target, Response, Loop->Storage);
+                    //     if (Settings.OnError)
+                    //         Settings.OnError(Target, Response, Loop->Storage);
 
                     //     AppendResponse(Response);
 

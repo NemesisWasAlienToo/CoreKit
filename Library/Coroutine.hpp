@@ -17,9 +17,9 @@ namespace Core
     public:
         struct State
         {
-            void *Stack;
-            void *Base;
-            void *Instruction;
+            void *Stack = nullptr;
+            void *Base = nullptr;
+            void *Instruction = nullptr;
 
             State() = default;
 
@@ -79,14 +79,14 @@ namespace Core
         };
 
     protected:
-        State My;
-        State Parent;
+        mutable State My;
+        mutable State Parent;
 
-        size_t StackSize = 0;
-        char *Stack;
+        mutable size_t StackSize = 0;
+        mutable char *Stack;
 
-        bool Finished = false;
-        bool Started = false;
+        mutable bool Finished = false;
+        mutable bool Started = false;
 
     public:
         __Coroutine_Helper() = default;

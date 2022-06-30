@@ -27,7 +27,24 @@ namespace Core::Network::HTTP
                   endPoint,
                   [this](Network::EndPoint const &Target)
                   {
-                      return ConnectionHandler(Timeout, Target, *this);
+                      return ConnectionHandler(
+                          Timeout,
+                          Target,
+                          Settings,
+                        //   [this](Async::EventLoop *Loop, Async::EventLoop::Entry &Entry, Network::EndPoint const &Target, Network::HTTP::Request &Request)
+                        //   {
+                        //       if (!Filters)
+                        //           return _Router.Match(Request, Request, Target, Loop->Storage);
+
+                        //       return Filters(Loop, Entry, Target, Request);
+                        //   },
+                          [this](Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> &Storage)
+                          {
+                              if (!Filters)
+                                  return _Router.Match(Request, Target, Request, Storage);
+
+                              return Filters(Target, Request, Storage);
+                          });
                   },
                   timeout,
                   ThreadCount,
@@ -241,17 +258,7 @@ namespace Core::Network::HTTP
         TFilter Filters = nullptr;
 
     public:
-        struct
-        {
-            size_t MaxHeaderSize;
-            size_t MaxBodySize;
-            size_t MaxFileSize;
-            size_t SendFileThreshold;
-            size_t RequestBufferSize;
-            size_t ResponseBufferSize;
-            std::string HostName;
-            std::function<void(Network::EndPoint const &, Network::HTTP::Response &, std::shared_ptr<void> &)> OnError;
-        } Settings{
+        ConnectionSettings Settings{
             1024 * 1024 * 1,
             1024 * 1024 * 5,
             1024 * 1024 * 5,
@@ -260,13 +267,5 @@ namespace Core::Network::HTTP
             1024,
             Network::DNS::HostName(),
             nullptr};
-
-        inline HTTP::Response OnRequest(Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> &Storage) const
-        {
-            if (!Filters)
-                return _Router.Match(Request, Target, Request, Storage);
-
-            return Filters(Target, Request, Storage);
-        }
     };
 }

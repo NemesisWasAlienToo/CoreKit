@@ -35,50 +35,20 @@ namespace Core
     class Machine<TReturn(TArgs...)>
     {
     protected:
-        static_assert(!(std::is_reference_v<TArgs> || ...), "Coroutine arguments can't be reference, use pointers instead");
-        static_assert(!std::is_reference_v<TReturn>, "Coroutine return type must not be reference, use pointers instead");
-
-        template <size_t N>
-        using TArgument = std::tuple_element_t<N, std::tuple<TArgs...>>;
-
-        using ArgsContainer = std::tuple<std::remove_const_t<TArgs>...>;
-
-        size_t _State = 0;
-        bool _IsFinished = false;
-        ArgsContainer _Args;
+        mutable size_t _State = 0;
+        mutable bool _IsFinished = false;
 
     public:
-        bool IsStarted() { return _State; }
+        bool IsStarted() const { return _State; }
         bool IsFinished() const { return _IsFinished; }
-        void Terminate() { _IsFinished = true; }
+        void Terminate() const { _IsFinished = true; }
 
-        void Reset()
+        void Reset() const
         {
             _State = 0;
             _IsFinished = false;
         }
 
-        template <size_t TNumber>
-        constexpr TArgument<TNumber> &
-        Argument()
-        {
-            return std::get<TNumber>(_Args);
-        }
-
-        inline decltype(auto) Start(TArgs... Args)
-        {
-            _State = 0;
-            _Args = ArgsContainer(std::forward<TArgs>(Args)...);
-            _IsFinished = false;
-
-            return this->operator()();
-        }
-
-        inline decltype(auto) Continue()
-        {
-            return this->operator()();
-        }
-
-        virtual TReturn operator()() = 0;
+        virtual TReturn operator()(TArgs...) = 0;
     };
 }
