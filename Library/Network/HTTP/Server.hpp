@@ -27,24 +27,7 @@ namespace Core::Network::HTTP
                   endPoint,
                   [this](Network::EndPoint const &Target)
                   {
-                      return ConnectionHandler(
-                          Timeout,
-                          Target,
-                          Settings,
-                        //   [this](Async::EventLoop *Loop, Async::EventLoop::Entry &Entry, Network::EndPoint const &Target, Network::HTTP::Request &Request)
-                        //   {
-                        //       if (!Filters)
-                        //           return _Router.Match(Request, Request, Target, Loop->Storage);
-
-                        //       return Filters(Loop, Entry, Target, Request);
-                        //   },
-                          [this](Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> &Storage)
-                          {
-                              if (!Filters)
-                                  return _Router.Match(Request, Target, Request, Storage);
-
-                              return Filters(Target, Request, Storage);
-                          });
+                      return ConnectionHandler(Timeout, Target, Settings);
                   },
                   timeout,
                   ThreadCount,
@@ -149,29 +132,16 @@ namespace Core::Network::HTTP
                 std::forward<TAction>(Action));
         }
 
-        using TFilter = std::function<HTTP::Response(Network::EndPoint const &Target, Network::HTTP::Request &, std::shared_ptr<void> &)>;
-
         template <typename TBuildCallback>
-        inline Server &FilterFrom(TBuildCallback &&Builder)
+        inline Server &MiddlewareFrom(TBuildCallback &&Builder)
         {
-            if (!Filters)
-            {
-                Filters = Builder(
-                    [this](Network::EndPoint const &Target, Network::HTTP::Request &Request, std::shared_ptr<void> &Storage)
-                    {
-                        return _Router.Match(Request, Target, Request, Storage);
-                    });
-
-                return *this;
-            }
-
-            Filters = Builder(std::move(Filters));
+            Settings.OnRequest = Builder(std::move(Settings.OnRequest));
 
             return *this;
         }
 
         template <typename TBuildCallback>
-        inline Server &MiddlewareFrom(TBuildCallback &&Builder)
+        inline Server &FilterFrom(TBuildCallback &&Builder)
         {
             _Router.Default = Builder(std::move(_Router.Default));
 
@@ -255,8 +225,6 @@ namespace Core::Network::HTTP
         Router<HTTP::Response(Network::EndPoint const &, Network::HTTP::Request &, std::shared_ptr<void> &)> _Router;
         Duration Timeout;
 
-        TFilter Filters = nullptr;
-
     public:
         ConnectionSettings Settings{
             1024 * 1024 * 1,
@@ -266,6 +234,11 @@ namespace Core::Network::HTTP
             1024,
             1024,
             Network::DNS::HostName(),
-            nullptr};
+            nullptr,
+            [this](Async::EventLoop *Loop, Async::EventLoop::Entry &Entry, Network::EndPoint const &Target, Network::HTTP::Request &Request)
+            {
+                Entry.CallbackAs<ConnectionHandler>()->AppendResponse(_Router.Match(Request, Target, Request, Loop->Storage));
+                Loop->Modify(Entry, ePoll::Out | ePoll::In);
+            }};
     };
 }

@@ -35,9 +35,9 @@ namespace Core
                 size_t ResponseBufferSize;
                 std::string HostName;
                 std::function<void(Network::EndPoint const &, Network::HTTP::Response &, std::shared_ptr<void> &)> OnError;
+                std::function<void(Async::EventLoop *, Async::EventLoop::Entry &, Network::EndPoint const &, Network::HTTP::Request &)> OnRequest;
             };
 
-            template <typename TCallback>
             struct ConnectionHandler
             {
                 struct OutEntry
@@ -53,21 +53,19 @@ namespace Core
                 Iterable::Queue<HTTP::Request> IBuffer;
                 Iterable::Queue<OutEntry> OBuffer;
                 ConnectionSettings const &Settings;
-                TCallback OnRequest;
 
                 // @todo Fix this limitations
                 HTTP::Parser Parser{Settings.MaxHeaderSize, Settings.MaxBodySize, Settings.RequestBufferSize};
                 bool ShouldClose = false;
 
-                ConnectionHandler(Duration const &Timeout, Network::EndPoint const &Target, ConnectionSettings const &settings, TCallback &&CB)
+                ConnectionHandler(Duration const &Timeout, Network::EndPoint const &Target, ConnectionSettings const &settings)
                     : Timeout(Timeout),
                       Target(Target),
-                      Settings(settings),
-                      OnRequest(std::forward<TCallback>(CB))
+                      Settings(settings)
                 {
                 }
 
-                void AppendResponse(HTTP::Response &Response)
+                void AppendResponse(HTTP::Response &&Response)
                 {
                     // Handle keep-alive
 
@@ -157,9 +155,6 @@ namespace Core
                         {
                             // Process request
 
-                            Network::HTTP::Response Response = OnRequest(Target, Parser.Result, Loop->Storage);
-                            // Network::HTTP::Response Response = OnRequest(Loop, Self, Target, Parser.Result);
-
                             // Decide if we should keep the connection
 
                             auto It = Parser.Result.Headers.find("Connection");
@@ -191,27 +186,18 @@ namespace Core
                                 if (Parser.Result.Version == HTTP::HTTP10 && ConnectionValue != "keep-alive")
                                 {
                                     ShouldClose = true;
+                                    Client.ShutDown(Network::Socket::Read);
                                 }
                                 else if (Parser.Result.Version == HTTP::HTTP11 && ConnectionValue == "close")
                                 {
                                     ShouldClose = true;
-                                }
-                            }
-
-                            // If we should close the connection, stop reading data from client
-
-                            if (ShouldClose)
-                            {
-                                Client.ShutDown(Network::Socket::Read);
+                                    Client.ShutDown(Network::Socket::Read);
+                                }                                
                             }
 
                             // Append response to buffer
 
-                            AppendResponse(Response);
-
-                            // Modify events
-
-                            Loop->Modify(Self, ShouldClose ? ePoll::Out : ePoll::In | ePoll::Out);
+                            Settings.OnRequest(Loop, Self, Target, Parser.Result);
 
                             // Reset Parser
 
@@ -223,7 +209,7 @@ namespace Core
                         if (Settings.OnError)
                             Settings.OnError(Target, Response, Loop->Storage);
 
-                        AppendResponse(Response);
+                        AppendResponse(std::move(Response));
 
                         // Set tcp no push if enabled bu user
 

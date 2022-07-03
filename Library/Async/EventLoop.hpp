@@ -40,6 +40,15 @@ namespace Core::Async
             // @todo Remove Buffer and Parser from here and put it in the callback handler
 
             TimeWheelType::Bucket::Iterator Timer;
+
+            template <typename T>
+            T *CallbackAs()
+            {
+                if (typeid(T) != Callback.target_type())
+                    throw std::bad_cast();
+
+                return Callback.target<T>();
+            }
         };
 
         struct EnqueueEntry
