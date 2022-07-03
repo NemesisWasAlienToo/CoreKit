@@ -52,17 +52,6 @@ int main(int, char const *[])
     // Building a simple filter
 
     Server.FilterFrom(
-        [](HTTP::Server::TFilter &&Next)
-        {
-            return [Next = std::move(Next)](Network::EndPoint const &Target, HTTP::Request &Request, std::shared_ptr<void> &Storage)
-            {
-                return Next(Target, Request, Storage);
-            };
-        });
-
-    // A simple middleware
-
-    Server.MiddlewareFrom(
         [](auto &&Next)
         {
             return [Next = std::move(Next)](Network::EndPoint const &Target, HTTP::Request &Request, std::shared_ptr<void> &Storage)
@@ -82,6 +71,17 @@ int main(int, char const *[])
                 }
 
                 return Next(Target, Request, Storage);
+            };
+        });
+
+    // A simple middleware
+
+    Server.MiddlewareFrom(
+        [](auto &&Next)
+        {
+            return [Next = std::move(Next)](Async::EventLoop *Loop, Async::EventLoop::Entry &Entry, Network::EndPoint const &Target, Network::HTTP::Request &Request)
+            {
+                Next(Loop, Entry, Target, Request);
             };
         });
 
