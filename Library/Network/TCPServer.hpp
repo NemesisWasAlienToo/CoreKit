@@ -76,6 +76,11 @@ namespace Core
 
             TCPServer &operator=(TCPServer const &Other) = delete;
 
+            Async::ThreadPool& ThreadPool()
+            {
+                return Pool;
+            }
+
             void Run()
             {
                 Async::Runnable::Run();

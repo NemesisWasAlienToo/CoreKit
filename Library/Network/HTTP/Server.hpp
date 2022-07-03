@@ -38,6 +38,11 @@ namespace Core::Network::HTTP
 
         // Server functions
 
+        inline Async::ThreadPool& ThreadPool()
+        {
+            return TCP.ThreadPool();
+        }
+
         inline Server &Run()
         {
             TCP.Run();
