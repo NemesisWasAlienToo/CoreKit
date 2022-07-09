@@ -25,6 +25,34 @@ namespace Core
     {
         namespace HTTP
         {
+
+            struct ConnectionContext
+            {
+                Async::EventLoop &Loop;
+                Async::EventLoop::Entry &Self;
+                Network::EndPoint const &Target;
+
+                // Helper functions
+
+                template <typename T>
+                inline T &StorageAs()
+                {
+                    return *std::static_pointer_cast<T>(Loop.Storage);
+                }
+
+                inline void ListenFor(ePoll::Event Events)
+                {
+                    Loop.Modify(Self, Events);
+                }
+
+                inline void Reschedual(Duration const &Timeout)
+                {
+                    Loop.Reschedual(Self, Timeout);
+                }
+
+                // inline void InsertHandler();
+            };
+
             struct ConnectionSettings
             {
                 size_t MaxHeaderSize;
@@ -34,8 +62,8 @@ namespace Core
                 size_t RequestBufferSize;
                 size_t ResponseBufferSize;
                 std::string HostName;
-                std::function<void(Network::EndPoint const &, Network::HTTP::Response &, std::shared_ptr<void> &)> OnError;
-                std::function<void(Async::EventLoop *, Async::EventLoop::Entry &, Network::EndPoint const &, Network::HTTP::Request &)> OnRequest;
+                std::function<void(ConnectionContext &, Network::HTTP::Response &)> OnError;
+                std::function<std::optional<Network::HTTP::Response>(ConnectionContext &, Network::HTTP::Request &)> OnRequest;
             };
 
             struct ConnectionHandler
@@ -192,12 +220,18 @@ namespace Core
                                 {
                                     ShouldClose = true;
                                     Client.ShutDown(Network::Socket::Read);
-                                }                                
+                                }
                             }
 
                             // Append response to buffer
 
-                            Settings.OnRequest(Loop, Self, Target, Parser.Result);
+                            ConnectionContext Context{*Loop, Self, Target};
+
+                            if (auto Result = Settings.OnRequest(Context, Parser.Result))
+                            {
+                                Context.Self.CallbackAs<HTTP::ConnectionHandler>()->AppendResponse(std::move(Result.value()));
+                                Context.ListenFor(ePoll::Out | ePoll::In);
+                            }
 
                             // Reset Parser
 
@@ -211,9 +245,7 @@ namespace Core
 
                         AppendResponse(std::move(Response));
 
-                        // Set tcp no push if enabled bu user
-
-                        Loop->Modify(Self, ShouldClose ? ePoll::Out : ePoll::In | ePoll::Out);
+                        Loop->Modify(Self, ePoll::Out);
 
                         ShouldClose = true;
                     }
@@ -226,7 +258,7 @@ namespace Core
 
                     //     AppendResponse(Response);
 
-                    //     Loop->Modify(Self, ShouldClose ? ePoll::Out : ePoll::In | ePoll::Out);
+                    //     Loop->Modify(Self, ePoll::Out);
 
                     //     ShouldClose = true;
                     // }

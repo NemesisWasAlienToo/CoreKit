@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <optional>
 
 #include <Network/DNS.hpp>
 #include <Event.hpp>
@@ -38,6 +39,11 @@ namespace Core::Network::HTTP
 
         // Server functions
 
+        inline Async::ThreadPool &ThreadPool()
+        {
+            return TCP.ThreadPool();
+        }
+
         inline Server &Run()
         {
             TCP.Run();
@@ -58,6 +64,13 @@ namespace Core::Network::HTTP
         inline Server &SetDefault(TAction &&Action)
         {
             _Router.Default = std::forward<TAction>(Action);
+            return *this;
+        }
+
+        template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
+        inline Server &SetBind(HTTP::Methods Method, TAction &&Action)
+        {
+            _Router.Add<TRoute, Group>(Method, std::forward<TAction>(Action));
             return *this;
         }
 
@@ -132,18 +145,28 @@ namespace Core::Network::HTTP
                 std::forward<TAction>(Action));
         }
 
-        template <typename TBuildCallback>
-        inline Server &MiddlewareFrom(TBuildCallback &&Builder)
+        template <typename TCallback>
+        inline Server &Middleware(TCallback &&Callback)
         {
-            Settings.OnRequest = Builder(std::move(Settings.OnRequest));
+            using namespace std::placeholders;
+
+            Settings.OnRequest = std::bind(
+                std::forward<TCallback>(Callback),
+                _1, _2,
+                std::move(Settings.OnRequest));
 
             return *this;
         }
 
-        template <typename TBuildCallback>
-        inline Server &FilterFrom(TBuildCallback &&Builder)
+        template <typename TCallback>
+        inline Server &Filter(TCallback &&Callback)
         {
-            _Router.Default = Builder(std::move(_Router.Default));
+            using namespace std::placeholders;
+
+            _Router.Default = std::bind(
+                std::forward<TCallback>(Callback),
+                _1, _2,
+                std::move(_Router.Default));
 
             return *this;
         }
@@ -222,7 +245,7 @@ namespace Core::Network::HTTP
 
     private:
         TCPServer TCP;
-        Router<HTTP::Response(Network::EndPoint const &, Network::HTTP::Request &, std::shared_ptr<void> &)> _Router;
+        Router<std::optional<HTTP::Response>(HTTP::ConnectionContext &, Network::HTTP::Request &)> _Router;
         Duration Timeout;
 
     public:
@@ -235,10 +258,9 @@ namespace Core::Network::HTTP
             1024,
             Network::DNS::HostName(),
             nullptr,
-            [this](Async::EventLoop *Loop, Async::EventLoop::Entry &Entry, Network::EndPoint const &Target, Network::HTTP::Request &Request)
+            [this](ConnectionContext &Context, Network::HTTP::Request &Request)
             {
-                Entry.CallbackAs<ConnectionHandler>()->AppendResponse(_Router.Match(Request, Target, Request, Loop->Storage));
-                Loop->Modify(Entry, ePoll::Out | ePoll::In);
+                return _Router.Match(Request, Context, Request);
             }};
     };
 }

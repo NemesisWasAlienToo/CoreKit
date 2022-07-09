@@ -36,9 +36,6 @@ namespace Core::Async
             CallbackType Callback;
             EndCallbackType End;
             Container::iterator Iterator;
-
-            // @todo Remove Buffer and Parser from here and put it in the callback handler
-
             TimeWheelType::Bucket::Iterator Timer;
 
             template <typename T>
@@ -84,6 +81,14 @@ namespace Core::Async
 
                             This->Insert(std::move(Des.File), std::move(Des.Callback), std::move(Des.End), std::move(Des.Interval));
                         }
+
+                        This->Actions.ForEach(
+                            [This](auto &CB)
+                            {
+                                CB(This);
+                            });
+
+                        This->Actions.Free();
                     }
                 },
                 nullptr,
@@ -167,6 +172,27 @@ namespace Core::Async
             _Poll.Modify(Self.File, Events, (size_t)&Self);
         }
 
+        template <typename TCallback>
+        void Execute(TCallback &&Callback)
+        {
+            if (HasPermission())
+            {
+                Callback(this);
+            }
+            else
+            {
+                // @todo maybe use lock free queue?
+
+                {
+                    std::unique_lock lock(QueueMutex);
+
+                    Actions.Add(std::move(Callback));
+                }
+
+                Notify();
+            }
+        }
+
         void Assign(Descriptor &&Client, CallbackType &&Callback, EndCallbackType &&End = nullptr, Duration const &Interval = {0, 0})
         {
             if (HasPermission())
@@ -179,8 +205,6 @@ namespace Core::Async
 
                 {
                     std::unique_lock lock(QueueMutex);
-
-                    // @todo Check max connections
 
                     Queue.Add(std::move(Client), std::move(Callback), std::move(End), Interval);
                 }
@@ -286,6 +310,7 @@ namespace Core::Async
 
         std::mutex QueueMutex;
         Iterable::Queue<EnqueueEntry> Queue;
+        Iterable::Queue<std::function<void(EventLoop *)>> Actions;
 
     public:
         std::thread Runner;
