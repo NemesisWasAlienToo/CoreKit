@@ -24,10 +24,13 @@ namespace Core::Async
     {
     public:
         struct Entry;
+        struct Context;
 
         using TimeWheelType = TimeWheel<32, 5>;
         using Container = std::list<Entry>;
-        using CallbackType = std::function<void(EventLoop *, ePoll::Entry &, Entry &)>;
+        using CallbackType = std::function<void(EventLoop::Context &, ePoll::Entry &)>;
+
+        // @todo Change this
         using EndCallbackType = std::function<void(EventLoop *, Entry &)>;
 
         struct Entry
@@ -64,6 +67,11 @@ namespace Core::Async
                 Loop.Modify(Self, Events);
             }
 
+            inline void Remove()
+            {
+                Loop.Remove(Self.Iterator);
+            }
+
             template <typename TCallback>
             inline auto Schedual(Duration const &Timeout, TCallback &&Callback)
             {
@@ -92,31 +100,31 @@ namespace Core::Async
         {
             auto IIterator = Insert(
                 Event(0, 0),
-                [](EventLoop *This, ePoll::Entry &, Entry &Self)
+                [](EventLoop::Context &Context, ePoll::Entry &)
                 {
-                    Event &ev = *static_cast<Event *>(&Self.File);
+                    Event &ev = *static_cast<Event *>(&Context.Self.File);
 
                     ev.Listen();
 
                     {
                         // @todo Potential buttle neck
 
-                        std::unique_lock lock(This->QueueMutex);
+                        std::unique_lock lock(Context.Loop.QueueMutex);
 
-                        while (!This->Queue.IsEmpty())
+                        while (!Context.Loop.Queue.IsEmpty())
                         {
-                            auto Des = This->Queue.Take();
+                            auto Des = Context.Loop.Queue.Take();
 
-                            This->Insert(std::move(Des.File), std::move(Des.Callback), std::move(Des.End), std::move(Des.Interval));
+                            Context.Loop.Insert(std::move(Des.File), std::move(Des.Callback), std::move(Des.End), std::move(Des.Interval));
                         }
 
-                        This->Actions.ForEach(
-                            [This](auto &CB)
+                        Context.Loop.Actions.ForEach(
+                            [Context](auto &CB)
                             {
-                                CB(This);
+                                CB(Context.Loop);
                             });
 
-                        This->Actions.Free();
+                        Context.Loop.Actions.Free();
                     }
                 },
                 nullptr,
@@ -130,12 +138,12 @@ namespace Core::Async
 
             auto TIterator = Insert(
                 Timer(Timer::Monotonic, 0),
-                [](EventLoop *This, ePoll::Entry &, auto &Self)
+                [](EventLoop::Context &Context, ePoll::Entry &)
                 {
-                    auto &Ev = *static_cast<Event *>(&Self.File);
+                    auto &Ev = *static_cast<Event *>(&Context.Self.File);
 
                     Ev.Listen();
-                    This->Wheel.Tick();
+                    Context.Loop.Wheel.Tick();
                 },
                 nullptr,
                 {0, 0});
@@ -270,9 +278,9 @@ namespace Core::Async
                 Events.ForEach(
                     [this](ePoll::Entry &Item)
                     {
-                        auto &Ent = *reinterpret_cast<Entry *>(Item.Data);
+                        EventLoop::Context Context{*this, *reinterpret_cast<Entry *>(Item.Data)};
 
-                        Ent.Callback(this, Item, Ent);
+                        Context.Self.Callback(Context, Item);
                     });
             }
 
@@ -346,7 +354,7 @@ namespace Core::Async
 
         std::mutex QueueMutex;
         Iterable::Queue<EnqueueEntry> Queue;
-        Iterable::Queue<std::function<void(EventLoop *)>> Actions;
+        Iterable::Queue<std::function<void(EventLoop &)>> Actions;
 
     public:
         std::thread Runner;

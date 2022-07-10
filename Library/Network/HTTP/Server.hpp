@@ -15,7 +15,7 @@
 #include <Network/HTTP/Parser.hpp>
 #include <Network/TCPServer.hpp>
 #include <Network/HTTP/Router.hpp>
-#include <Network/HTTP/ConnectionHandler.hpp>
+#include <Network/HTTP/Connection.hpp>
 
 namespace Core::Network::HTTP
 {
@@ -28,7 +28,7 @@ namespace Core::Network::HTTP
                   endPoint,
                   [this](Network::EndPoint const &Target)
                   {
-                      return ConnectionHandler(Timeout, Target, Settings);
+                      return Connection(Timeout, Target, Settings);
                   },
                   timeout,
                   ThreadCount,
@@ -58,12 +58,6 @@ namespace Core::Network::HTTP
         inline void Stop()
         {
             TCP.Stop();
-        }
-
-        inline static void SendResponse(HTTP::ConnectionContext const &Context, HTTP::Response &&Response)
-        {
-            Context.Self.CallbackAs<HTTP::ConnectionHandler>()->AppendResponse(std::move(Response));
-            Context.ListenFor(ePoll::Out | ePoll::In);
         }
 
         template <typename TAction>
@@ -251,11 +245,11 @@ namespace Core::Network::HTTP
 
     private:
         TCPServer TCP;
-        Router<std::optional<HTTP::Response>(HTTP::ConnectionContext &, Network::HTTP::Request &)> _Router;
+        Router<std::optional<HTTP::Response>(HTTP::Connection::Context &, Network::HTTP::Request &)> _Router;
         Duration Timeout;
 
     public:
-        ConnectionHandler::Settings Settings{
+        Connection::Settings Settings{
             1024 * 1024 * 1,
             1024 * 1024 * 5,
             1024 * 1024 * 5,
@@ -264,7 +258,7 @@ namespace Core::Network::HTTP
             1024,
             Network::DNS::HostName(),
             nullptr,
-            [this](ConnectionContext &Context, Network::HTTP::Request &Request)
+            [this](Connection::Context &Context, Network::HTTP::Request &Request)
             {
                 return _Router.Match(Request, Context, Request);
             }};
