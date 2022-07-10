@@ -107,12 +107,12 @@ namespace Core
                     Response.Headers.insert_or_assign("Content-Length", std::to_string(HasFile ? FileLength : StringLength));
                     Response.Headers.insert_or_assign("Host", Setting.HostName);
 
-                    OBuffer.Add(
-                        Iterable::Queue<char>(Setting.ResponseBufferSize),
-                        // @todo Remove pointer
-                        HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
-                        FileLength,
-                        UseSendFile);
+                    OBuffer.Insert(
+                        {Iterable::Queue<char>(Setting.ResponseBufferSize),
+                         // @todo Remove pointer
+                         HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
+                         FileLength,
+                         UseSendFile});
 
                     Format::Stream Ser(OBuffer.Tail().Buffer);
 
@@ -122,7 +122,7 @@ namespace Core
                 void operator()(Async::EventLoop::Context &Context, ePoll::Entry &Item)
                 {
                     Network::Socket &Client = *static_cast<Network::Socket *>(&Context.Self.File);
-                    Connection::Context ConnContext{Context.Loop, Context.Self, Target};
+                    Connection::Context ConnContext{Context, Target};
 
                     if (Item.Happened(ePoll::In) || Item.Happened(ePoll::UrgentIn))
                     {

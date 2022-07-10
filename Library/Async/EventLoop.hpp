@@ -18,6 +18,43 @@
 
 // @todo Safety of assign caller thread
 
+struct ThrowOnCopy
+{
+    ThrowOnCopy() = default;
+    ThrowOnCopy(const ThrowOnCopy &) { throw std::logic_error("Oops!"); }
+    ThrowOnCopy(ThrowOnCopy &&) = default;
+    ThrowOnCopy &operator=(ThrowOnCopy &&) = default;
+};
+
+template <typename T>
+struct FakeCopyable : ThrowOnCopy
+{
+    FakeCopyable(T &&t) : target(std::forward<T>(t)) {}
+
+    FakeCopyable(FakeCopyable &&) = default;
+
+    FakeCopyable(const FakeCopyable &other)
+        : ThrowOnCopy(other),                              // this will throw
+          target(std::move(const_cast<T &>(other.target))) // never reached
+    {
+    }
+
+    template <typename... Args>
+    auto operator()(Args &&...a)
+    {
+        return target(std::forward<Args>(a)...);
+    }
+
+    T target;
+};
+
+template <typename T>
+FakeCopyable<T>
+fake_copyable(T &&t)
+{
+    return {std::forward<T>(t)};
+}
+
 namespace Core::Async
 {
     class EventLoop
@@ -94,7 +131,7 @@ namespace Core::Async
 
         EventLoop() = default;
         EventLoop(EventLoop const &Other) = delete;
-        EventLoop(EventLoop &&Other) noexcept : _Poll(std::move(Other._Poll)), Expire(std::move(Other.Expire)), Interrupt(std::move(Other.Interrupt)), Wheel(std::move(Other.Wheel)), Handlers(std::move(Other.Handlers)), Queue(std::move(Other.Queue)) {}
+        EventLoop(EventLoop &&Other) noexcept : _Poll(std::move(Other._Poll)), Expire(std::move(Other.Expire)), Interrupt(std::move(Other.Interrupt)), Wheel(std::move(Other.Wheel)), Handlers(std::move(Other.Handlers)), Actions(std::move(Other.Actions)) {}
 
         EventLoop(Duration const &Interval) : _Poll(0), Expire(nullptr), Interrupt(nullptr), Wheel(Interval)
         {
@@ -110,13 +147,6 @@ namespace Core::Async
                         // @todo Potential buttle neck
 
                         std::unique_lock lock(Context.Loop.QueueMutex);
-
-                        while (!Context.Loop.Queue.IsEmpty())
-                        {
-                            auto Des = Context.Loop.Queue.Take();
-
-                            Context.Loop.Insert(std::move(Des.File), std::move(Des.Callback), std::move(Des.End), std::move(Des.Interval));
-                        }
 
                         Context.Loop.Actions.ForEach(
                             [Context](auto &CB)
@@ -250,7 +280,12 @@ namespace Core::Async
                 {
                     std::unique_lock lock(QueueMutex);
 
-                    Queue.Add(std::move(Client), std::move(Callback), std::move(End), Interval);
+                    Actions.Add(fake_copyable(
+                        [c = std::move(Client), cb = std::move(Callback), ecb = std::move(End), Interval](EventLoop& Loop) mutable
+                        {
+                            Loop.Insert(std::move(c), std::move(cb), std::move(ecb), Interval);
+                        }
+                    ));
                 }
 
                 Notify();
@@ -297,7 +332,7 @@ namespace Core::Async
                 Interrupt = std::move(Other.Interrupt);
                 Wheel = std::move(Other.Wheel);
                 Handlers = std::move(Other.Handlers);
-                Queue = std::move(Other.Queue);
+                Actions = std::move(Other.Actions);
             }
 
             return *this;
@@ -306,8 +341,8 @@ namespace Core::Async
     private:
         Container::iterator Insert(Descriptor &&descriptor, CallbackType &&handler, EndCallbackType &&end, Duration const &Timeout)
         {
-            auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), std::move(end), {}, {}});
-            // auto Iterator = Handlers.emplace(std::move(descriptor), std::move(handler), Handlers.end(), Wheel.end());
+            auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), std::move(end), Handlers.end(), Wheel.end()});
+            // auto Iterator = Handlers.emplace(std::move(descriptor), std::move(handler), std::move(end), Handlers.end(), Wheel.end());
             Iterator->Iterator = Iterator;
 
             if (Timeout.AsMilliseconds() > 0)
@@ -353,7 +388,6 @@ namespace Core::Async
         Container Handlers;
 
         std::mutex QueueMutex;
-        Iterable::Queue<EnqueueEntry> Queue;
         Iterable::Queue<std::function<void(EventLoop &)>> Actions;
 
     public:
