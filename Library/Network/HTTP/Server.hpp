@@ -60,6 +60,12 @@ namespace Core::Network::HTTP
             TCP.Stop();
         }
 
+        inline static void SendResponse(HTTP::ConnectionContext const &Context, HTTP::Response &&Response)
+        {
+            Context.Self.CallbackAs<HTTP::ConnectionHandler>()->AppendResponse(std::move(Response));
+            Context.ListenFor(ePoll::Out | ePoll::In);
+        }
+
         template <typename TAction>
         inline Server &SetDefault(TAction &&Action)
         {
@@ -249,7 +255,7 @@ namespace Core::Network::HTTP
         Duration Timeout;
 
     public:
-        ConnectionSettings Settings{
+        ConnectionHandler::Settings Settings{
             1024 * 1024 * 1,
             1024 * 1024 * 5,
             1024 * 1024 * 5,

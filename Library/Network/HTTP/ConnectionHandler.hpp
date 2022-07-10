@@ -25,45 +25,18 @@ namespace Core
     {
         namespace HTTP
         {
+            struct ConnectionHandler;
 
-            struct ConnectionContext
+            struct ConnectionContext : public Async::EventLoop::Context
             {
-                Async::EventLoop &Loop;
-                Async::EventLoop::Entry &Self;
                 Network::EndPoint const &Target;
 
-                // Helper functions
-
-                template <typename T>
-                inline T &StorageAs()
-                {
-                    return *std::static_pointer_cast<T>(Loop.Storage);
-                }
-
-                inline void ListenFor(ePoll::Event Events)
-                {
-                    Loop.Modify(Self, Events);
-                }
-
-                inline void Reschedual(Duration const &Timeout)
-                {
-                    Loop.Reschedual(Self, Timeout);
-                }
+                // inline void Send(HTTP::Response &&Response)
+                // {
+                //     Self.CallbackAs<HTTP::ConnectionHandler>()->SendResponse(std::move(Response));
+                // }
 
                 // inline void InsertHandler();
-            };
-
-            struct ConnectionSettings
-            {
-                size_t MaxHeaderSize;
-                size_t MaxBodySize;
-                size_t MaxFileSize;
-                size_t SendFileThreshold;
-                size_t RequestBufferSize;
-                size_t ResponseBufferSize;
-                std::string HostName;
-                std::function<void(ConnectionContext &, Network::HTTP::Response &)> OnError;
-                std::function<std::optional<Network::HTTP::Response>(ConnectionContext &, Network::HTTP::Request &)> OnRequest;
             };
 
             struct ConnectionHandler
@@ -76,20 +49,33 @@ namespace Core
                     bool SendFile;
                 };
 
+                struct Settings
+                {
+                    size_t MaxHeaderSize;
+                    size_t MaxBodySize;
+                    size_t MaxFileSize;
+                    size_t SendFileThreshold;
+                    size_t RequestBufferSize;
+                    size_t ResponseBufferSize;
+                    std::string HostName;
+                    std::function<void(ConnectionContext &, Network::HTTP::Response &)> OnError;
+                    std::function<std::optional<Network::HTTP::Response>(ConnectionContext &, Network::HTTP::Request &)> OnRequest;
+                };
+
                 Duration Timeout;
                 Network::EndPoint Target;
                 Iterable::Queue<HTTP::Request> IBuffer;
                 Iterable::Queue<OutEntry> OBuffer;
-                ConnectionSettings const &Settings;
+                Settings const &Setting;
 
                 // @todo Fix this limitations
-                HTTP::Parser Parser{Settings.MaxHeaderSize, Settings.MaxBodySize, Settings.RequestBufferSize};
+                HTTP::Parser Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize};
                 bool ShouldClose = false;
 
-                ConnectionHandler(Duration const &Timeout, Network::EndPoint const &Target, ConnectionSettings const &settings)
+                ConnectionHandler(Duration const &Timeout, Network::EndPoint const &Target, Settings const &setting)
                     : Timeout(Timeout),
                       Target(Target),
-                      Settings(settings)
+                      Setting(setting)
                 {
                 }
 
@@ -111,18 +97,18 @@ namespace Core
                     size_t StringLength = 0;
 
                     HasFile ? FileLength =
-                                  std::min(std::get<std::shared_ptr<File>>(Response.Content)->Size(), Settings.MaxFileSize)
-                            : StringLength = std::min(std::get<std::string>(Response.Content).length(), Settings.MaxBodySize);
+                                  std::min(std::get<std::shared_ptr<File>>(Response.Content)->Size(), Setting.MaxFileSize)
+                            : StringLength = std::min(std::get<std::string>(Response.Content).length(), Setting.MaxBodySize);
 
-                    bool UseSendFile = Settings.SendFileThreshold && HasFile && FileLength > Settings.SendFileThreshold;
+                    bool UseSendFile = Setting.SendFileThreshold && HasFile && FileLength > Setting.SendFileThreshold;
 
                     // Trim content if its too big
 
                     Response.Headers.insert_or_assign("Content-Length", std::to_string(HasFile ? FileLength : StringLength));
-                    Response.Headers.insert_or_assign("Host", Settings.HostName);
+                    Response.Headers.insert_or_assign("Host", Setting.HostName);
 
                     OBuffer.Add(
-                        Iterable::Queue<char>(Settings.ResponseBufferSize),
+                        Iterable::Queue<char>(Setting.ResponseBufferSize),
                         // @todo Remove pointer
                         HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
                         FileLength,
@@ -133,21 +119,11 @@ namespace Core
                     Ser << Response;
                 }
 
-                void Pause(Async::EventLoop *Loop, Async::EventLoop::Entry &Self)
-                {
-                    Loop->Modify(Self, ePoll::Out);
-                }
-
-                void Resume(Async::EventLoop *Loop, Async::EventLoop::Entry &Self)
-                {
-                    Loop->Reschedual(Self, Timeout);
-                }
-
                 void operator()(Async::EventLoop *Loop, ePoll::Entry &Item, Async::EventLoop::Entry &Self)
                 {
                     Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
 
-                    if (Item.Happened(ePoll::In) | Item.Happened(ePoll::UrgentIn))
+                    if (Item.Happened(ePoll::In) || Item.Happened(ePoll::UrgentIn))
                     {
                         if (!Client.Received())
                         {
@@ -174,6 +150,7 @@ namespace Core
                 void OnRead(Async::EventLoop *Loop, Async::EventLoop::Entry &Self)
                 {
                     Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
+                    ConnectionContext Context{*Loop, Self, Target};
 
                     try
                     {
@@ -225,9 +202,7 @@ namespace Core
 
                             // Append response to buffer
 
-                            ConnectionContext Context{*Loop, Self, Target};
-
-                            if (auto Result = Settings.OnRequest(Context, Parser.Result))
+                            if (auto Result = Setting.OnRequest(Context, Parser.Result))
                             {
                                 Context.Self.CallbackAs<HTTP::ConnectionHandler>()->AppendResponse(std::move(Result.value()));
                                 Context.ListenFor(ePoll::Out | ePoll::In);
@@ -240,8 +215,8 @@ namespace Core
                     }
                     catch (HTTP::Response &Response)
                     {
-                        if (Settings.OnError)
-                            Settings.OnError(Target, Response, Loop->Storage);
+                        if (Setting.OnError)
+                            Setting.OnError(Context, Response);
 
                         AppendResponse(std::move(Response));
 
@@ -253,8 +228,8 @@ namespace Core
                     // {
                     //     auto Response = HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, "");
 
-                    //     if (Settings.OnError)
-                    //         Settings.OnError(Target, Response, Loop->Storage);
+                    //     if (Setting.OnError)
+                    //         Setting.OnError(Target, Response, Loop->Storage);
 
                     //     AppendResponse(Response);
 

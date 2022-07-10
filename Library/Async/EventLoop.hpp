@@ -48,6 +48,34 @@ namespace Core::Async
             }
         };
 
+        struct Context
+        {
+            EventLoop &Loop;
+            Entry &Self;
+
+            template <typename T>
+            inline T &StorageAs()
+            {
+                return *std::static_pointer_cast<T>(Loop.Storage);
+            }
+
+            inline void ListenFor(ePoll::Event Events) const
+            {
+                Loop.Modify(Self, Events);
+            }
+
+            template <typename TCallback>
+            inline auto Schedual(Duration const &Timeout, TCallback &&Callback)
+            {
+                return Loop.Schedual(Timeout, std::forward<TCallback>(Callback));
+            }
+
+            inline void Reschedual(Duration const &Timeout)
+            {
+                Loop.Reschedual(Self, Timeout);
+            }
+        };
+
         struct EnqueueEntry
         {
             Descriptor File;
@@ -126,6 +154,14 @@ namespace Core::Async
         {
             if (!HasPermission())
                 throw std::runtime_error("Invalid thread");
+        }
+
+        template <typename TCallback>
+        auto Schedual(Duration const &Interval, TCallback &&Callback)
+        {
+            AssertPersmission();
+
+            return Wheel.Add(Interval, std::forward<TCallback>(Callback));
         }
 
         void Reschedual(Entry &Self, Duration const &Interval)
