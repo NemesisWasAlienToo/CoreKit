@@ -36,7 +36,7 @@ namespace Core
 
                 Pool[0].Assign(
                     std::move(Server),
-                    [this, HandlerBuilder = std::forward<TCallback>(handlerBuilder), Timeout, Counter = 0](Async::EventLoop::Context& Context, ePoll::Entry &) mutable
+                    [this, HandlerBuilder = std::forward<TCallback>(handlerBuilder), Timeout, Counter = 0](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
                     {
                         Network::Socket &Server = *static_cast<Network::Socket *>(&Context.Self.File);
 
@@ -62,7 +62,7 @@ namespace Core
                         Turn.Assign(
                             std::move(Client),
                             HandlerBuilder(Info),
-                            [this](Async::EventLoop *, Async::EventLoop::Entry &)
+                            [this](Async::EventLoop::Context &)
                             {
                                 ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
                             },
@@ -76,7 +76,7 @@ namespace Core
 
             TCPServer &operator=(TCPServer const &Other) = delete;
 
-            Async::ThreadPool& ThreadPool()
+            Async::ThreadPool &ThreadPool()
             {
                 return Pool;
             }

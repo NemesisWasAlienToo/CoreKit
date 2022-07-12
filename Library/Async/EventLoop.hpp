@@ -8,6 +8,7 @@
 
 #include <Event.hpp>
 #include <Duration.hpp>
+#include <Function.hpp>
 #include <TimeWheel.hpp>
 #include <ePoll.hpp>
 #include <Iterable/Queue.hpp>
@@ -65,10 +66,10 @@ namespace Core::Async
 
         using TimeWheelType = TimeWheel<32, 5>;
         using Container = std::list<Entry>;
-        using CallbackType = std::function<void(EventLoop::Context &, ePoll::Entry &)>;
+        using CallbackType = Core::Function<void(EventLoop::Context &, ePoll::Entry &)>;
 
         // @todo Change this
-        using EndCallbackType = std::function<void(EventLoop *, Entry &)>;
+        using EndCallbackType = Core::Function<void(EventLoop::Context &)>;
 
         struct Entry
         {
@@ -81,10 +82,7 @@ namespace Core::Async
             template <typename T>
             T *CallbackAs()
             {
-                if (typeid(T) != Callback.target_type())
-                    throw std::bad_cast();
-
-                return Callback.target<T>();
+                return Callback.Target<T>();
             }
         };
 
@@ -222,7 +220,10 @@ namespace Core::Async
             AssertPersmission();
 
             if (Iterator->End)
-                Iterator->End(this, *Iterator);
+            {
+                Context ctx{*this, *Iterator};
+                Iterator->End(ctx);
+            }
 
             _Poll.Delete(Iterator->File);
             Handlers.erase(Iterator);
@@ -388,7 +389,7 @@ namespace Core::Async
         Container Handlers;
 
         std::mutex QueueMutex;
-        Iterable::Queue<std::function<void(EventLoop &)>> Actions;
+        Iterable::Queue<Core::Function<void(EventLoop &)>> Actions;
 
     public:
         std::thread Runner;

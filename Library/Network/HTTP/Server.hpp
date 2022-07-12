@@ -26,7 +26,7 @@ namespace Core::Network::HTTP
         Server(EndPoint const &endPoint, Duration const &timeout, size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500))
             : TCP(
                   endPoint,
-                  [this](Network::EndPoint const &Target)
+                  [this](Network::EndPoint const &Target) -> Connection
                   {
                       return Connection(Timeout, Target, Settings);
                   },
