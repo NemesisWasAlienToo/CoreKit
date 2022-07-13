@@ -33,24 +33,27 @@ namespace Core
             CopyConstructor(&Object, Other.Object);
         }
 
-        Function(std::nullptr_t){};
+        Function(std::nullptr_t) noexcept {};
 
         template <typename TFunctor>
-        Function(TFunctor &&Functor) noexcept : Object(new std::decay_t<TFunctor>(std::forward<TFunctor>(Functor))),
-                                                Invoker(
-                                                    [](void *Item, TArgs... Args)
-                                                    {
-                                                        using T = std::decay_t<TFunctor>;
-                                                        return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
-                                                    }),
-                                                Destructor(
-                                                    [](void const *Item)
-                                                    {
-                                                        using T = std::decay_t<TFunctor>;
-                                                        static_cast<T const *>(Item)->~T();
-                                                    }),
+        Function(TFunctor &&Functor,
+                 std::enable_if_t<
+                     !std::is_same_v<std::decay_t<TFunctor>, Function>, void> * = nullptr) noexcept
+            : Object(new std::decay_t<TFunctor>(std::forward<TFunctor>(Functor))),
+              Invoker(
+                  [](void *Item, TArgs... Args)
+                  {
+                      using T = std::decay_t<TFunctor>;
+                      return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
+                  }),
+              Destructor(
+                  [](void const *Item)
+                  {
+                      using T = std::decay_t<TFunctor>;
+                      static_cast<T const *>(Item)->~T();
+                  }),
 
-                                                Hash(typeid(TFunctor).hash_code())
+              Hash(typeid(TFunctor).hash_code())
         {
             if constexpr (std::is_copy_constructible_v<std::decay_t<TFunctor>> || std::is_trivially_constructible_v<std::decay_t<TFunctor>>)
             {
