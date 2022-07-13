@@ -5,6 +5,7 @@
 #include <thread>
 #include <mutex>
 #include <memory>
+#include <functional>
 
 #include <Event.hpp>
 #include <Duration.hpp>
@@ -66,10 +67,10 @@ namespace Core::Async
 
         using TimeWheelType = TimeWheel<32, 5>;
         using Container = std::list<Entry>;
-        using CallbackType = Core::Function<void(EventLoop::Context &, ePoll::Entry &)>;
+        using CallbackType = std::function<void(EventLoop::Context &, ePoll::Entry &)>;
 
         // @todo Change this
-        using EndCallbackType = Core::Function<void(EventLoop::Context &)>;
+        using EndCallbackType = std::function<void(EventLoop::Context &)>;
 
         struct Entry
         {
@@ -82,7 +83,9 @@ namespace Core::Async
             template <typename T>
             T *CallbackAs()
             {
-                return Callback.Target<T>();
+                // return Callback.Target<T>();
+
+                return Callback.target<T>();
             }
         };
 
@@ -269,10 +272,10 @@ namespace Core::Async
                     //     std::forward<TArgs>(Args)...));
 
                     Actions.Add(
-                        [Callback = std::forward<TCallback>(Callback), ... Args = std::forward<TArgs>(Args)](EventLoop &Loop) mutable
+                        fake_copyable([Callback = std::forward<TCallback>(Callback), ... Args = std::forward<TArgs>(Args)](EventLoop &Loop) mutable
                         {
                             Callback(Loop, std::forward<TArgs>(Args)...);
-                        });
+                        }));
                 }
 
                 Notify();
@@ -406,7 +409,7 @@ namespace Core::Async
         Container Handlers;
 
         std::mutex QueueMutex;
-        Iterable::Queue<Core::Function<void(EventLoop &)>> Actions;
+        Iterable::Queue<std::function<void(EventLoop &)>> Actions;
 
     public:
         std::thread Runner;
