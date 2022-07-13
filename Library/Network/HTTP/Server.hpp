@@ -15,7 +15,7 @@
 #include <Network/HTTP/Parser.hpp>
 #include <Network/TCPServer.hpp>
 #include <Network/HTTP/Router.hpp>
-#include <Network/HTTP/ConnectionHandler.hpp>
+#include <Network/HTTP/Connection.hpp>
 
 namespace Core::Network::HTTP
 {
@@ -26,9 +26,9 @@ namespace Core::Network::HTTP
         Server(EndPoint const &endPoint, Duration const &timeout, size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500))
             : TCP(
                   endPoint,
-                  [this](Network::EndPoint const &Target)
+                  [this](Network::EndPoint const &Target) -> Connection
                   {
-                      return ConnectionHandler(Timeout, Target, Settings);
+                      return Connection(Timeout, Target, Settings);
                   },
                   timeout,
                   ThreadCount,
@@ -245,11 +245,11 @@ namespace Core::Network::HTTP
 
     private:
         TCPServer TCP;
-        Router<std::optional<HTTP::Response>(HTTP::ConnectionContext &, Network::HTTP::Request &)> _Router;
+        Router<std::optional<HTTP::Response>(HTTP::Connection::Context &, Network::HTTP::Request &)> _Router;
         Duration Timeout;
 
     public:
-        ConnectionSettings Settings{
+        Connection::Settings Settings{
             1024 * 1024 * 1,
             1024 * 1024 * 5,
             1024 * 1024 * 5,
@@ -258,7 +258,7 @@ namespace Core::Network::HTTP
             1024,
             Network::DNS::HostName(),
             nullptr,
-            [this](ConnectionContext &Context, Network::HTTP::Request &Request)
+            [this](Connection::Context &Context, Network::HTTP::Request &Request)
             {
                 return _Router.Match(Request, Context, Request);
             }};

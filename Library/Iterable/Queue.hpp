@@ -417,6 +417,22 @@ namespace Core::Iterable
             std::construct_at(&_ElementAt(_Length++), std::forward<TArgs>(Args)...);
         }
 
+        template <typename... TArgs>
+        void Insert(T &&Item)
+        {
+            IncreaseCapacity();
+
+            std::construct_at(&_ElementAt(_Length++), std::move(Item));
+        }
+
+        template <typename... TArgs>
+        void Insert(T const &Item)
+        {
+            IncreaseCapacity();
+
+            std::construct_at(&_ElementAt(_Length++), Item);
+        }
+
         void MoveFrom(T *Data, size_t Count)
         {
             IncreaseCapacity(Count);

@@ -25,48 +25,7 @@ namespace Core
     {
         namespace HTTP
         {
-
-            struct ConnectionContext
-            {
-                Async::EventLoop &Loop;
-                Async::EventLoop::Entry &Self;
-                Network::EndPoint const &Target;
-
-                // Helper functions
-
-                template <typename T>
-                inline T &StorageAs()
-                {
-                    return *std::static_pointer_cast<T>(Loop.Storage);
-                }
-
-                inline void ListenFor(ePoll::Event Events)
-                {
-                    Loop.Modify(Self, Events);
-                }
-
-                inline void Reschedual(Duration const &Timeout)
-                {
-                    Loop.Reschedual(Self, Timeout);
-                }
-
-                // inline void InsertHandler();
-            };
-
-            struct ConnectionSettings
-            {
-                size_t MaxHeaderSize;
-                size_t MaxBodySize;
-                size_t MaxFileSize;
-                size_t SendFileThreshold;
-                size_t RequestBufferSize;
-                size_t ResponseBufferSize;
-                std::string HostName;
-                std::function<void(ConnectionContext &, Network::HTTP::Response &)> OnError;
-                std::function<std::optional<Network::HTTP::Response>(ConnectionContext &, Network::HTTP::Request &)> OnRequest;
-            };
-
-            struct ConnectionHandler
+            struct Connection
             {
                 struct OutEntry
                 {
@@ -76,20 +35,64 @@ namespace Core
                     bool SendFile;
                 };
 
+                struct Context : public Async::EventLoop::Context
+                {
+                    Network::EndPoint const &Target;
+
+                    inline void SendResponse(HTTP::Response &&Response) const
+                    {
+                        // Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
+
+                        // ListenFor(ePoll::In | ePoll::Out);
+
+                        Loop.Execute(
+                            [*this](Async::EventLoop &, HTTP::Response &&Response)
+                            {
+                                Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
+
+                                ListenFor(ePoll::In | ePoll::Out);
+                            },
+                            std::move(Response));
+
+                        // Loop.Execute(
+                        //     [*this, Response = std::move(Response)](Async::EventLoop &) mutable
+                        //     {
+                        //         Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
+
+                        //         ListenFor(ePoll::In | ePoll::Out);
+                        //     });
+                    }
+
+                    // inline void InsertHandler();
+                };
+
+                struct Settings
+                {
+                    size_t MaxHeaderSize;
+                    size_t MaxBodySize;
+                    size_t MaxFileSize;
+                    size_t SendFileThreshold;
+                    size_t RequestBufferSize;
+                    size_t ResponseBufferSize;
+                    std::string HostName;
+                    std::function<void(Context &, Network::HTTP::Response &)> OnError;
+                    std::function<std::optional<Network::HTTP::Response>(Context &, Network::HTTP::Request &)> OnRequest;
+                };
+
                 Duration Timeout;
                 Network::EndPoint Target;
                 Iterable::Queue<HTTP::Request> IBuffer;
                 Iterable::Queue<OutEntry> OBuffer;
-                ConnectionSettings const &Settings;
+                Settings const &Setting;
 
                 // @todo Fix this limitations
-                HTTP::Parser Parser{Settings.MaxHeaderSize, Settings.MaxBodySize, Settings.RequestBufferSize};
+                HTTP::Parser Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize};
                 bool ShouldClose = false;
 
-                ConnectionHandler(Duration const &Timeout, Network::EndPoint const &Target, ConnectionSettings const &settings)
+                Connection(Duration const &Timeout, Network::EndPoint const &Target, Settings &setting)
                     : Timeout(Timeout),
                       Target(Target),
-                      Settings(settings)
+                      Setting(setting)
                 {
                 }
 
@@ -111,69 +114,60 @@ namespace Core
                     size_t StringLength = 0;
 
                     HasFile ? FileLength =
-                                  std::min(std::get<std::shared_ptr<File>>(Response.Content)->Size(), Settings.MaxFileSize)
-                            : StringLength = std::min(std::get<std::string>(Response.Content).length(), Settings.MaxBodySize);
+                                  std::min(std::get<std::shared_ptr<File>>(Response.Content)->Size(), Setting.MaxFileSize)
+                            : StringLength = std::min(std::get<std::string>(Response.Content).length(), Setting.MaxBodySize);
 
-                    bool UseSendFile = Settings.SendFileThreshold && HasFile && FileLength > Settings.SendFileThreshold;
+                    bool UseSendFile = Setting.SendFileThreshold && HasFile && FileLength > Setting.SendFileThreshold;
 
                     // Trim content if its too big
 
                     Response.Headers.insert_or_assign("Content-Length", std::to_string(HasFile ? FileLength : StringLength));
-                    Response.Headers.insert_or_assign("Host", Settings.HostName);
+                    Response.Headers.insert_or_assign("Host", Setting.HostName);
 
-                    OBuffer.Add(
-                        Iterable::Queue<char>(Settings.ResponseBufferSize),
-                        // @todo Remove pointer
-                        HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
-                        FileLength,
-                        UseSendFile);
+                    OBuffer.Insert(
+                        {Iterable::Queue<char>(Setting.ResponseBufferSize),
+                         // @todo Remove pointer
+                         HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
+                         FileLength,
+                         UseSendFile});
 
                     Format::Stream Ser(OBuffer.Tail().Buffer);
 
                     Ser << Response;
                 }
 
-                void Pause(Async::EventLoop *Loop, Async::EventLoop::Entry &Self)
+                void operator()(Async::EventLoop::Context &Context, ePoll::Entry &Item)
                 {
-                    Loop->Modify(Self, ePoll::Out);
-                }
+                    Network::Socket &Client = *static_cast<Network::Socket *>(&Context.Self.File);
+                    Connection::Context ConnContext{Context, Target};
 
-                void Resume(Async::EventLoop *Loop, Async::EventLoop::Entry &Self)
-                {
-                    Loop->Reschedual(Self, Timeout);
-                }
-
-                void operator()(Async::EventLoop *Loop, ePoll::Entry &Item, Async::EventLoop::Entry &Self)
-                {
-                    Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
-
-                    if (Item.Happened(ePoll::In) | Item.Happened(ePoll::UrgentIn))
+                    if (Item.Happened(ePoll::In) || Item.Happened(ePoll::UrgentIn))
                     {
                         if (!Client.Received())
                         {
-                            Loop->Remove(Self.Iterator);
+                            Context.Remove();
                             return;
                         }
 
-                        Loop->Reschedual(Self, Timeout);
+                        Context.Reschedual(Timeout);
 
-                        OnRead(Loop, Self);
+                        OnRead(ConnContext);
                     }
 
                     if (Item.Happened(ePoll::Out))
                     {
-                        OnWrite(Loop, Self);
+                        OnWrite(ConnContext);
                     }
 
                     if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error))
                     {
-                        Loop->Remove(Self.Iterator);
+                        Context.Remove();
                     }
                 }
 
-                void OnRead(Async::EventLoop *Loop, Async::EventLoop::Entry &Self)
+                void OnRead(Connection::Context &Context)
                 {
-                    Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
+                    Network::Socket &Client = *static_cast<Network::Socket *>(&Context.Self.File);
 
                     try
                     {
@@ -211,12 +205,8 @@ namespace Core
 
                                 // @todo Optimize this
 
-                                if (Parser.Result.Version == HTTP::HTTP10 && ConnectionValue != "keep-alive")
-                                {
-                                    ShouldClose = true;
-                                    Client.ShutDown(Network::Socket::Read);
-                                }
-                                else if (Parser.Result.Version == HTTP::HTTP11 && ConnectionValue == "close")
+                                if ((Parser.Result.Version == HTTP::HTTP10 && ConnectionValue != "keep-alive") ||
+                                    (Parser.Result.Version == HTTP::HTTP11 && ConnectionValue == "close"))
                                 {
                                     ShouldClose = true;
                                     Client.ShutDown(Network::Socket::Read);
@@ -225,11 +215,9 @@ namespace Core
 
                             // Append response to buffer
 
-                            ConnectionContext Context{*Loop, Self, Target};
-
-                            if (auto Result = Settings.OnRequest(Context, Parser.Result))
+                            if (auto Result = Setting.OnRequest(Context, Parser.Result))
                             {
-                                Context.Self.CallbackAs<HTTP::ConnectionHandler>()->AppendResponse(std::move(Result.value()));
+                                Context.Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Result.value()));
                                 Context.ListenFor(ePoll::Out | ePoll::In);
                             }
 
@@ -240,12 +228,12 @@ namespace Core
                     }
                     catch (HTTP::Response &Response)
                     {
-                        if (Settings.OnError)
-                            Settings.OnError(Target, Response, Loop->Storage);
+                        if (Setting.OnError)
+                            Setting.OnError(Context, Response);
 
                         AppendResponse(std::move(Response));
 
-                        Loop->Modify(Self, ePoll::Out);
+                        Context.ListenFor(ePoll::Out);
 
                         ShouldClose = true;
                     }
@@ -253,8 +241,8 @@ namespace Core
                     // {
                     //     auto Response = HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, "");
 
-                    //     if (Settings.OnError)
-                    //         Settings.OnError(Target, Response, Loop->Storage);
+                    //     if (Setting.OnError)
+                    //         Setting.OnError(Target, Response, Loop->Storage);
 
                     //     AppendResponse(Response);
 
@@ -264,9 +252,9 @@ namespace Core
                     // }
                 }
 
-                void OnWrite(Async::EventLoop *Loop, Async::EventLoop::Entry &Self)
+                void OnWrite(Connection::Context &Context)
                 {
-                    Network::Socket &Client = *static_cast<Network::Socket *>(&Self.File);
+                    Network::Socket &Client = *static_cast<Network::Socket *>(&Context.Self.File);
 
                     // If there is nothing to send
 
@@ -274,13 +262,13 @@ namespace Core
                     {
                         if (ShouldClose)
                         {
-                            Loop->Remove(Self.Iterator);
+                            Context.Remove();
                             return;
                         }
 
                         OBuffer.Free();
 
-                        Loop->Modify(Self, ePoll::In);
+                        Context.ListenFor(ePoll::In);
                         return;
                     }
 
@@ -302,7 +290,7 @@ namespace Core
 
                         // @todo Make socket non-blocking and improve this
 
-                        Self.File << Ser;
+                        Context.Self.File << Ser;
 
                         if (!Item.Buffer.IsEmpty())
                             return;
