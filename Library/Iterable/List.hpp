@@ -3,6 +3,7 @@
 #include <tuple>
 #include <memory>
 #include <optional>
+#include <type_traits>
 #include <initializer_list>
 #include <sys/uio.h>
 
@@ -18,7 +19,7 @@ namespace Core::Iterable
 
         List() = default;
         List(size_t Size, bool Growable = true) : _Content(Size), _Length(0), _Growable(Growable) {}
-        List(std::initializer_list<T> list) : _Content(list.size()), _Length(list.size()), _Growable(true)
+        List(std::initializer_list<T> list) : _Content(list.size()), _Length(0), _Growable(true)
         {
             for (auto &Item : list)
                 Add(Item);

@@ -290,27 +290,6 @@ namespace Core::Async
                     Insert(std::move(c), std::move(cb), std::move(ecb), to);
                 },
                 std::move(Client), std::move(Callback), std::move(End), Interval);
-
-            // if (HasPermission())
-            // {
-            //     Insert(std::move(Client), std::move(Callback), std::move(End), Interval);
-            // }
-            // else
-            // {
-            //     // @todo maybe use lock free queue?
-
-            //     {
-            //         std::unique_lock lock(QueueMutex);
-
-            //         Actions.Add(
-            //             [c = std::move(Client), cb = std::move(Callback), ecb = std::move(End), Interval](EventLoop &Loop) mutable
-            //             {
-            //                 Loop.Insert(std::move(c), std::move(cb), std::move(ecb), Interval);
-            //             });
-            //     }
-
-            //     Notify();
-            // }
         }
 
         void Notify(uint64_t Value = 1)

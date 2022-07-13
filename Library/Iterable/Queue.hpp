@@ -18,7 +18,7 @@ namespace Core::Iterable
 
         Queue() = default;
         Queue(size_t Size, bool Growable = true) : _Content(Size), _First(0), _Length(0), _Growable(Growable) {}
-        Queue(std::initializer_list<T> list) : _Content(list.size()), _First(0), _Length(list.size()), _Growable(true)
+        Queue(std::initializer_list<T> list) : _Content(list.size()), _First(0), _Length(0), _Growable(true)
         {
             for (auto &Item : list)
                 Add(Item);
