@@ -41,9 +41,26 @@ namespace Core
 
                     inline void SendResponse(HTTP::Response &&Response) const
                     {
-                        Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
+                        // Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
 
-                        ListenFor(ePoll::In | ePoll::Out);
+                        // ListenFor(ePoll::In | ePoll::Out);
+
+                        Loop.Execute(
+                            [*this](Async::EventLoop &, HTTP::Response &&Response)
+                            {
+                                Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
+
+                                ListenFor(ePoll::In | ePoll::Out);
+                            },
+                            std::move(Response));
+
+                        // Loop.Execute(
+                        //     [*this, Response = std::move(Response)](Async::EventLoop &) mutable
+                        //     {
+                        //         Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
+
+                        //         ListenFor(ePoll::In | ePoll::Out);
+                        //     });
                     }
 
                     // inline void InsertHandler();

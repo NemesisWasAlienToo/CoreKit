@@ -247,21 +247,32 @@ namespace Core::Async
             _Poll.Modify(Self.File, Events, (size_t)&Self);
         }
 
-        template <typename TCallback>
-        void Execute(TCallback &&Callback)
+        template <typename TCallback, typename... TArgs>
+        void Execute(TCallback &&Callback, TArgs &&...Args)
         {
             if (HasPermission())
             {
-                Callback(this);
+                Callback(*this, std::forward<TArgs>(Args)...);
             }
             else
             {
                 // @todo maybe use lock free queue?
 
                 {
+                    using namespace std::placeholders;
+
                     std::unique_lock lock(QueueMutex);
 
-                    Actions.Add(std::move(Callback));
+                    // Actions.Add(std::bind(
+                    //     std::forward<TCallback>(Callback),
+                    //     _1,
+                    //     std::forward<TArgs>(Args)...));
+
+                    Actions.Add(
+                        [Callback = std::forward<TCallback>(Callback), ... Args = std::forward<TArgs>(Args)](EventLoop &Loop) mutable
+                        {
+                            Callback(Loop, std::forward<TArgs>(Args)...);
+                        });
                 }
 
                 Notify();
@@ -270,27 +281,33 @@ namespace Core::Async
 
         void Assign(Descriptor &&Client, CallbackType &&Callback, EndCallbackType &&End = nullptr, Duration const &Interval = {0, 0})
         {
-            if (HasPermission())
-            {
-                Insert(std::move(Client), std::move(Callback), std::move(End), Interval);
-            }
-            else
-            {
-                // @todo maybe use lock free queue?
-
+            Execute(
+                [this](EventLoop &, Descriptor &&c, CallbackType &&cb, EndCallbackType &&ecb = nullptr, Duration const &to) mutable
                 {
-                    std::unique_lock lock(QueueMutex);
+                    Insert(std::move(c), std::move(cb), std::move(ecb), to);
+                },
+                std::move(Client), std::move(Callback), std::move(End), Interval);
 
-                    Actions.Add(fake_copyable(
-                        [c = std::move(Client), cb = std::move(Callback), ecb = std::move(End), Interval](EventLoop& Loop) mutable
-                        {
-                            Loop.Insert(std::move(c), std::move(cb), std::move(ecb), Interval);
-                        }
-                    ));
-                }
+            // if (HasPermission())
+            // {
+            //     Insert(std::move(Client), std::move(Callback), std::move(End), Interval);
+            // }
+            // else
+            // {
+            //     // @todo maybe use lock free queue?
 
-                Notify();
-            }
+            //     {
+            //         std::unique_lock lock(QueueMutex);
+
+            //         Actions.Add(
+            //             [c = std::move(Client), cb = std::move(Callback), ecb = std::move(End), Interval](EventLoop &Loop) mutable
+            //             {
+            //                 Loop.Insert(std::move(c), std::move(cb), std::move(ecb), Interval);
+            //             });
+            //     }
+
+            //     Notify();
+            // }
         }
 
         void Notify(uint64_t Value = 1)

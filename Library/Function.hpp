@@ -3,9 +3,6 @@
 
 namespace Core
 {
-#include <iostream>
-#include <type_traits>
-#include <functional>
 
     template <typename>
     class Function;
@@ -36,7 +33,7 @@ namespace Core
             CopyConstructor(&Object, Other.Object);
         }
 
-        Function(std::nullptr_t) {};
+        Function(std::nullptr_t){};
 
         template <typename TFunctor>
         Function(TFunctor &&Functor) noexcept : Object(new std::decay_t<TFunctor>(std::forward<TFunctor>(Functor))),
