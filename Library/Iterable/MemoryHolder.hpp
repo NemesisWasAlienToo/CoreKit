@@ -13,21 +13,21 @@ namespace Core::Iterable
         size_t _Length = 0;
 
     public:
-        MemoryHolder() = default;
-        MemoryHolder(size_t Size) : _Content(Allocate(Size)), _Length(Size) {}
-        MemoryHolder(MemoryHolder const &Other) : _Content(Allocate(Other._Length)), _Length(Other._Length) {}
-        MemoryHolder(MemoryHolder &&Other) : _Content(Other._Content), _Length(Other._Length)
+        constexpr MemoryHolder() = default;
+        constexpr MemoryHolder(size_t Size) : _Content(Allocate(Size)), _Length(Size) {}
+        constexpr MemoryHolder(MemoryHolder const &Other) : _Content(Allocate(Other._Length)), _Length(Other._Length) {}
+        constexpr MemoryHolder(MemoryHolder &&Other) : _Content(Other._Content), _Length(Other._Length)
         {
             Other._Content = nullptr;
             Other._Length = 0;
         }
 
-        ~MemoryHolder()
+        constexpr ~MemoryHolder()
         {
             Deallocate();
         }
 
-        MemoryHolder &operator=(MemoryHolder &&Other)
+        constexpr MemoryHolder &operator=(MemoryHolder &&Other)
         {
             Deallocate();
 
@@ -40,7 +40,7 @@ namespace Core::Iterable
             return *this;
         }
 
-        MemoryHolder &operator=(MemoryHolder const &Other)
+        constexpr MemoryHolder &operator=(MemoryHolder const &Other)
         {
             Deallocate();
 
@@ -50,22 +50,23 @@ namespace Core::Iterable
             return *this;
         }
 
-        inline T *Allocate(size_t Count)
+        constexpr inline T *Allocate(size_t Count)
         {
             return _Allocator.allocate(Count);
         }
 
-        inline void Deallocate()
+        constexpr inline void Deallocate()
         {
-            _Allocator.deallocate(_Content, _Length);
+            if (_Content)
+                _Allocator.deallocate(_Content, _Length);
         }
 
-        inline size_t Length() const { return _Length; }
+        constexpr inline size_t Length() const { return _Length; }
 
-        inline T *Content() { return _Content; }
-        inline T const *Content() const { return _Content; }
+        constexpr inline T *Content() { return _Content; }
+        constexpr inline T const *Content() const { return _Content; }
 
-        inline T &operator[](size_t Index) { return _Content[Index]; }
-        inline T const &operator[](size_t Index) const { return _Content[Index]; }
+        constexpr inline T &operator[](size_t Index) { return _Content[Index]; }
+        constexpr inline T const &operator[](size_t Index) const { return _Content[Index]; }
     };
 }
