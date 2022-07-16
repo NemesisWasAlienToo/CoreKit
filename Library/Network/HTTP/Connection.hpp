@@ -41,15 +41,56 @@ namespace Core
 
                     inline void SendResponse(HTTP::Response &&Response) const
                     {
-                        Loop.Execute(
-                            [*this](Async::EventLoop &, HTTP::Response &&Response)
-                            {
-                                Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
+                        Loop.AssertPersmission();
 
-                                ListenFor(ePoll::In | ePoll::Out);
-                            },
-                            std::move(Response));
+                        Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
+
+                        ListenFor(ePoll::In | ePoll::Out);
                     }
+
+                    template <typename TCallback>
+                    inline void OnDone(TCallback &&Callback)
+                    {
+                        HandlerAs<HTTP::Connection>().OnDone = std::forward<TCallback>(Callback);
+                    }
+
+                    template <typename TCallback>
+                    inline void Upgrade(TCallback &&Callback, ePoll::Event Events = ePoll::In)
+                    {
+                        ListenFor(ePoll::Out);
+
+                        OnDone(
+                            [*this, Events, Callback = std::forward<TCallback>(Callback)](bool Closes) mutable
+                            {
+                                if (Closes)
+                                    return;
+
+                                ListenFor(Events);
+
+                                Self.Callback = std::forward<TCallback>(Callback);
+                            });
+                    }
+
+                    // template <typename TCallback>
+                    // inline void Upgrade(TCallback &&Callback, ePoll::Event Events = ePoll::In)
+                    // {
+                    //     ListenFor(ePoll::Out);
+
+                    //     OnDone(
+                    //         [*this, Events, Callback = std::forward<TCallback>(Callback)](bool Closes) mutable
+                    //         {
+                    //             if (Closes)
+                    //                 return;
+
+                    //             Loop.Queue(
+                    //                 [*this, Events, Callback = std::forward<TCallback>(Callback)]() mutable
+                    //                 {
+                    //                     ListenFor(Events);
+
+                    //                     Self.Callback = std::forward<TCallback>(Callback);
+                    //                 });
+                    //         });
+                    // }
 
                     // inline void InsertHandler();
                 };
@@ -72,6 +113,7 @@ namespace Core
                 Iterable::Queue<HTTP::Request> IBuffer;
                 Iterable::Queue<OutEntry> OBuffer;
                 Settings const &Setting;
+                std::function<void(bool)> OnDone;
 
                 // @todo Fix this limitations
                 HTTP::Parser Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize};
@@ -129,6 +171,12 @@ namespace Core
                     Network::Socket &Client = *static_cast<Network::Socket *>(&Context.Self.File);
                     Connection::Context ConnContext{Context, Target};
 
+                    if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error))
+                    {
+                        Context.Remove();
+                        return;
+                    }
+
                     if (Item.Happened(ePoll::In) || Item.Happened(ePoll::UrgentIn))
                     {
                         if (!Client.Received())
@@ -145,11 +193,6 @@ namespace Core
                     if (Item.Happened(ePoll::Out))
                     {
                         OnWrite(ConnContext);
-                    }
-
-                    if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error))
-                    {
-                        Context.Remove();
                     }
                 }
 
@@ -205,17 +248,24 @@ namespace Core
 
                             if (auto Result = Setting.OnRequest(Context, Parser.Result))
                             {
-                                Context.Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Result.value()));
-                                Context.ListenFor(ePoll::Out | ePoll::In);
+                                Context.SendResponse(std::move(Result.value()));
                             }
+
+                            if (ShouldClose)
+                                return;
 
                             // Reset Parser
 
                             Parser.Reset();
+
+                            if (OBuffer.IsEmpty() && OnDone)
+                                OnDone(false);
                         }
                     }
-                    catch (HTTP::Response &Response)
+                    catch (HTTP::Status Method)
                     {
+                        auto Response = HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, "");
+
                         if (Setting.OnError)
                             Setting.OnError(Context, Response);
 
@@ -225,19 +275,6 @@ namespace Core
 
                         ShouldClose = true;
                     }
-                    // catch (HTTP::Status Method)
-                    // {
-                    //     auto Response = HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, "");
-
-                    //     if (Setting.OnError)
-                    //         Setting.OnError(Target, Response, Loop->Storage);
-
-                    //     AppendResponse(Response);
-
-                    //     Loop->Modify(Self, ePoll::Out);
-
-                    //     ShouldClose = true;
-                    // }
                 }
 
                 void OnWrite(Connection::Context &Context)
@@ -250,6 +287,7 @@ namespace Core
                     {
                         if (ShouldClose)
                         {
+                            OnDone(true);
                             Context.Remove();
                             return;
                         }
@@ -257,6 +295,10 @@ namespace Core
                         OBuffer.Free();
 
                         Context.ListenFor(ePoll::In);
+
+                        if (OnDone)
+                            OnDone(false);
+
                         return;
                     }
 

@@ -56,9 +56,11 @@ namespace Core
 
             void Execute()
             {
+                if (Entries.size() <= 0)
+                    return;
+                    
                 for (auto &entry : Entries)
                 {
-                    // @todo Check whether entry is valid
                     if (entry.Callback)
                         entry.Callback();
                 }

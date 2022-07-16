@@ -68,15 +68,13 @@ namespace Core::Async
         using TimeWheelType = TimeWheel<32, 5>;
         using Container = std::list<Entry>;
         using CallbackType = std::function<void(EventLoop::Context &, ePoll::Entry &)>;
-
-        // @todo Change this
-        using EndCallbackType = std::function<void(EventLoop::Context &)>;
+        using EndCallbackType = std::function<void()>;
 
         struct Entry
         {
             Descriptor File;
             CallbackType Callback;
-            EndCallbackType End;
+            Iterable::Queue<EndCallbackType> End;
             Container::iterator Iterator;
             TimeWheelType::Bucket::Iterator Timer;
 
@@ -94,31 +92,91 @@ namespace Core::Async
             EventLoop &Loop;
             Entry &Self;
 
+            inline void AssertPermission()
+            {
+                Loop.AssertPersmission();
+            }
+
+            template <typename TCallback, typename... TArgs>
+            void operator()(TCallback &&Callback, TArgs &&...Args)
+            {
+                Loop.Execute(std::forward<TCallback>(Callback), std::forward<TArgs>(Args)...);
+            }
+
             template <typename T>
             inline T &StorageAs()
             {
                 return *std::static_pointer_cast<T>(Loop.Storage);
             }
 
+            template <typename T>
+            inline T &HandlerAs()
+            {
+                return *Self.CallbackAs<T>();
+            }
+
+            template <typename T>
+            inline T &FileAs()
+            {
+                return *static_cast<Network::Socket *>(&Self.File);
+            }
+
             inline void ListenFor(ePoll::Event Events) const
             {
+                // Loop.Execute(
+                //     [*this, Events](auto &)
+                //     {
+                //         Loop.Modify(Self, Events);
+                //     });
+
                 Loop.Modify(Self, Events);
             }
 
             inline void Remove()
             {
+                // Loop.Execute(
+                //     [*this](auto &)
+                //     {
+                //         Loop.Remove(Self.Iterator);
+                //     });
+
                 Loop.Remove(Self.Iterator);
             }
 
             template <typename TCallback>
             inline auto Schedual(Duration const &Timeout, TCallback &&Callback)
             {
-                return Loop.Schedual(Timeout, std::forward<TCallback>(Callback));
+                // Loop.Execute(
+                //     [*this, Timeout](auto &, auto &&Callback)
+                //     {
+                //         Loop.Schedual(Timeout, std::forward<TCallback>(Callback));
+                //     },
+                //     std::forward<TCallback>(Callback));
+
+                Loop.Schedual(Timeout, std::forward<TCallback>(Callback));
             }
 
             inline void Reschedual(Duration const &Timeout)
             {
+                // Loop.Execute(
+                //     [*this, Timeout](auto &)
+                //     {
+                //         Loop.Reschedual(Self, Timeout);
+                //     });
+
                 Loop.Reschedual(Self, Timeout);
+            }
+            template <typename TCallback>
+            inline void OnDisconnect(TCallback &&Callback)
+            {
+                // Loop.Execute(
+                //     [*this](Async::EventLoop &, TCallback &&Callback)
+                //     {
+                //         Self.End.Add(std::forward<TCallback>(Callback));
+                //     },
+                //     std::forward<TCallback>(Callback));
+
+                Self.End.Add(std::forward<TCallback>(Callback));
             }
         };
 
@@ -150,9 +208,9 @@ namespace Core::Async
                         std::unique_lock lock(Context.Loop.QueueMutex);
 
                         Context.Loop.Actions.ForEach(
-                            [Context](auto &CB)
+                            [](auto &CB)
                             {
-                                CB(Context.Loop);
+                                CB();
                             });
 
                         Context.Loop.Actions.Free();
@@ -222,10 +280,13 @@ namespace Core::Async
         {
             AssertPersmission();
 
-            if (Iterator->End)
+            if (Iterator->End.Length())
             {
-                Context ctx{*this, *Iterator};
-                Iterator->End(ctx);
+                Iterator->End.ForEach(
+                    [](auto &Item)
+                    {
+                        Item();
+                    });
             }
 
             _Poll.Delete(Iterator->File);
@@ -250,12 +311,26 @@ namespace Core::Async
             _Poll.Modify(Self.File, Events, (size_t)&Self);
         }
 
+        template <typename TCallback>
+        void Queue(TCallback &&Callback)
+        {
+            {
+                using namespace std::placeholders;
+
+                std::unique_lock lock(QueueMutex);
+
+                Actions.Add(std::forward<TCallback>(Callback));
+            }
+
+            Notify();
+        }
+
         template <typename TCallback, typename... TArgs>
         void Execute(TCallback &&Callback, TArgs &&...Args)
         {
             if (HasPermission())
             {
-                Callback(*this, std::forward<TArgs>(Args)...);
+                Callback(std::forward<TArgs>(Args)...);
             }
             else
             {
@@ -271,10 +346,10 @@ namespace Core::Async
                     //     _1,
                     //     std::forward<TArgs>(Args)...));
 
-                    Actions.Add(
-                        fake_copyable([Callback = std::forward<TCallback>(Callback), ... Args = std::forward<TArgs>(Args)](EventLoop &Loop) mutable
+                    Actions.Add(fake_copyable(
+                        [Callback = std::forward<TCallback>(Callback), ... Args = std::forward<TArgs>(Args)]() mutable
                         {
-                            Callback(Loop, std::forward<TArgs>(Args)...);
+                            Callback(std::forward<TArgs>(Args)...);
                         }));
                 }
 
@@ -285,7 +360,7 @@ namespace Core::Async
         void Assign(Descriptor &&Client, CallbackType &&Callback, EndCallbackType &&End = nullptr, Duration const &Interval = {0, 0})
         {
             Execute(
-                [this](EventLoop &, Descriptor &&c, CallbackType &&cb, EndCallbackType &&ecb = nullptr, Duration const &to) mutable
+                [this](Descriptor &&c, CallbackType &&cb, EndCallbackType &&ecb, Duration const &to) mutable
                 {
                     Insert(std::move(c), std::move(cb), std::move(ecb), to);
                 },
@@ -341,9 +416,10 @@ namespace Core::Async
     private:
         Container::iterator Insert(Descriptor &&descriptor, CallbackType &&handler, EndCallbackType &&end, Duration const &Timeout)
         {
-            auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), std::move(end), Handlers.end(), Wheel.end()});
-            // auto Iterator = Handlers.emplace(std::move(descriptor), std::move(handler), std::move(end), Handlers.end(), Wheel.end());
+            // auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), std::move(end), Handlers.end(), Wheel.end()});
+            auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), Iterable::Queue<EndCallbackType>(2), Handlers.end(), Wheel.end()});
             Iterator->Iterator = Iterator;
+            Iterator->End.Add(std::move(end));
 
             if (Timeout.AsMilliseconds() > 0)
             {
@@ -388,7 +464,7 @@ namespace Core::Async
         Container Handlers;
 
         std::mutex QueueMutex;
-        Iterable::Queue<std::function<void(EventLoop &)>> Actions;
+        Iterable::Queue<std::function<void()>> Actions;
 
     public:
         std::thread Runner;

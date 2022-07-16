@@ -77,7 +77,8 @@ namespace Core
 
                     std::string_view Cookie = Iterator->second;
 
-                    for (auto match : ctre::range<"([^;]+)=([^;]+)(?:;\\s)?">(Cookie))
+                    // for (auto match : ctre::range<"([^;]+)=([^;]+)(?:;\\s)?">(Cookie))
+                    for (auto match : ctre::range<"([^;]+)=([^;]+)">(Cookie))
                     {
                         Result.emplace(match.get<1>(), match.get<2>());
                     }
@@ -109,6 +110,34 @@ namespace Core
                     {
                         Result.emplace(match.get<1>(), match.get<2>());
                     }
+                }
+
+                void QueryParamViews(std::unordered_map<std::string, std::string_view> &Result) const
+                {
+                    std::string_view PathView{Path};
+
+                    auto Start = PathView.find('?');
+
+                    if (Start == std::string_view::npos || PathView.length() == ++Start)
+                    {
+                        return;
+                    }
+
+                    std::string_view Params = PathView.substr(Start);
+
+                    for (auto match : ctre::range<"([^&]+)=([^&]+)">(Params))
+                    {
+                        Result.emplace(match.get<1>(), match.get<2>());
+                    }
+                }
+
+                std::unordered_map<std::string, std::string_view> QueryParamViews() const
+                {
+                    std::unordered_map<std::string, std::string_view> Result;
+
+                    QueryParamViews(Result);
+
+                    return Result;
                 }
 
                 std::unordered_map<std::string, std::string> QueryParams() const

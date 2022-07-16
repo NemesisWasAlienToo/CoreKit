@@ -62,7 +62,7 @@ namespace Core
                         Turn.Assign(
                             std::move(Client),
                             HandlerBuilder(Info),
-                            [this](Async::EventLoop::Context &)
+                            [this]
                             {
                                 ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
                             },
