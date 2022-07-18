@@ -92,16 +92,7 @@ namespace Core::Async
             EventLoop &Loop;
             Entry &Self;
 
-            inline void AssertPermission()
-            {
-                Loop.AssertPersmission();
-            }
-
-            template <typename TCallback, typename... TArgs>
-            void operator()(TCallback &&Callback, TArgs &&...Args)
-            {
-                Loop.Execute(std::forward<TCallback>(Callback), std::forward<TArgs>(Args)...);
-            }
+            // Context functions
 
             template <typename T>
             inline T &StorageAs()
@@ -123,22 +114,14 @@ namespace Core::Async
 
             inline void ListenFor(ePoll::Event Events) const
             {
-                // Loop.Execute(
-                //     [*this, Events](auto &)
-                //     {
-                //         Loop.Modify(Self, Events);
-                //     });
+                // Loop.AssertPersmission();
 
                 Loop.Modify(Self, Events);
             }
 
             inline void Remove()
             {
-                // Loop.Execute(
-                //     [*this](auto &)
-                //     {
-                //         Loop.Remove(Self.Iterator);
-                //     });
+                // Loop.AssertPersmission();
 
                 Loop.Remove(Self.Iterator);
             }
@@ -146,35 +129,36 @@ namespace Core::Async
             template <typename TCallback>
             inline auto Schedual(Duration const &Timeout, TCallback &&Callback)
             {
-                // Loop.Execute(
-                //     [*this, Timeout](auto &, auto &&Callback)
-                //     {
-                //         Loop.Schedual(Timeout, std::forward<TCallback>(Callback));
-                //     },
-                //     std::forward<TCallback>(Callback));
+                // Loop.AssertPersmission();
 
-                Loop.Schedual(Timeout, std::forward<TCallback>(Callback));
+                return Loop.Schedual(Timeout, std::forward<TCallback>(Callback));
             }
 
             inline void Reschedual(Duration const &Timeout)
             {
-                // Loop.Execute(
-                //     [*this, Timeout](auto &)
-                //     {
-                //         Loop.Reschedual(Self, Timeout);
-                //     });
+                // Loop.AssertPersmission();
 
                 Loop.Reschedual(Self, Timeout);
             }
+
+            inline void Reschedual(Entry &entry, Duration const &Timeout)
+            {
+                // Loop.AssertPersmission();
+
+                Loop.Reschedual(entry, Timeout);
+            }
+
+            inline auto Reschedual(TimeWheelType::Bucket::Iterator Iterator, Duration const &Timeout)
+            {
+                // Loop.AssertPersmission();
+
+                return Loop.Reschedual(Iterator, Timeout);
+            }
+
             template <typename TCallback>
             inline void OnDisconnect(TCallback &&Callback)
             {
-                // Loop.Execute(
-                //     [*this](Async::EventLoop &, TCallback &&Callback)
-                //     {
-                //         Self.End.Add(std::forward<TCallback>(Callback));
-                //     },
-                //     std::forward<TCallback>(Callback));
+                // Loop.AssertPersmission();
 
                 Self.End.Add(std::forward<TCallback>(Callback));
             }
@@ -242,34 +226,39 @@ namespace Core::Async
             Expire = static_cast<Timer *>(&TIterator->File);
         }
 
-        inline bool HasPermission()
+        inline bool HasPermission() const
         {
             return RunnerId == std::this_thread::get_id();
         }
 
-        inline void AssertPersmission()
+        inline void AssertPersmission() const
         {
             if (!HasPermission())
                 throw std::runtime_error("Invalid thread");
         }
 
         template <typename TCallback>
-        auto Schedual(Duration const &Interval, TCallback &&Callback)
+        TimeWheelType::Bucket::Iterator Schedual(Duration const &Interval, TCallback &&Callback)
         {
             AssertPersmission();
 
             return Wheel.Add(Interval, std::forward<TCallback>(Callback));
         }
 
-        void Reschedual(Entry &Self, Duration const &Interval)
+        TimeWheelType::Bucket::Iterator Reschedual(TimeWheelType::Bucket::Iterator Iterator, Duration const &Interval)
         {
             AssertPersmission();
 
-            auto Callback = std::move(Self.Timer->Callback);
+            auto Callback = std::move(Iterator->Callback);
 
-            Wheel.Remove(Self.Timer);
+            Wheel.Remove(Iterator);
 
-            Self.Timer = Wheel.Add(Interval, std::move(Callback));
+            return Wheel.Add(Interval, std::move(Callback));
+        }
+
+        void Reschedual(Entry &Self, Duration const &Interval)
+        {
+            Self.Timer = Reschedual(Self.Timer, Interval);
         }
 
         /**
