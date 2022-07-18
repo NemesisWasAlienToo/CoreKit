@@ -72,24 +72,11 @@ namespace Core
                     }
 
                     // template <typename TCallback>
-                    // inline void Upgrade(TCallback &&Callback, ePoll::Event Events = ePoll::In)
+                    // inline void OnDisconnect(TCallback &&Callback)
                     // {
-                    //     ListenFor(ePoll::Out);
+                    //     // Loop.AssertPersmission();
 
-                    //     OnDone(
-                    //         [*this, Events, Callback = std::forward<TCallback>(Callback)](bool Closes) mutable
-                    //         {
-                    //             if (Closes)
-                    //                 return;
-
-                    //             Loop.Queue(
-                    //                 [*this, Events, Callback = std::forward<TCallback>(Callback)]() mutable
-                    //                 {
-                    //                     ListenFor(Events);
-
-                    //                     Self.Callback = std::forward<TCallback>(Callback);
-                    //                 });
-                    //         });
+                    //     Self.End = std::forward<TCallback>(Callback);
                     // }
 
                     // inline void InsertHandler();

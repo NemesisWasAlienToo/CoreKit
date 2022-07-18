@@ -74,7 +74,7 @@ namespace Core::Async
         {
             Descriptor File;
             CallbackType Callback;
-            Iterable::Queue<EndCallbackType> End;
+            EndCallbackType End;
             Container::iterator Iterator;
             TimeWheelType::Bucket::Iterator Timer;
 
@@ -154,22 +154,6 @@ namespace Core::Async
 
                 return Loop.Reschedual(Iterator, Timeout);
             }
-
-            template <typename TCallback>
-            inline void OnDisconnect(TCallback &&Callback)
-            {
-                // Loop.AssertPersmission();
-
-                Self.End.Add(std::forward<TCallback>(Callback));
-            }
-        };
-
-        struct EnqueueEntry
-        {
-            Descriptor File;
-            CallbackType Callback;
-            EndCallbackType End;
-            Duration Interval;
         };
 
         EventLoop() = default;
@@ -269,13 +253,9 @@ namespace Core::Async
         {
             AssertPersmission();
 
-            if (Iterator->End.Length())
+            if (Iterator->End)
             {
-                Iterator->End.ForEach(
-                    [](auto &Item)
-                    {
-                        Item();
-                    });
+                Iterator->End();
             }
 
             _Poll.Delete(Iterator->File);
@@ -301,7 +281,7 @@ namespace Core::Async
         }
 
         template <typename TCallback>
-        void Queue(TCallback &&Callback)
+        void Enqueue(TCallback &&Callback)
         {
             {
                 using namespace std::placeholders;
@@ -405,10 +385,8 @@ namespace Core::Async
     private:
         Container::iterator Insert(Descriptor &&descriptor, CallbackType &&handler, EndCallbackType &&end, Duration const &Timeout)
         {
-            // auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), std::move(end), Handlers.end(), Wheel.end()});
-            auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), Iterable::Queue<EndCallbackType>(2), Handlers.end(), Wheel.end()});
+            auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), std::move(end), Handlers.end(), Wheel.end()});
             Iterator->Iterator = Iterator;
-            Iterator->End.Add(std::move(end));
 
             if (Timeout.AsMilliseconds() > 0)
             {
