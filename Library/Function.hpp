@@ -68,6 +68,21 @@ namespace Core
             }
         }
 
+        Function(TRet (*Function)(TArgs...)) noexcept
+            : Object(reinterpret_cast<void *>(Function)),
+              Invoker(
+                  [](void *Item, TArgs... Args)
+                  {
+                      return (reinterpret_cast<TRet (*)(TArgs...)>(Item))(std::forward<TArgs>(Args)...);
+                  }),
+              Destructor(nullptr),
+              CopyConstructor(
+                  [](void ** Self, void const *Other)
+                  {
+                      *Self = (void*)Other;
+                  }),
+              Hash(typeid(decltype(Function)).hash_code()) {}
+
         Function &operator=(Function &&Other)
         {
             if (this != &Other)
@@ -106,43 +121,6 @@ namespace Core
         ~Function()
         {
             Clear();
-        }
-
-        template <typename TFunctor>
-        static Function From(TFunctor &&Functor)
-        {
-            Function Result;
-
-            using T = std::decay_t<TFunctor>;
-
-            Result.Object = new T(std::forward<TFunctor>(Functor));
-
-            Result.Invoker = [](void *Item, TArgs... Args)
-            {
-                return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
-            };
-
-            Result.Destructor = [](void const *Item)
-            {
-                static_cast<T const *>(Item)->~T();
-                delete static_cast<T const *>(Item);
-            };
-
-            Result.Hash = typeid(T).hash_code();
-
-            if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
-            {
-                Result.CopyConstructor = [](void **Self, void const *Other)
-                {
-                    *Self = new T(*static_cast<T const *>(Other));
-                };
-            }
-            else
-            {
-                Result.CopyConstructor = nullptr;
-            }
-
-            return Result;
         }
 
         inline bool IsCopyable() const

@@ -134,8 +134,9 @@ public:
     TDefault Default;
 
     Router() = default;
-    Router(TDefault &&_Default) : Default(std::move(_Default)) {}
-    Router(TDefault const &_Default) : Default(_Default) {}
+
+    template <typename TCallback>
+    Router(TCallback &&Callback) : Default(std::forward<TCallback>(Callback)) {}
 
     // Had to redefine args to enable universal refrence
 

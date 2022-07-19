@@ -49,9 +49,15 @@ namespace Core
                     }
 
                     template <typename TCallback>
-                    inline void OnDone(TCallback &&Callback)
+                    inline void OnRemove(TCallback &&Callback)
                     {
-                        HandlerAs<HTTP::Connection>().OnDone = std::forward<TCallback>(Callback);
+                        HandlerAs<HTTP::Connection>().OnRemove = std::forward<TCallback>(Callback);
+                    }
+
+                    template <typename TCallback>
+                    inline void OnIdle(TCallback &&Callback)
+                    {
+                        HandlerAs<HTTP::Connection>().OnIdle = std::forward<TCallback>(Callback);
                     }
 
                     template <typename TCallback>
@@ -59,25 +65,14 @@ namespace Core
                     {
                         ListenFor(ePoll::Out);
 
-                        OnDone(
-                            [*this, Events, Callback = std::forward<TCallback>(Callback)](bool Closes) mutable
+                        OnIdle(
+                            [*this, Events, Callback = std::forward<TCallback>(Callback)]() mutable
                             {
-                                if (Closes)
-                                    return;
-
                                 ListenFor(Events);
 
                                 Self.Callback = std::forward<TCallback>(Callback);
                             });
                     }
-
-                    // template <typename TCallback>
-                    // inline void OnDisconnect(TCallback &&Callback)
-                    // {
-                    //     // Loop.AssertPersmission();
-
-                    //     Self.End = std::forward<TCallback>(Callback);
-                    // }
 
                     // inline void InsertHandler();
                 };
@@ -95,22 +90,31 @@ namespace Core
                     std::function<std::optional<Network::HTTP::Response>(Context &, Network::HTTP::Request &)> OnRequest;
                 };
 
-                Duration Timeout;
                 Network::EndPoint Target;
+                Duration Timeout;
                 Iterable::Queue<HTTP::Request> IBuffer;
                 Iterable::Queue<OutEntry> OBuffer;
                 Settings const &Setting;
-                std::function<void(bool)> OnDone;
+
+                // Events
+                std::function<void()> OnRemove;
+                std::function<void()> OnIdle;
 
                 // @todo Fix this limitations
                 HTTP::Parser Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize};
                 bool ShouldClose = false;
 
-                Connection(Duration const &Timeout, Network::EndPoint const &Target, Settings &setting)
-                    : Timeout(Timeout),
-                      Target(Target),
+                Connection(Network::EndPoint const &Target, Duration const &Timeout, Settings &setting)
+                    : Target(Target),
+                      Timeout(Timeout),
                       Setting(setting)
                 {
+                }
+
+                ~Connection()
+                {
+                    if (OnRemove)
+                        OnRemove();
                 }
 
                 void AppendResponse(HTTP::Response &&Response)
@@ -244,9 +248,6 @@ namespace Core
                             // Reset Parser
 
                             Parser.Reset();
-
-                            if (OBuffer.IsEmpty() && OnDone)
-                                OnDone(false);
                         }
                     }
                     catch (HTTP::Status Method)
@@ -274,7 +275,6 @@ namespace Core
                     {
                         if (ShouldClose)
                         {
-                            OnDone(true);
                             Context.Remove();
                             return;
                         }
@@ -283,8 +283,8 @@ namespace Core
 
                         Context.ListenFor(ePoll::In);
 
-                        if (OnDone)
-                            OnDone(false);
+                        if (OnIdle)
+                            OnIdle();
 
                         return;
                     }
