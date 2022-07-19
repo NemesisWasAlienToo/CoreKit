@@ -21,6 +21,8 @@ namespace Core
             template <typename TCallback>
             TCPServer(EndPoint const &endPoint, TCallback &&handlerBuilder, Duration const &Timeout, size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500)) : Pool(Interval, ThreadCount)
             {
+                Settings.Timeout = Timeout;
+
                 Network::Socket Server(static_cast<Network::Socket::SocketFamily>(endPoint.Address().Family()), Network::Socket::TCP);
 
                 // Set Reuse
@@ -36,7 +38,7 @@ namespace Core
 
                 Pool[0].Assign(
                     std::move(Server),
-                    [this, HandlerBuilder = std::forward<TCallback>(handlerBuilder), Timeout, Counter = 0](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
+                    [this, HandlerBuilder = std::forward<TCallback>(handlerBuilder), Counter = 0](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
                     {
                         Network::Socket &Server = *static_cast<Network::Socket *>(&Context.Self.File);
 
@@ -61,12 +63,12 @@ namespace Core
 
                         Turn.Assign(
                             std::move(Client),
-                            HandlerBuilder(Info),
-                            [this](Async::EventLoop::Context &)
+                            HandlerBuilder(Info, Settings.Timeout),
+                            [this]
                             {
                                 ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
                             },
-                            Timeout);
+                            Settings.Timeout);
 
                         Counter = (Counter + 1) % Pool.Length();
                     },
@@ -124,17 +126,25 @@ namespace Core
                 Settings.NoDelay = Enable;
             }
 
+            void IdleTimeout(Duration const &timeout)
+            {
+                Settings.Timeout = timeout;
+            }
+
         private:
             Async::ThreadPool Pool;
             std::atomic<size_t> ConnectionCount{0};
 
+        public:
             struct
             {
                 size_t MaxConnectionCount;
                 bool NoDelay;
+                Duration Timeout;
             } Settings{
                 1024,
-                false};
+                false,
+                {0, 0}};
         };
     }
 }

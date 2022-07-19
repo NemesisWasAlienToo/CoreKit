@@ -23,17 +23,25 @@ namespace Core::Network::HTTP
     {
     public:
         Server() = default;
-        Server(EndPoint const &endPoint, Duration const &timeout, size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500))
+        Server(EndPoint const &endPoint, Duration const &timeout, size_t ThreadCount = std::thread::hardware_concurrency())
             : TCP(
                   endPoint,
-                  [this](Network::EndPoint const &Target) -> Connection
+                  [this](Network::EndPoint const &Target, Duration const &Timeout) -> Connection
                   {
-                      return Connection(Timeout, Target, Settings);
+                      return Connection(Target, Timeout, Settings);
                   },
                   timeout,
                   ThreadCount,
-                  Interval),
-              Timeout(timeout)
+                  Duration::FromMilliseconds(500)),
+              _Router(DefaultRoute)
+        {
+        }
+
+        template <typename TCallback>
+        Server(EndPoint const &endPoint, Duration const &timeout, TCallback &&Callback, size_t ThreadCount = std::thread::hardware_concurrency(),
+               std::enable_if_t<!std::is_integral_v<TCallback>> * = nullptr)
+            : TCP(endPoint, std::forward<TCallback>(Callback), timeout, ThreadCount, Duration::FromMilliseconds(500)),
+              _Router(DefaultRoute)
         {
         }
 
@@ -64,13 +72,6 @@ namespace Core::Network::HTTP
         inline Server &SetDefault(TAction &&Action)
         {
             _Router.Default = std::forward<TAction>(Action);
-            return *this;
-        }
-
-        template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
-        inline Server &SetBind(HTTP::Methods Method, TAction &&Action)
-        {
-            _Router.Add<TRoute, Group>(Method, std::forward<TAction>(Action));
             return *this;
         }
 
@@ -243,10 +244,20 @@ namespace Core::Network::HTTP
             return *this;
         }
 
+        inline Server &IdleTimeout(Duration const &timeout)
+        {
+            TCP.IdleTimeout(timeout);
+            return *this;
+        }
+
     private:
         TCPServer TCP;
         Router<std::optional<HTTP::Response>(HTTP::Connection::Context &, Network::HTTP::Request &)> _Router;
-        Duration Timeout;
+
+        static std::optional<HTTP::Response> DefaultRoute(HTTP::Connection::Context &, HTTP::Request &Req)
+        {
+            return HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>");
+        }
 
     public:
         Connection::Settings Settings{

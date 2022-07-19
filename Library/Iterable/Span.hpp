@@ -10,15 +10,22 @@ namespace Core
         template <typename T>
         class Span
         {
-        private:
-            size_t _Length = 0;
-            T *_Content = nullptr;
-
         public:
-            Span() = default;
-            Span(size_t Size) : _Length(Size), _Content(new T[Size]) {}
+            constexpr Span() = default;
 
-            Span(size_t Size, const T &Value) : _Length(Size), _Content(new T[Size])
+            constexpr Span(std::initializer_list<T> list) : _Length(list.size()), _Content(new T[list.size()])
+            {
+                size_t i = 0;
+                for (auto &item : list)
+                {
+                    _Content[i++] = item;
+                    // i++;
+                }
+            }
+
+            constexpr Span(size_t Size) : _Length(Size), _Content(new T[Size]) {}
+
+            constexpr Span(size_t Size, const T &Value) : _Length(Size), _Content(new T[Size])
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -26,13 +33,13 @@ namespace Core
                 }
             }
 
-            Span(Span &&Other) : _Length(Other._Length), _Content(Other._Content)
+            constexpr Span(Span &&Other) : _Length(Other._Length), _Content(Other._Content)
             {
                 Other._Content = nullptr;
                 Other._Length = 0;
             }
 
-            Span(const Span &Other) : _Length(Other._Length), _Content(new T[Other._Length])
+            constexpr Span(const Span &Other) : _Length(Other._Length), _Content(new T[Other._Length])
             {
                 for (size_t i = 0; i < Other._Length; i++)
                 {
@@ -40,7 +47,7 @@ namespace Core
                 }
             }
 
-            Span(const T *Array, size_t Size) : _Length(Size), _Content(new T[Size])
+            constexpr Span(const T *Array, size_t Size) : _Length(Size), _Content(new T[Size])
             {
                 for (size_t i = 0; i < Size; i++)
                 {
@@ -48,23 +55,13 @@ namespace Core
                 }
             }
 
-            Span(std::initializer_list<T> list) : _Length(list.size()), _Content(new T[list.size()])
-            {
-                size_t i = 0;
-                for (auto &item : list)
-                {
-                    _Content[i] = item;
-                    i++;
-                }
-            }
-
-            ~Span()
+            constexpr ~Span()
             {
                 delete[] _Content;
                 _Content = nullptr;
             }
 
-            Span &operator=(Span const &Other)
+            constexpr Span &operator=(Span const &Other)
             {
                 if (this != &Other)
                 {
@@ -82,7 +79,7 @@ namespace Core
                 return *this;
             }
 
-            Span &operator=(Span &&Other)
+            constexpr Span &operator=(Span &&Other)
             {
                 if (this != &Other)
                 {
@@ -98,42 +95,42 @@ namespace Core
                 return *this;
             }
 
-            inline T *Content()
+            constexpr inline T *Content()
             {
                 return _Content;
             }
 
-            inline T const *Content() const
+            constexpr inline T const *Content() const
             {
                 return _Content;
             }
 
-            inline size_t Length() const
+            constexpr inline size_t Length() const
             {
                 return _Length;
             }
 
-            T &First()
+            constexpr T &First()
             {
                 return this->operator[](0);
             }
 
-            T &Last()
+            constexpr T &Last()
             {
                 return this->operator[](_Length - 1);
             }
 
-            T const &First() const
+            constexpr T const &First() const
             {
                 return this->operator[](0);
             }
 
-            T const &Last() const
+            constexpr T const &Last() const
             {
                 return this->operator[](_Length - 1);
             }
 
-            void Resize(size_t const NewSize)
+            constexpr void Resize(size_t const NewSize)
             {
                 auto NewData = new T[NewSize];
                 auto Bound = std::min(NewSize, _Length);
@@ -151,7 +148,7 @@ namespace Core
             }
 
             template <typename TCallback>
-            std::optional<size_t> Contains(TCallback Callback) const
+            constexpr std::optional<size_t> Contains(TCallback Callback) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -163,7 +160,7 @@ namespace Core
             }
 
             template <typename TCallback>
-            void ForEach(TCallback Action)
+            constexpr void ForEach(TCallback Action)
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -172,7 +169,7 @@ namespace Core
             }
 
             template <typename TCallback>
-            void ForEach(TCallback Action) const
+            constexpr void ForEach(TCallback Action) const
             {
                 for (size_t i = 0; i < _Length; i++)
                 {
@@ -180,20 +177,28 @@ namespace Core
                 }
             }
 
-            T &operator[](size_t const Index)
+            constexpr T &operator[](size_t const Index)
             {
-                if (Index >= _Length)
-                    throw std::out_of_range("");
+                AssertIndex(Index);
 
                 return _Content[Index];
             }
 
-            T const &operator[](size_t const Index) const
+            constexpr T const &operator[](size_t const Index) const
             {
-                if (Index >= _Length)
-                    throw std::out_of_range("");
+                AssertIndex(Index);
 
                 return _Content[Index];
+            }
+
+        private:
+            size_t _Length = 0;
+            T *_Content = nullptr;
+
+            constexpr inline void AssertIndex(size_t Index)
+            {
+                if (Index >= _Length)
+                    throw std::out_of_range("Index out of range");
             }
         };
     }
