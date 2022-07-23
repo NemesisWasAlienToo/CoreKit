@@ -172,30 +172,18 @@ namespace Core::Format
 
         friend Descriptor &operator<<(Descriptor &descriptor, Stream &Stream)
         {
-            size_t Sent = 0;
             struct iovec Vectors[2];
 
-            do
-            {
-                Sent = descriptor.Write(Vectors, 1 + Stream.Queue.DataVector(Vectors));
-
-                Stream.Queue.Free(Sent);
-            } while (!Stream.Queue.IsEmpty() && Sent);
+            Stream.Queue.Free(descriptor.Write(Vectors, 1 + Stream.Queue.DataVector(Vectors)));
 
             return descriptor;
         }
 
         friend Descriptor const &operator<<(Descriptor const &descriptor, Stream &Stream)
         {
-            size_t Sent = 0;
             struct iovec Vectors[2];
 
-            do
-            {
-                Sent = descriptor.Write(Vectors, 1 + Stream.Queue.DataVector(Vectors));
-
-                Stream.Queue.Free(Sent);
-            } while (!Stream.Queue.IsEmpty() && Sent);
+            Stream.Queue.Free(descriptor.Write(Vectors, 1 + Stream.Queue.DataVector(Vectors)));
 
             return descriptor;
         }
@@ -231,42 +219,20 @@ namespace Core::Format
 
         friend Descriptor const &operator>>(Descriptor const &descriptor, Stream &Stream)
         {
-            size_t Read = 0;
             struct iovec Vectors[2];
+
             Stream.Queue.IncreaseCapacity(descriptor.Received());
-
-            do
-            {
-                Read = descriptor.Read(Vectors, 1 + Stream.Queue.EmptyVector(Vectors));
-
-                Stream.Queue.AdvanceTail(Read);
-
-            } while (Read);
-
-            // Read = descriptor.Read(Vectors, Stream.Queue.EmptyVector(Vectors) ? 2 : 1);
-
-            // Stream.Queue.AdvanceTail(Read);
+            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVector(Vectors) ? 2 : 1));
 
             return descriptor;
         }
 
         friend Descriptor &operator>>(Descriptor &descriptor, Stream &Stream)
         {
-            size_t Read = 0;
             struct iovec Vectors[2];
+
             Stream.Queue.IncreaseCapacity(descriptor.Received());
-
-            do
-            {
-                Read = descriptor.Read(Vectors, 1 + Stream.Queue.EmptyVector(Vectors));
-
-                Stream.Queue.AdvanceTail(Read);
-
-            } while (Read);
-
-            // Read = descriptor.Read(Vectors, Stream.Queue.EmptyVector(Vectors) ? 2 : 1);
-
-            // Stream.Queue.AdvanceTail(Read);
+            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVector(Vectors) ? 2 : 1));
 
             return descriptor;
         }
