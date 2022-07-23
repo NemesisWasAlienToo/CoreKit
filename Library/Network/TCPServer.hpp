@@ -52,7 +52,7 @@ namespace Core
 
                         // Set Non-blocking
 
-                        Client.Blocking(false);
+                        // Client.Blocking(false);
 
                         // Set NoDelay
 

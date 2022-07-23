@@ -152,9 +152,21 @@ namespace Core
                          FileLength,
                          UseSendFile});
 
-                    Format::Stream Ser(OBuffer.Tail().Buffer);
+                    auto &Item = OBuffer.Tail();
+
+                    Format::Stream Ser(Item.Buffer);
 
                     Ser << Response;
+
+                    // Append file content
+
+                    if (Item.SendFile)
+                        return;
+
+                    while (Item.FileContentLength)
+                    {
+                        Item.FileContentLength -= Ser.ReadOnce(*Item.FilePtr, Item.FileContentLength);
+                    }
                 }
 
                 void operator()(Async::EventLoop::Context &Context, ePoll::Entry &Item)
@@ -291,13 +303,6 @@ namespace Core
 
                     auto &Item = OBuffer.Head();
                     Format::Stream Ser(Item.Buffer);
-
-                    // Append file content
-
-                    if (Item.FileContentLength && !Item.SendFile)
-                    {
-                        Item.FileContentLength -= Ser.ReadOnce(*Item.FilePtr, Item.FileContentLength);
-                    }
 
                     // Send data in buffer
 
