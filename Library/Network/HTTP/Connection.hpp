@@ -111,6 +111,15 @@ namespace Core
                 {
                 }
 
+                Connection(Connection &&Other) : Target(Other.Target),
+                                                 Timeout(Other.Timeout),
+                                                //  IBuffer(std::move(Other.IBuffer)),
+                                                 OBuffer(std::move(Other.OBuffer)),
+                                                 Setting(Other.Setting)
+                {
+                    //
+                }
+
                 ~Connection()
                 {
                     if (OnRemove)
