@@ -254,9 +254,12 @@ namespace Core::Network::HTTP
         TCPServer TCP;
         Router<std::optional<HTTP::Response>(HTTP::Connection::Context &, Network::HTTP::Request &)> _Router;
 
-        static std::optional<HTTP::Response> DefaultRoute(HTTP::Connection::Context &, HTTP::Request &Req)
+        static std::optional<HTTP::Response> DefaultRoute(HTTP::Connection::Context &Context, HTTP::Request &Req)
         {
-            return HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>");
+            // this is a bit faster than returning the response
+
+            Context.SendResponse(HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>"));
+            return std::nullopt;
         }
 
     public:

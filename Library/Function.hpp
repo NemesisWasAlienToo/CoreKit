@@ -146,12 +146,12 @@ namespace Core
         }
 
         template <typename... RTArgs>
-        TRet operator()(RTArgs &&...Args)
+        TRet operator()(RTArgs &&...Args) const
         {
             return Invoker(Object, std::forward<RTArgs>(Args)...);
         }
 
-        operator bool()
+        operator bool() const
         {
             return (Invoker && Object);
         }
