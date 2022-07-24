@@ -20,43 +20,6 @@
 
 // @todo Safety of assign caller thread
 
-struct ThrowOnCopy
-{
-    ThrowOnCopy() = default;
-    ThrowOnCopy(const ThrowOnCopy &) { throw std::logic_error("Oops!"); }
-    ThrowOnCopy(ThrowOnCopy &&) = default;
-    ThrowOnCopy &operator=(ThrowOnCopy &&) = default;
-};
-
-template <typename T>
-struct FakeCopyable : ThrowOnCopy
-{
-    FakeCopyable(T &&t) : target(std::forward<T>(t)) {}
-
-    FakeCopyable(FakeCopyable &&) = default;
-
-    FakeCopyable(const FakeCopyable &other)
-        : ThrowOnCopy(other),                              // this will throw
-          target(std::move(const_cast<T &>(other.target))) // never reached
-    {
-    }
-
-    template <typename... Args>
-    auto operator()(Args &&...a)
-    {
-        return target(std::forward<Args>(a)...);
-    }
-
-    T target;
-};
-
-template <typename T>
-FakeCopyable<T>
-fake_copyable(T &&t)
-{
-    return {std::forward<T>(t)};
-}
-
 namespace Core::Async
 {
     class EventLoop
@@ -67,8 +30,8 @@ namespace Core::Async
 
         using TimeWheelType = TimeWheel<32, 5>;
         using Container = std::list<Entry>;
-        using CallbackType = std::function<void(EventLoop::Context &, ePoll::Entry &)>;
-        using EndCallbackType = std::function<void()>;
+        using CallbackType = Core::Function<void(EventLoop::Context &, ePoll::Entry &)>;
+        using EndCallbackType = Core::Function<void()>;
 
         struct Entry
         {
@@ -81,9 +44,9 @@ namespace Core::Async
             template <typename T>
             T *CallbackAs()
             {
-                // return Callback.Target<T>();
+                return Callback.Target<T>();
 
-                return Callback.target<T>();
+                // return Callback.target<T>();
             }
         };
 
@@ -310,16 +273,11 @@ namespace Core::Async
 
                     std::unique_lock lock(QueueMutex);
 
-                    // Actions.Add(std::bind(
-                    //     std::forward<TCallback>(Callback),
-                    //     _1,
-                    //     std::forward<TArgs>(Args)...));
-
-                    Actions.Add(fake_copyable(
+                    Actions.Add(
                         [Callback = std::forward<TCallback>(Callback), ... Args = std::forward<TArgs>(Args)]() mutable
                         {
                             Callback(std::forward<TArgs>(Args)...);
-                        }));
+                        });
                 }
 
                 Notify();
@@ -431,7 +389,7 @@ namespace Core::Async
         Container Handlers;
 
         std::mutex QueueMutex;
-        Iterable::Queue<std::function<void()>> Actions;
+        Iterable::Queue<Core::Function<void()>> Actions;
 
     public:
         std::thread Runner;
