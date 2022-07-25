@@ -113,7 +113,7 @@ namespace Core
 
                 Connection(Connection &&Other) : Target(Other.Target),
                                                  Timeout(Other.Timeout),
-                                                //  IBuffer(std::move(Other.IBuffer)),
+                                                 //  IBuffer(std::move(Other.IBuffer)),
                                                  OBuffer(std::move(Other.OBuffer)),
                                                  Setting(Other.Setting)
                 {
@@ -143,13 +143,14 @@ namespace Core
                     size_t FileLength = 0;
                     size_t StringLength = 0;
 
-                    HasFile ? FileLength =
-                                  std::min(std::get<std::shared_ptr<File>>(Response.Content)->Size(), Setting.MaxFileSize)
+                    // Trim content if its too big
+
+                    HasFile ? FileLength = std::min(std::get<std::shared_ptr<File>>(Response.Content)->Size(), Setting.MaxFileSize)
                             : StringLength = std::min(std::get<std::string>(Response.Content).length(), Setting.MaxBodySize);
 
-                    bool UseSendFile = Setting.SendFileThreshold && HasFile && FileLength > Setting.SendFileThreshold;
+                    // Decide if we need to use sendfile
 
-                    // Trim content if its too big
+                    bool UseSendFile = Setting.SendFileThreshold && HasFile && (FileLength > Setting.SendFileThreshold);
 
                     Response.Headers.insert_or_assign("Content-Length", std::to_string(HasFile ? FileLength : StringLength));
                     Response.Headers.insert_or_assign("Host", Setting.HostName);
@@ -171,6 +172,9 @@ namespace Core
 
                     if (Item.SendFile)
                         return;
+
+                    // if (Item.FileContentLength)
+                    //     Item.FilePtr->ReadAll(Item.Buffer);
 
                     while (Item.FileContentLength)
                     {
@@ -215,61 +219,6 @@ namespace Core
                     try
                     {
                         Parser(Client);
-
-                        if (Parser.IsFinished())
-                        {
-                            // Process request
-
-                            // Decide if we should keep the connection
-
-                            auto It = Parser.Result.Headers.find("Connection");
-                            auto End = Parser.Result.Headers.end();
-
-                            // @todo Optimize this
-
-                            {
-                                std::string ConnectionValue;
-
-                                if (It != End)
-                                {
-                                    // @todo Optimize this
-
-                                    ConnectionValue.resize(It->second.length());
-
-                                    std::transform(
-                                        It->second.begin(),
-                                        It->second.end(),
-                                        ConnectionValue.begin(),
-                                        [](auto c)
-                                        {
-                                            return std::tolower(c);
-                                        });
-                                }
-
-                                // @todo Optimize this
-
-                                if ((Parser.Result.Version == HTTP::HTTP10 && ConnectionValue != "keep-alive") ||
-                                    (Parser.Result.Version == HTTP::HTTP11 && ConnectionValue == "close"))
-                                {
-                                    ShouldClose = true;
-                                    Client.ShutDown(Network::Socket::Read);
-                                }
-                            }
-
-                            // Append response to buffer
-
-                            if (auto Result = Setting.OnRequest(Context, Parser.Result))
-                            {
-                                Context.SendResponse(std::move(Result.value()));
-                            }
-
-                            if (ShouldClose)
-                                return;
-
-                            // Reset Parser
-
-                            Parser.Reset();
-                        }
                     }
                     catch (HTTP::Status Method)
                     {
@@ -283,7 +232,68 @@ namespace Core
                         Context.ListenFor(ePoll::Out);
 
                         ShouldClose = true;
+
+                        return;
                     }
+
+                    if (!Parser.IsFinished())
+                        return;
+
+                    // Decide if we should keep the connection
+
+                    auto It = Parser.Result.Headers.find("Connection");
+                    auto End = Parser.Result.Headers.end();
+
+                    // @todo Optimize this
+
+                    {
+                        std::string ConnectionValue;
+
+                        if (It != End)
+                        {
+                            // @todo Optimize this
+
+                            ConnectionValue.resize(It->second.length());
+
+                            std::transform(
+                                It->second.begin(),
+                                It->second.end(),
+                                ConnectionValue.begin(),
+                                [](auto c)
+                                {
+                                    return std::tolower(c);
+                                });
+                        }
+
+                        // @todo Optimize this
+
+                        if ((Parser.Result.Version == HTTP::HTTP10 && ConnectionValue != "keep-alive") ||
+                            (Parser.Result.Version == HTTP::HTTP11 && ConnectionValue == "close"))
+                        {
+                            Client.ShutDown(Network::Socket::ShutdownRead);
+                            ShouldClose = true;
+                        }
+                    }
+
+                    // Append response to buffer
+
+                    if (auto Result = Setting.OnRequest(Context, Parser.Result))
+                    {
+                        AppendResponse(std::move(Result.value()));
+
+                        Context.ListenFor(ePoll::In | ePoll::Out);
+
+                        // Same as bellow
+
+                        // Context.SendResponse(std::move(Result.value()));
+                    }
+
+                    if (ShouldClose)
+                        return;
+
+                    // Reset Parser
+
+                    Parser.Reset();
                 }
 
                 void OnWrite(Connection::Context &Context)
@@ -318,8 +328,6 @@ namespace Core
                     if (!Item.Buffer.IsEmpty())
                     {
                         // Write data
-
-                        // @todo Make socket non-blocking and improve this
 
                         Context.Self.File << Ser;
 

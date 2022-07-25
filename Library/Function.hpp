@@ -79,9 +79,11 @@ namespace Core
                   }),
               Destructor(nullptr),
               CopyConstructor(
-                  [](void ** Self, void const *Other)
+                  [](void **Self, void const *Other)
                   {
-                      *Self = (void*)Other;
+                      // @todo Fix this!!
+
+                      *Self = (void *)Other;
                   }),
               Hash(typeid(decltype(Function)).hash_code()) {}
 

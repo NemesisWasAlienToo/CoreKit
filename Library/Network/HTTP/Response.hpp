@@ -137,7 +137,7 @@ namespace Core::Network::HTTP
 
             ResultStream << Name << "=" << Value;
 
-            ResultStream << "; Expires=" << Expires.ToGMT().Format("%a, %d %b %Y %T %X GMT", 29);
+            ResultStream << "; Expires=" << Expires.ToGMT().Format("%a, %d %b %Y %T %X GMT");
 
             if (!Path.empty())
             {

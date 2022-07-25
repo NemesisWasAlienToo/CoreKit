@@ -189,22 +189,22 @@ namespace Core
             }
         }
 
+        // void ReadAll(Iterable::Queue<char> &Queue)
+        // {
+        //     size_t Total = Size();
+        //     size_t len = 0;
+        //     struct iovec Vecors[2];
+
+        //     Queue.IncreaseCapacity(Total);
+
+        //     while (len < Total)
+        //     {
+        //         len += Read(Vecors, Queue.EmptyVector(Vecors) + 1);
+        //         Queue.AdvanceTail(len);
+        //     }
+        // }
+
         std::string ReadAll()
-        {
-            std::string buffer;
-            buffer.resize(Size());
-
-            size_t len = 0;
-
-            while (len < buffer.length())
-            {
-                len += Read(&(buffer[len]), (buffer.length() - len));
-            }
-
-            return buffer;
-        }
-
-        std::string ReadAllString()
         {
             std::string buffer;
             buffer.resize(Size());

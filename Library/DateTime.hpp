@@ -211,15 +211,24 @@ namespace Core
 
         // @todo Fix this
 
-        std::string Format(const std::string &Format, size_t Size) const
+        std::string Format(char const *Format, size_t Size = 64) const
         {
-            std::string buffer(Size, ' ');
+            std::string retval;
 
-            Size = strftime(&*buffer.begin(), buffer.length(), Format.c_str(), &State);
+            retval.resize(Size);
+            size_t len = strftime((char *)retval.data(),
+                                  retval.size(),
+                                  Format,
+                                  &State);
 
-            buffer.resize(Size);
+            retval.resize(len);
 
-            return buffer;
+            return retval;
+        }
+
+        std::string Format(std::string const &Format) const
+        {
+            return this->Format(Format.c_str());
         }
 
         DateTime ToGMT() const
@@ -253,15 +262,9 @@ namespace Core
             return Result;
         }
 
-        static DateTime FromNow(Duration duration)
+        static DateTime FromNow(Duration const &duration)
         {
-            auto Result = Now();
-
-            Result.AddSecond(duration.Seconds);
-
-            Result.AddNanosecond(duration.Nanoseconds);
-
-            return Result;
+            return FromNow(duration.Seconds, duration.Nanoseconds);
         }
 
         // Funtionality

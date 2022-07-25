@@ -57,9 +57,9 @@ namespace Core::Network
 
         enum ShutDownHow
         {
-            Read = SHUT_RD,
-            Write = SHUT_WR,
-            Both = SHUT_RDWR,
+            ShutdownRead = SHUT_RD,
+            ShutdownWrite = SHUT_WR,
+            ShutdownBoth = SHUT_RDWR,
         };
 
         Socket() = default;
