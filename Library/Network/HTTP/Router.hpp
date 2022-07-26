@@ -124,10 +124,8 @@ class Router<TRet(TArgs...)>
 {
 protected:
     using TDefault = std::function<TRet(TArgs...)>;
-    // using TMatcher = std::function<std::optional<TRet>(std::string_view, TArgs...)>;
     using TMatcher = std::function<bool(TRet &, std::string_view, TArgs...)>;
 
-    // Iterable::List<TMatcher> Routes;
     Iterable::List<std::tuple<Network::HTTP::Methods, TMatcher>> Routes;
 
 public:

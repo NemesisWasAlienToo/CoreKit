@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <type_traits>
 
@@ -36,9 +38,8 @@ namespace Core
         Function(std::nullptr_t) noexcept {};
 
         template <typename TFunctor>
-        Function(TFunctor &&Functor,
-                 std::enable_if_t<
-                     !std::is_same_v<std::decay_t<TFunctor>, Function>, void> * = nullptr) noexcept
+        Function(TFunctor &&Functor) noexcept
+            requires(!std::is_same_v<std::decay_t<TFunctor>, Function>)
             : Object(new std::decay_t<TFunctor>(std::forward<TFunctor>(Functor))),
               Invoker(
                   [](void *Item, TArgs... Args)
@@ -46,15 +47,22 @@ namespace Core
                       using T = std::decay_t<TFunctor>;
                       return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
                   }),
-              Destructor(
-                  [](void const *Item)
-                  {
-                      using T = std::decay_t<TFunctor>;
-                      static_cast<T const *>(Item)->~T();
-                  }),
 
               Hash(typeid(TFunctor).hash_code())
         {
+            if constexpr (!std::is_trivially_destructible_v<std::decay_t<TFunctor>>)
+            {
+                Destructor = [](void const *Item)
+                {
+                    using T = std::decay_t<TFunctor>;
+                    static_cast<T const *>(Item)->~T();
+                };
+            }
+            else
+            {
+                Destructor = nullptr;
+            }
+
             if constexpr (std::is_copy_constructible_v<std::decay_t<TFunctor>> || std::is_trivially_constructible_v<std::decay_t<TFunctor>>)
             {
                 CopyConstructor = [](void **Self, void const *Other)
@@ -77,9 +85,11 @@ namespace Core
                   }),
               Destructor(nullptr),
               CopyConstructor(
-                  [](void ** Self, void const *Other)
+                  [](void **Self, void const *Other)
                   {
-                      *Self = (void*)Other;
+                      // @todo Fix this!!
+
+                      *Self = (void *)Other;
                   }),
               Hash(typeid(decltype(Function)).hash_code()) {}
 
@@ -144,12 +154,12 @@ namespace Core
         }
 
         template <typename... RTArgs>
-        TRet operator()(RTArgs &&...Args)
+        TRet operator()(RTArgs &&...Args) const
         {
             return Invoker(Object, std::forward<RTArgs>(Args)...);
         }
 
-        operator bool()
+        operator bool() const
         {
             return (Invoker && Object);
         }
