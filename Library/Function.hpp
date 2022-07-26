@@ -42,7 +42,7 @@ namespace Core
             requires(!std::is_same_v<std::decay_t<TFunctor>, Function>)
             : Object(new std::decay_t<TFunctor>(std::forward<TFunctor>(Functor))),
               Invoker(
-                  [](void *Item, TArgs... Args)
+                  [](void *Item, TArgs &&...Args)
                   {
                       using T = std::decay_t<TFunctor>;
                       return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
@@ -76,12 +76,12 @@ namespace Core
             }
         }
 
-        Function(TRet (*Function)(TArgs...)) noexcept
+        Function(TRet (*Function)(TArgs &&...)) noexcept
             : Object(reinterpret_cast<void *>(Function)),
               Invoker(
-                  [](void *Item, TArgs... Args)
+                  [](void *Item, TArgs&&... Args)
                   {
-                      return (reinterpret_cast<TRet (*)(TArgs...)>(Item))(std::forward<TArgs>(Args)...);
+                      return (reinterpret_cast<TRet (*)(TArgs&&...)>(Item))(std::forward<TArgs>(Args)...);
                   }),
               Destructor(nullptr),
               CopyConstructor(
