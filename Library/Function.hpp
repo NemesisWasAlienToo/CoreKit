@@ -5,7 +5,6 @@
 
 namespace Core
 {
-
     template <typename>
     class Function;
 
@@ -119,12 +118,14 @@ namespace Core
             }
         }
 
-        constexpr Function(TRet (*Function)(TArgs &&...)) noexcept
+        // constexpr Function(TRet (*Function)(TArgs &&...)) noexcept
+        constexpr Function(TRet (*Function)(TArgs...)) noexcept
             : Object(reinterpret_cast<void *>(Function)),
               Invoker(
                   [](void *Item, TArgs &&...Args)
                   {
-                      return (reinterpret_cast<TRet (*)(TArgs && ...)>(Item))(std::forward<TArgs>(Args)...);
+                      //   return (reinterpret_cast<TRet (*)(TArgs && ...)>(Item))(std::forward<TArgs>(Args)...);
+                      return (reinterpret_cast<TRet (*)(TArgs...)>(Item))(std::forward<TArgs>(Args)...);
                   }),
               Destructor(nullptr),
               CopyConstructor(
@@ -142,11 +143,13 @@ namespace Core
             {
                 Clear();
 
+                Object = Other.Object;
                 Invoker = Other.Invoker;
                 CopyConstructor = Other.CopyConstructor;
                 Destructor = Other.Destructor;
                 Hash = Other.Hash;
 
+                Other.Object = nullptr;
                 Other.Invoker = nullptr;
                 Other.CopyConstructor = nullptr;
                 Other.Destructor = nullptr;
@@ -183,8 +186,14 @@ namespace Core
 
         constexpr void Clear()
         {
-            if (Destructor && Object)
+            // if (Destructor && Object)
+            if (Destructor)
+            {
                 Destructor(Object);
+                Destructor = nullptr;
+            }
+
+            Invoker = nullptr;
         }
 
         template <typename T>
@@ -196,14 +205,14 @@ namespace Core
             return static_cast<T *>(Object);
         }
 
-        constexpr TRet operator()(TArgs ...Args) const
+        constexpr TRet operator()(TArgs... Args) const
         {
             return Invoker(Object, std::forward<TArgs>(Args)...);
         }
 
         constexpr operator bool() const
         {
-            return (Invoker && Object);
+            return bool(Invoker);
         }
 
     protected:
@@ -211,7 +220,7 @@ namespace Core
         TInvoker Invoker = nullptr;
         TDestructor Destructor = nullptr;
         TCopyConstructor CopyConstructor = nullptr;
-        char const * Hash = 0;
+        char const *Hash = 0;
 
         constexpr inline void AssertCopyable() const
         {

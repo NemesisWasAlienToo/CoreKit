@@ -29,23 +29,42 @@ namespace Core
             return Output;
         }
 
-        inline void Assert(bool condition, const std::string &message)
+       template <typename TTest>
+        inline void MustThrow(TTest &&Test)
+        try
         {
-            if (!condition)
-                throw std::invalid_argument(message);
+            Test();
+            throw std::invalid_argument("");
+        }
+        catch (...)
+        {
+            return;
+        }
+
+        inline void Assert(bool Condition, std::string const &Message = "")
+        {
+            if (!Condition)
+                throw std::invalid_argument(Message);
         }
 
         template <typename TTest>
-        inline void Test(const std::string &Name, TTest Test)
+        inline void Test(std::string const &Name, TTest &&Test)
         {
             try
             {
-                Assert(Test(), Name + " failed");
+                Test();
                 std::cout << Green << "Passed : " << Reset << Name << std::endl;
             }
-            catch (const std::exception &e)
+            // catch (std::exception const &e)
+            // {
+            //     if (auto text = e.what())
+            //         std::cout << Red << "Failed : " << Reset << Name << " With " << Blue << text << Reset << std::endl;
+            //     else
+            //         std::cout << Red << "Failed : " << Reset << Name << std::endl;
+            // }
+            catch (...)
             {
-                std::cout << Name << Red << " Failed with : " << Reset << e.what() << std::endl;
+                std::cout << Red << "Failed : " << Reset << Name << std::endl;
             }
         }
 
