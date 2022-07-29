@@ -196,10 +196,9 @@ namespace Core
             return static_cast<T *>(Object);
         }
 
-        template <typename... RTArgs>
-        constexpr TRet operator()(RTArgs &&...Args) const
+        constexpr TRet operator()(TArgs ...Args) const
         {
-            return Invoker(Object, std::forward<RTArgs>(Args)...);
+            return Invoker(Object, std::forward<TArgs>(Args)...);
         }
 
         constexpr operator bool() const
