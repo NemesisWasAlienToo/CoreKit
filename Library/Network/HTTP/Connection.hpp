@@ -117,7 +117,6 @@ namespace Core
                                                  OBuffer(std::move(Other.OBuffer)),
                                                  Setting(Other.Setting)
                 {
-                    //
                 }
 
                 ~Connection()

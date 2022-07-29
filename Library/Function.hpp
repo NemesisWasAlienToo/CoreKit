@@ -5,7 +5,6 @@
 
 namespace Core
 {
-
     template <typename>
     class Function;
 
@@ -13,33 +12,36 @@ namespace Core
     class Function<TRet(TArgs...)>
     {
     public:
+        using TObject = void *;
         using TInvoker = TRet (*)(void *, TArgs &&...);
         using TDestructor = void (*)(void const *);
         using TCopyConstructor = void (*)(void **, void const *);
 
-        Function() = default;
+        constexpr static size_t SmallSize = sizeof(TObject);
 
-        Function(Function &&Other) noexcept : Object(Other.Object), Invoker(Other.Invoker), Destructor(Other.Destructor), CopyConstructor(Other.CopyConstructor), Hash(Other.Hash)
+        constexpr Function() = default;
+
+        constexpr Function(Function &&Other) noexcept : Object(Other.Object), Invoker(Other.Invoker), Destructor(Other.Destructor), CopyConstructor(Other.CopyConstructor), Hash(Other.Hash)
         {
             Other.Object = nullptr;
             Other.Invoker = nullptr;
             Other.Destructor = nullptr;
             Other.CopyConstructor = nullptr;
-            Other.Hash = 0;
+            Other.Hash = nullptr;
         }
 
-        Function(Function const &Other) : Invoker(Other.Invoker), Destructor(Other.Destructor), CopyConstructor(Other.CopyConstructor), Hash(Other.Hash)
+        constexpr Function(Function const &Other) : Invoker(Other.Invoker), Destructor(Other.Destructor), CopyConstructor(Other.CopyConstructor), Hash(Other.Hash)
         {
-            AssertCopyable();
+            Other.AssertCopyable();
 
             CopyConstructor(&Object, Other.Object);
         }
 
-        Function(std::nullptr_t) noexcept {};
+        constexpr Function(std::nullptr_t) noexcept {};
 
         template <typename TFunctor>
-        Function(TFunctor &&Functor) noexcept
-            requires(!std::is_same_v<std::decay_t<TFunctor>, Function>)
+        constexpr Function(TFunctor &&Functor) noexcept
+            requires(!std::is_same_v<std::decay_t<TFunctor>, Function> && sizeof(std::decay_t<TFunctor>) > SmallSize)
             : Object(new std::decay_t<TFunctor>(std::forward<TFunctor>(Functor))),
               Invoker(
                   [](void *Item, TArgs &&...Args)
@@ -48,13 +50,14 @@ namespace Core
                       return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
                   }),
 
-              Hash(typeid(TFunctor).hash_code())
+              Hash(typeid(TFunctor).name())
         {
-            if constexpr (!std::is_trivially_destructible_v<std::decay_t<TFunctor>>)
+            using T = std::decay_t<TFunctor>;
+
+            if constexpr (!std::is_trivially_destructible_v<T>)
             {
                 Destructor = [](void const *Item)
                 {
-                    using T = std::decay_t<TFunctor>;
                     static_cast<T const *>(Item)->~T();
                 };
             }
@@ -63,11 +66,11 @@ namespace Core
                 Destructor = nullptr;
             }
 
-            if constexpr (std::is_copy_constructible_v<std::decay_t<TFunctor>> || std::is_trivially_constructible_v<std::decay_t<TFunctor>>)
+            if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
             {
                 CopyConstructor = [](void **Self, void const *Other)
                 {
-                    *Self = new std::decay_t<TFunctor>(*static_cast<std::decay_t<TFunctor> const *>(Other));
+                    *Self = new T(*static_cast<T const *>(Other));
                 };
             }
             else
@@ -76,12 +79,53 @@ namespace Core
             }
         }
 
-        Function(TRet (*Function)(TArgs &&...)) noexcept
+        template <typename TFunctor>
+        constexpr Function(TFunctor &&Functor) noexcept
+            requires(!std::is_same_v<std::decay_t<TFunctor>, Function> && sizeof(std::decay_t<TFunctor>) <= SmallSize)
+            : Hash(typeid(TFunctor).name())
+        {
+            using T = std::decay_t<TFunctor>;
+
+            std::construct_at(static_cast<T *>(static_cast<void *>(&Object)), std::forward<TFunctor>(Functor));
+
+            Invoker = [](void *Item, TArgs &&...Args)
+            {
+                return static_cast<T *>(static_cast<void *>(&Item))->operator()(std::forward<TArgs>(Args)...);
+            };
+
+            if constexpr (!std::is_trivially_destructible_v<T>)
+            {
+                Destructor = [](void const *Item)
+                {
+                    static_cast<T const *>(static_cast<void *>(&Item))->~T();
+                };
+            }
+            else
+            {
+                Destructor = nullptr;
+            }
+
+            if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
+            {
+                CopyConstructor = [](void **Self, void const *Other)
+                {
+                    std::construct_at(static_cast<T *>(static_cast<void *>(Self)), *static_cast<T const *>(static_cast<void *>(&Other)));
+                };
+            }
+            else
+            {
+                CopyConstructor = nullptr;
+            }
+        }
+
+        // constexpr Function(TRet (*Function)(TArgs &&...)) noexcept
+        constexpr Function(TRet (*Function)(TArgs...)) noexcept
             : Object(reinterpret_cast<void *>(Function)),
               Invoker(
-                  [](void *Item, TArgs&&... Args)
+                  [](void *Item, TArgs &&...Args)
                   {
-                      return (reinterpret_cast<TRet (*)(TArgs&&...)>(Item))(std::forward<TArgs>(Args)...);
+                      //   return (reinterpret_cast<TRet (*)(TArgs && ...)>(Item))(std::forward<TArgs>(Args)...);
+                      return (reinterpret_cast<TRet (*)(TArgs...)>(Item))(std::forward<TArgs>(Args)...);
                   }),
               Destructor(nullptr),
               CopyConstructor(
@@ -91,29 +135,31 @@ namespace Core
 
                       *Self = (void *)Other;
                   }),
-              Hash(typeid(decltype(Function)).hash_code()) {}
+              Hash(typeid(decltype(Function)).name()) {}
 
-        Function &operator=(Function &&Other)
+        constexpr Function &operator=(Function &&Other) noexcept
         {
             if (this != &Other)
             {
                 Clear();
 
+                Object = Other.Object;
                 Invoker = Other.Invoker;
                 CopyConstructor = Other.CopyConstructor;
                 Destructor = Other.Destructor;
                 Hash = Other.Hash;
 
+                Other.Object = nullptr;
                 Other.Invoker = nullptr;
                 Other.CopyConstructor = nullptr;
                 Other.Destructor = nullptr;
-                Other.Hash = 0;
+                Other.Hash = nullptr;
             }
 
             return *this;
         }
 
-        Function &operator=(Function const &Other)
+        constexpr Function &operator=(Function const &Other)
         {
             Other.AssertCopyable();
 
@@ -128,50 +174,55 @@ namespace Core
             return *this;
         }
 
-        ~Function()
+        constexpr ~Function()
         {
             Clear();
         }
 
-        inline bool IsCopyable() const
+        constexpr inline bool IsCopyable() const
         {
             return CopyConstructor != nullptr;
         }
 
-        void Clear()
+        constexpr void Clear()
         {
-            if (Destructor && Object)
+            // if (Destructor && Object)
+            if (Destructor)
+            {
                 Destructor(Object);
+                Destructor = nullptr;
+            }
+
+            Invoker = nullptr;
         }
 
         template <typename T>
-        T *Target()
+        constexpr T *Target()
         {
-            if (typeid(T).hash_code() != Hash)
+            if (typeid(T).name() != Hash)
                 throw std::bad_cast();
 
             return static_cast<T *>(Object);
         }
 
-        template <typename... RTArgs>
-        TRet operator()(RTArgs &&...Args) const
+        constexpr TRet operator()(TArgs... Args) const
         {
-            return Invoker(Object, std::forward<RTArgs>(Args)...);
+            return Invoker(Object, std::forward<TArgs>(Args)...);
         }
 
-        operator bool() const
+        constexpr operator bool() const
         {
-            return (Invoker && Object);
+            return bool(Invoker);
         }
 
     protected:
-        void *Object = nullptr;
+        TObject Object = nullptr;
         TInvoker Invoker = nullptr;
         TDestructor Destructor = nullptr;
         TCopyConstructor CopyConstructor = nullptr;
-        size_t Hash = 0;
+        char const *Hash = 0;
 
-        inline void AssertCopyable() const
+        constexpr inline void AssertCopyable() const
         {
             if (!IsCopyable())
                 throw std::runtime_error("No suitable copy constructor");
