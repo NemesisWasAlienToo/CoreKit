@@ -1,6 +1,5 @@
 #pragma once
 
-#include <iostream>
 #include <type_traits>
 
 namespace Core
@@ -118,13 +117,11 @@ namespace Core
             }
         }
 
-        // constexpr Function(TRet (*Function)(TArgs &&...)) noexcept
         constexpr Function(TRet (*Function)(TArgs...)) noexcept
             : Object(reinterpret_cast<void *>(Function)),
               Invoker(
                   [](void *Item, TArgs &&...Args)
                   {
-                      //   return (reinterpret_cast<TRet (*)(TArgs && ...)>(Item))(std::forward<TArgs>(Args)...);
                       return (reinterpret_cast<TRet (*)(TArgs...)>(Item))(std::forward<TArgs>(Args)...);
                   }),
               Destructor(nullptr),
@@ -186,7 +183,6 @@ namespace Core
 
         constexpr void Clear()
         {
-            // if (Destructor && Object)
             if (Destructor)
             {
                 Destructor(Object);
@@ -205,12 +201,12 @@ namespace Core
             return static_cast<T *>(Object);
         }
 
-        constexpr TRet operator()(TArgs... Args) const
+        constexpr inline TRet operator()(TArgs... Args) const
         {
             return Invoker(Object, std::forward<TArgs>(Args)...);
         }
 
-        constexpr operator bool() const
+        constexpr inline operator bool() const
         {
             return bool(Invoker);
         }
@@ -220,7 +216,7 @@ namespace Core
         TInvoker Invoker = nullptr;
         TDestructor Destructor = nullptr;
         TCopyConstructor CopyConstructor = nullptr;
-        char const *Hash = 0;
+        char const *Hash = nullptr;
 
         constexpr inline void AssertCopyable() const
         {
