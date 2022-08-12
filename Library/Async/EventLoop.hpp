@@ -77,45 +77,45 @@ namespace Core::Async
 
             inline void ListenFor(ePoll::Event Events) const
             {
-                // Loop.AssertPersmission();
+                // Loop.AssertPermission();
 
                 Loop.Modify(Self, Events);
             }
 
             inline void Remove()
             {
-                // Loop.AssertPersmission();
+                // Loop.AssertPermission();
 
                 Loop.Remove(Self.Iterator);
             }
 
             template <typename TCallback>
-            inline auto Schedual(Duration const &Timeout, TCallback &&Callback)
+            inline auto Schedule(Duration const &Timeout, TCallback &&Callback)
             {
-                // Loop.AssertPersmission();
+                // Loop.AssertPermission();
 
-                return Loop.Schedual(Timeout, std::forward<TCallback>(Callback));
+                return Loop.Schedule(Timeout, std::forward<TCallback>(Callback));
             }
 
-            inline void Reschedual(Duration const &Timeout)
+            inline void Reschedule(Duration const &Timeout)
             {
-                // Loop.AssertPersmission();
+                // Loop.AssertPermission();
 
-                Loop.Reschedual(Self, Timeout);
+                Loop.Reschedule(Self, Timeout);
             }
 
-            inline void Reschedual(Entry &entry, Duration const &Timeout)
+            inline void Reschedule(Entry &entry, Duration const &Timeout)
             {
-                // Loop.AssertPersmission();
+                // Loop.AssertPermission();
 
-                Loop.Reschedual(entry, Timeout);
+                Loop.Reschedule(entry, Timeout);
             }
 
-            inline auto Reschedual(TimeWheelType::Bucket::Iterator Iterator, Duration const &Timeout)
+            inline auto Reschedule(TimeWheelType::Bucket::Iterator Iterator, Duration const &Timeout)
             {
-                // Loop.AssertPersmission();
+                // Loop.AssertPermission();
 
-                return Loop.Reschedual(Iterator, Timeout);
+                return Loop.Reschedule(Iterator, Timeout);
             }
         };
 
@@ -134,7 +134,7 @@ namespace Core::Async
                     ev.Listen();
 
                     {
-                        // @todo Potential buttle neck
+                        // @todo Potential bottle neck
 
                         std::unique_lock lock(Context.Loop.QueueMutex);
 
@@ -150,7 +150,7 @@ namespace Core::Async
                 nullptr,
                 {0, 0});
 
-            // Assgin interrupt event
+            // Assign interrupt event
 
             Interrupt = static_cast<Event *>(&IIterator->File);
 
@@ -178,23 +178,23 @@ namespace Core::Async
             return RunnerId == std::this_thread::get_id();
         }
 
-        inline void AssertPersmission() const
+        inline void AssertPermission() const
         {
             if (!HasPermission())
                 throw std::runtime_error("Invalid thread");
         }
 
         template <typename TCallback>
-        TimeWheelType::Bucket::Iterator Schedual(Duration const &Interval, TCallback &&Callback)
+        TimeWheelType::Bucket::Iterator Schedule(Duration const &Interval, TCallback &&Callback)
         {
-            AssertPersmission();
+            AssertPermission();
 
             return Wheel.Add(Interval, std::forward<TCallback>(Callback));
         }
 
-        TimeWheelType::Bucket::Iterator Reschedual(TimeWheelType::Bucket::Iterator Iterator, Duration const &Interval)
+        TimeWheelType::Bucket::Iterator Reschedule(TimeWheelType::Bucket::Iterator Iterator, Duration const &Interval)
         {
-            AssertPersmission();
+            AssertPermission();
 
             auto Callback = std::move(Iterator->Callback);
 
@@ -203,9 +203,9 @@ namespace Core::Async
             return Wheel.Add(Interval, std::move(Callback));
         }
 
-        void Reschedual(Entry &Self, Duration const &Interval)
+        void Reschedule(Entry &Self, Duration const &Interval)
         {
-            Self.Timer = Reschedual(Self.Timer, Interval);
+            Self.Timer = Reschedule(Self.Timer, Interval);
         }
 
         /**
@@ -214,7 +214,7 @@ namespace Core::Async
          */
         void RemoveHandler(Container::iterator Iterator)
         {
-            AssertPersmission();
+            AssertPermission();
 
             if (Iterator->End)
             {
@@ -227,7 +227,7 @@ namespace Core::Async
 
         void RemoveTimer(Container::iterator Iterator)
         {
-            AssertPersmission();
+            AssertPermission();
 
             Wheel.Remove(Iterator->Timer);
         }
@@ -358,9 +358,9 @@ namespace Core::Async
                          * @brief Important note
                          * Remove cannot be used here
                          * because this function is called on time out
-                         * event in wich an iterator will loop through
+                         * event in which an iterator will loop through
                          * the list's entries and clean it.
-                         * Calling normal Remove will cause the iterator itseld
+                         * Calling normal Remove will cause the iterator itself
                          * to be removed in between iterating through that list
                          * and will cause segmentation fault.
                          * RemoveHandler in turn, will only remove the descriptor

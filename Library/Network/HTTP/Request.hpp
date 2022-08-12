@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <regex>
-#include <Extra/ctre.hpp>
+#include <Extra/compile-time-regular-expressions/single-header/ctre.hpp>
 
 #include <Duration.hpp>
 #include <Iterable/Queue.hpp>
@@ -170,7 +170,7 @@ namespace Core
 
                 size_t ParseFirstLine(std::string_view const &Text)
                 {
-                    // @todo Hanlde null case
+                    // @todo Handle null case
 
                     size_t Cursor = 0;
                     size_t CursorTmp = 0;

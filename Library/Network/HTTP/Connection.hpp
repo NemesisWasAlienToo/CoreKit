@@ -41,7 +41,7 @@ namespace Core
 
                     inline void SendResponse(HTTP::Response &&Response) const
                     {
-                        Loop.AssertPersmission();
+                        Loop.AssertPermission();
 
                         Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
 
@@ -200,7 +200,7 @@ namespace Core
                             return;
                         }
 
-                        Context.Reschedual(Timeout);
+                        Context.Reschedule(Timeout);
 
                         OnRead(ConnContext);
                     }

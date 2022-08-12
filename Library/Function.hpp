@@ -51,6 +51,7 @@ namespace Core
 
               Hash(typeid(TFunctor).name())
         {
+            
             using T = std::decay_t<TFunctor>;
 
             if constexpr (!std::is_trivially_destructible_v<T>)
@@ -90,6 +91,7 @@ namespace Core
             Invoker = [](void *Item, TArgs &&...Args)
             {
                 return static_cast<T *>(static_cast<void *>(&Item))->operator()(std::forward<TArgs>(Args)...);
+                // return std::invoke(*static_cast<T *>(static_cast<void *>(&Item)), std::forward<TArgs>(Args)...);
             };
 
             if constexpr (!std::is_trivially_destructible_v<T>)
