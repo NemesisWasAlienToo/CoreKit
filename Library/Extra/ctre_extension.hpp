@@ -69,7 +69,7 @@ constexpr auto Find(size_t Index)
     return static_cast<size_t>(-1);
 }
 
-// Make Lenght use a struct
+// Make Length use a struct
 
 template <ctll::fixed_string Original, ctll::fixed_string Phrase>
 constexpr size_t FindCount()

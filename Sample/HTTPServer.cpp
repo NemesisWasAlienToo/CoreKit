@@ -75,8 +75,7 @@ int main(int, char const *[])
     Server.GET<"/Delayed">(
         [](HTTP::Connection::Context &Context, HTTP::Request &Request) -> std::optional<HTTP::Response>
         {
-            // Context.Schedule(
-            Context.Schedual(
+            Context.Schedule(
                 {2, 0},
                 [Context, Version = Request.Version]
                 {
@@ -136,7 +135,7 @@ int main(int, char const *[])
 
                         Iterable::Span<char> Data = Context.FileAs<Network::Socket>().Receive();
 
-                        Context.Reschedual({5, 0});
+                        Context.Reschedule({5, 0});
                     }
                 });
 

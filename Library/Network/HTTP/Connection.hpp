@@ -41,7 +41,7 @@ namespace Core
 
                     inline void SendResponse(HTTP::Response &&Response) const
                     {
-                        Loop.AssertPersmission();
+                        Loop.AssertPermission();
 
                         Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
 
@@ -183,7 +183,7 @@ namespace Core
 
                 void operator()(Async::EventLoop::Context &Context, ePoll::Entry &Item)
                 {
-                    Network::Socket &Client = *static_cast<Network::Socket *>(&Context.Self.File);
+                    Network::Socket &Client = static_cast<Network::Socket&>(Context.Self.File);
                     Connection::Context ConnContext{Context, Target};
 
                     if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error))
@@ -200,7 +200,7 @@ namespace Core
                             return;
                         }
 
-                        Context.Reschedual(Timeout);
+                        Context.Reschedule(Timeout);
 
                         OnRead(ConnContext);
                     }
@@ -213,7 +213,7 @@ namespace Core
 
                 void OnRead(Connection::Context &Context)
                 {
-                    Network::Socket &Client = *static_cast<Network::Socket *>(&Context.Self.File);
+                    Network::Socket &Client = static_cast<Network::Socket&>(Context.Self.File);
 
                     try
                     {
@@ -297,7 +297,7 @@ namespace Core
 
                 void OnWrite(Connection::Context &Context)
                 {
-                    Network::Socket &Client = *static_cast<Network::Socket *>(&Context.Self.File);
+                    Network::Socket &Client = static_cast<Network::Socket&>(Context.Self.File);
 
                     // If there is nothing to send
 
