@@ -16,9 +16,7 @@ int main(int, char const *[])
 
     Test::Log("Server started");
 
-    // Default route for the cases that no route matches the request
-
-    // Optional fallback router
+    // Optional default route for the cases that no route matches the request
 
     Server.SetDefault(
         [](HTTP::Connection::Context &, HTTP::Request &Request)
@@ -77,6 +75,7 @@ int main(int, char const *[])
     Server.GET<"/Delayed">(
         [](HTTP::Connection::Context &Context, HTTP::Request &Request) -> std::optional<HTTP::Response>
         {
+            // Context.Schedule(
             Context.Schedual(
                 {2, 0},
                 [Context, Version = Request.Version]
@@ -87,15 +86,10 @@ int main(int, char const *[])
             return std::nullopt;
         });
 
-<<<<<<< HEAD
-    Server.GET<"/Static", true>(
-        [](HTTP::Connection::Context &, HTTP::Request &Request, std::string_view &&Param)
-=======
     // Route which watches for connections to disconnect after visiting this route
 
     Server.GET<"/Notify">(
         [&](HTTP::Connection::Context &Context, HTTP::Request &Request) -> std::optional<HTTP::Response>
->>>>>>> Dev
         {
             static std::set<EndPoint> Peers;
             static std::mutex Lock;
