@@ -189,21 +189,6 @@ namespace Core
             }
         }
 
-        // void ReadAll(Iterable::Queue<char> &Queue)
-        // {
-        //     size_t Total = Size();
-        //     size_t len = 0;
-        //     struct iovec Vecors[2];
-
-        //     Queue.IncreaseCapacity(Total);
-
-        //     while (len < Total)
-        //     {
-        //         len += Read(Vecors, Queue.EmptyVector(Vecors) + 1);
-        //         Queue.AdvanceTail(len);
-        //     }
-        // }
-
         std::string ReadAll()
         {
             std::string buffer;
@@ -219,25 +204,25 @@ namespace Core
             return buffer;
         }
 
-        static Iterable::Span<char> ReadAll(std::string const &Path)
-        {
-            auto file = Open(Path, ReadOnly);
+        // static Iterable::Span<char> ReadAll(std::string const &Path)
+        // {
+        //     auto file = Open(Path, ReadOnly);
 
-            Iterable::Span<char> buffer = file.Size();
+        //     Iterable::Span<char> buffer = file.Size();
 
-            size_t len = 0;
+        //     size_t len = 0;
 
-            while (len < buffer.Length())
-            {
-                len += file.Read(&(buffer[len]), (buffer.Length() - len));
-            }
+        //     while (len < buffer.Length())
+        //     {
+        //         len += file.Read(&(buffer[len]), (buffer.Length() - len));
+        //     }
 
-            file.Close();
+        //     file.Close();
 
-            return buffer;
-        }
+        //     return buffer;
+        // }
 
-        static std::string ReadAllString(std::string const &Path)
+        static std::string ReadAll(std::string const &Path)
         {
             auto file = Open(Path, ReadOnly);
 
@@ -256,7 +241,7 @@ namespace Core
             return buffer;
         }
 
-        static void WriteAll(std::string const &Path, std::string_view const &Content, bool Create = true, uint32_t Permissions = DefaultPermission)
+        static void WriteAll(std::string const &Path, std::string_view Content, bool Create = true, uint32_t Permissions = DefaultPermission)
         {
             int flags = WriteOnly;
 
@@ -276,7 +261,7 @@ namespace Core
             file.Close();
         }
 
-        static void AppendAll(std::string const &Path, std::string_view const &Content)
+        static void AppendAll(std::string const &Path, std::string_view Content)
         {
             auto file = Open(Path, WriteOnly | Append);
 
@@ -387,30 +372,30 @@ namespace Core
             return static_cast<size_t>(Result);
         }
 
-        void WriteLine(std::string_view const &Message)
-        {
-            *this << Message << '\n';
-        }
+        // void WriteLine(std::string_view Message)
+        // {
+        //     *this << Message << '\n';
+        // }
 
-        std::string ReadLine()
-        {
-            // @todo Fix and optimize this maybe with string stream?
-            char c;
-            size_t RRead;
-            std::string Res;
+        // std::string ReadLine()
+        // {
+        //     // @todo Fix and optimize this maybe with string stream?
+        //     char c;
+        //     size_t RRead;
+        //     std::string Res;
 
-            while ((RRead = Read(&c, 1)) > 0)
-            {
-                if (c == '\n')
-                {
-                    break;
-                }
+        //     while ((RRead = Read(&c, 1)) > 0)
+        //     {
+        //         if (c == '\n')
+        //         {
+        //             break;
+        //         }
 
-                Res += c;
-            }
+        //         Res += c;
+        //     }
 
-            return Res;
-        }
+        //     return Res;
+        // }
 
         // ### Operators
 
@@ -425,114 +410,109 @@ namespace Core
 
         // @todo Remove these operators
 
-        File &operator<<(const char Message)
-        {
-            int Result = write(_INode, &Message, 1);
+        // File &operator<<(const char Message)
+        // {
+        //     int Result = write(_INode, &Message, 1);
 
-            // Error handling here
+        //     // Error handling here
 
-            if (Result < 0)
-            {
-                throw std::system_error(errno, std::generic_category());
-            }
+        //     if (Result < 0)
+        //     {
+        //         throw std::system_error(errno, std::generic_category());
+        //     }
 
-            return *this;
-        }
+        //     return *this;
+        // }
 
-        File &operator<<(std::string_view const &Message)
-        {
-            int Result = 0;
-            int Length = Message.length();
-            int Sent = 0;
-            const char *str = Message.begin();
+        // File &operator<<(std::string_view Message)
+        // {
+        //     int Result = 0;
+        //     int Length = Message.length();
+        //     int Sent = 0;
+        //     const char *str = Message.begin();
 
-            while (Sent < Length)
-            {
-                // Need to check for unblocking too
+        //     while (Sent < Length)
+        //     {
+        //         // Need to check for unblocking too
 
-                Result = write(_INode, str + Sent, Length - Sent);
-                Sent += Result;
-            }
+        //         Result = write(_INode, str + Sent, Length - Sent);
+        //         Sent += Result;
+        //     }
 
-            // Error handling here
+        //     // Error handling here
 
-            if (Result < 0)
-            {
-                throw std::system_error(errno, std::generic_category());
-            }
+        //     if (Result < 0)
+        //     {
+        //         throw std::system_error(errno, std::generic_category());
+        //     }
 
-            return *this;
-        }
-
-        operator bool() const
-        {
-            return _INode != -1;
-        }
+        //     return *this;
+        // }
 
         // @todo Remove these
 
-        File &operator>>(std::string &Message)
-        {
-            int Result = 0;
-            size_t Size = 128;
+        // File &operator>>(std::string &Message)
+        // {
+        //     int Result = 0;
+        //     size_t Size = 128;
 
-            Message.resize(0);
+        //     Message.resize(0);
 
-            do
-            {
-                char buffer[Size];
+        //     do
+        //     {
+        //         char buffer[Size];
 
-                Result = read(_INode, buffer, Size);
+        //         Result = read(_INode, buffer, Size);
 
-                if (Result <= 0)
-                    break;
+        //         if (Result <= 0)
+        //             break;
 
-                Message.append(buffer, Result);
+        //         Message.append(buffer, Result);
 
-            } while ((Size = Received()) > 0);
+        //     } while ((Size = Received()) > 0);
 
-            if (Result < 0 && errno != EAGAIN)
-            {
-                throw std::system_error(errno, std::generic_category());
-            }
+        //     if (Result < 0 && errno != EAGAIN)
+        //     {
+        //         throw std::system_error(errno, std::generic_category());
+        //     }
 
-            return *this;
-        }
+        //     return *this;
+        // }
 
-        const File &operator>>(std::string &Message) const
-        {
-            int Result = 0;
-            size_t Size = 128;
+        // const File &operator>>(std::string &Message) const
+        // {
+        //     int Result = 0;
+        //     size_t Size = 128;
 
-            Message.resize(0);
+        //     Message.resize(0);
 
-            do
-            {
-                char buffer[Size];
+        //     do
+        //     {
+        //         char buffer[Size];
 
-                Result = read(_INode, buffer, Size);
+        //         Result = read(_INode, buffer, Size);
 
-                if (Result <= 0)
-                    break;
+        //         if (Result <= 0)
+        //             break;
 
-                Message.append(buffer, Result);
+        //         Message.append(buffer, Result);
 
-            } while ((Size = Received()) > 0);
+        //     } while ((Size = Received()) > 0);
 
-            if (Result < 0 && errno != EAGAIN)
-            {
-                throw std::system_error(errno, std::generic_category());
-            }
+        //     if (Result < 0 && errno != EAGAIN)
+        //     {
+        //         throw std::system_error(errno, std::generic_category());
+        //     }
 
-            return *this;
-        }
+        //     return *this;
+        // }
 
-        friend std::ostream &operator<<(std::ostream &os, File const &file)
-        {
-            std::string str;
-            file >> str; // fix this
-            return os << str;
-        }
+        // friend std::ostream &operator<<(std::ostream &os, File const &file)
+        // {
+        //     std::string str;
+        //     file >> str; // fix this
+        //     return os << str;
+        // }
     };
 
     inline File STDIN = STDIN_FILENO;

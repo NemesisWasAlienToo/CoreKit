@@ -40,7 +40,7 @@ namespace Core
                     std::move(Server),
                     [this, HandlerBuilder = std::forward<TCallback>(handlerBuilder), Counter = 0](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
                     {
-                        Network::Socket &Server = *static_cast<Network::Socket *>(&Context.Self.File);
+                        Network::Socket &Server = static_cast<Network::Socket&>(Context.Self.File);
 
                         auto [Client, Info] = Server.Accept();
 

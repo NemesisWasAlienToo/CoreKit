@@ -53,7 +53,7 @@ namespace Core
             Close();
         }
 
-        // ### Functionalitues
+        // ### Functionalities
 
         inline bool IsValid() const
         {
@@ -328,6 +328,11 @@ namespace Core
         inline bool operator<(const Descriptor &Other) const noexcept
         {
             return _INode < Other._INode;
+        }
+
+        operator bool() const
+        {
+            return _INode != -1;
         }
 
         // Stream operators

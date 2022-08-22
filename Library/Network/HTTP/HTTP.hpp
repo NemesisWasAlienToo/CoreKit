@@ -219,7 +219,7 @@ namespace Core::Network::HTTP
             {"class", "application/java"},
             {"csh", "application/x-csh"}};
 
-    std::string_view GetExtension(std::string_view const &Path)
+    std::string_view GetExtension(std::string_view Path)
     {
         auto pos = Path.find_last_of('.');
         if (pos == std::string_view::npos)
@@ -227,7 +227,7 @@ namespace Core::Network::HTTP
         return Path.substr(pos + 1);
     }
 
-    std::string_view GetContentType(std::string_view const &Extension)
+    std::string_view GetContentType(std::string_view Extension)
     {
         if (Extension == "")
             return "text/plain";
@@ -247,7 +247,7 @@ namespace Core::Network::HTTP
         std::unordered_map<std::string, std::string> Headers;
         std::string Content;
 
-        size_t ParseHeaders(std::string_view const &Text, size_t Start, size_t End = 0)
+        size_t ParseHeaders(std::string_view Text, size_t Start, size_t End = 0)
         {
             size_t Cursor = Start;
             size_t CursorTmp = 0;
@@ -289,7 +289,7 @@ namespace Core::Network::HTTP
             return BodyStart + 4;
         }
 
-        void ParseContent(const std::string_view &Text, size_t BodyIndex)
+        void ParseContent(std::string_view Text, size_t BodyIndex)
         {
             Content = std::string{Text.substr(BodyIndex)};
         }

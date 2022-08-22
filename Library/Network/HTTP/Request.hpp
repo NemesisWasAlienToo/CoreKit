@@ -50,7 +50,7 @@ namespace Core
                     return Ser;
                 }
 
-                void SetContent(std::string_view const &NewContent)
+                void SetContent(std::string_view NewContent)
                 {
                     Content = std::string{NewContent};
                     Headers.insert_or_assign("Content-Length", std::to_string(Content.length()));
@@ -168,7 +168,7 @@ namespace Core
                     return Result;
                 }
 
-                size_t ParseFirstLine(std::string_view const &Text)
+                size_t ParseFirstLine(std::string_view Text)
                 {
                     // @todo Handle null case
 
@@ -211,7 +211,7 @@ namespace Core
                     return CursorTmp + 2;
                 }
 
-                static Request From(const std::string_view &Text, size_t BodyIndex = 0)
+                static Request From(std::string_view Text, size_t BodyIndex = 0)
                 {
                     Request ret;
                     size_t Index = 0;
@@ -223,7 +223,7 @@ namespace Core
                     return ret;
                 }
 
-                inline static Request From(std::string_view const &Version, Methods Method, std::string_view const &Path, std::unordered_map<std::string, std::string> Headers = {}, std::string_view const &Content = "")
+                inline static Request From(std::string_view Version, Methods Method, std::string_view Path, std::unordered_map<std::string, std::string> Headers = {}, std::string_view Content = "")
                 {
                     Request request;
                     request.Method = Method;
@@ -234,7 +234,7 @@ namespace Core
                     return request;
                 }
 
-                static Request Get(std::string_view const &Version, std::string_view const &Path)
+                static Request Get(std::string_view Version, std::string_view Path)
                 {
                     return Request::From(
                         Version,
@@ -242,7 +242,7 @@ namespace Core
                         Path);
                 }
 
-                static Request Post(std::string_view const &Version, std::string_view const &Path, std::string_view const &Content)
+                static Request Post(std::string_view Version, std::string_view Path, std::string_view Content)
                 {
                     return Request::From(
                         Version,
@@ -253,7 +253,7 @@ namespace Core
                         Content);
                 }
 
-                static Request Put(std::string_view const &Version, std::string_view const &Path, std::string_view const &Content)
+                static Request Put(std::string_view Version, std::string_view Path, std::string_view Content)
                 {
                     return Request::From(
                         Version,
@@ -264,7 +264,7 @@ namespace Core
                         Content);
                 }
 
-                static Request Delete(std::string_view const & Version, std::string_view const &Path)
+                static Request Delete(std::string_view  Version, std::string_view Path)
                 {
                     return Request::From(
                         Version,
@@ -272,7 +272,7 @@ namespace Core
                         Path);
                 }
 
-                static Request Options(std::string_view const &Version, std::string_view const &Path)
+                static Request Options(std::string_view Version, std::string_view Path)
                 {
                     return Request::From(
                         Version,
@@ -280,7 +280,7 @@ namespace Core
                         Path);
                 }
 
-                static Request Head(std::string_view const & Version, std::string_view const &Path)
+                static Request Head(std::string_view  Version, std::string_view Path)
                 {
                     return Request::From(
                         Version,
@@ -288,7 +288,7 @@ namespace Core
                         Path);
                 }
 
-                static Request Patch(std::string_view const &Version, std::string_view const &Path, std::string_view const &Content)
+                static Request Patch(std::string_view Version, std::string_view Path, std::string_view Content)
                 {
                     return Request::From(
                         Version,
