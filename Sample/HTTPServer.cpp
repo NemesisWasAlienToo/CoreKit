@@ -12,6 +12,8 @@ using namespace Core::Network;
 
 int main(int, char const *[])
 {
+    // Create an instance of http runner with a 2 working threads
+    
     HTTP::Server Server(2);
 
     Test::Log("Server started");
