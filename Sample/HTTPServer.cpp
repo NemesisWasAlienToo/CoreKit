@@ -12,17 +12,21 @@ using namespace Core::Network;
 
 int main(int, char const *[])
 {
+    // Create an instance of http runner with a 2 working threads
+    
     HTTP::Server Server(2);
 
     Test::Log("Server started");
 
-    // Optional default route for the cases that no route matches the request
+    // Default route for the cases that no route matches the request
 
-    // Server.SetDefault(
-    //     [](HTTP::Connection::Context &, HTTP::Request &Request)
-    //     {
-    //         return HTTP::Response::HTML(Request.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>");
-    //     });
+    // Optional fallback router
+
+    Server.SetDefault(
+        [](HTTP::Connection::Context &, HTTP::Request &Request)
+        {
+            return HTTP::Response::HTML(Request.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>");
+        });
 
     // Global Filter will be called if no route is matched and before Default is called
 
