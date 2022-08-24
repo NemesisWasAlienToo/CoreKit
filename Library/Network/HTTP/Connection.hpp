@@ -38,6 +38,7 @@ namespace Core
                 struct Context : public Async::EventLoop::Context
                 {
                     Network::EndPoint const &Target;
+                    Network::EndPoint const &Source;
 
                     inline void SendResponse(HTTP::Response &&Response) const
                     {
@@ -88,11 +89,14 @@ namespace Core
                     std::string HostName;
                     std::function<void(Context &, Network::HTTP::Response &)> OnError;
                     std::function<std::optional<Network::HTTP::Response>(Context &, Network::HTTP::Request &)> OnRequest;
+                    size_t MaxConnectionCount;
+                    bool NoDelay;
+                    Duration Timeout;
                 };
 
                 Network::EndPoint Target;
-                Duration Timeout;
-                Iterable::Queue<HTTP::Request> IBuffer;
+                Network::EndPoint Source;
+                Iterable::Queue<char> IBuffer;
                 Iterable::Queue<OutEntry> OBuffer;
                 Settings const &Setting;
 
@@ -101,19 +105,19 @@ namespace Core
                 std::function<void()> OnIdle;
 
                 // @todo Fix this limitations
-                HTTP::Parser Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize};
+                HTTP::Parser Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize, IBuffer};
                 bool ShouldClose = false;
 
-                Connection(Network::EndPoint const &Target, Duration const &Timeout, Settings &setting)
-                    : Target(Target),
-                      Timeout(Timeout),
+                Connection(Network::EndPoint const &target, Network::EndPoint const &source, Settings &setting)
+                    : Target(target),
+                      Source(source),
                       Setting(setting)
                 {
                 }
 
                 Connection(Connection &&Other) : Target(Other.Target),
-                                                 Timeout(Other.Timeout),
-                                                 //  IBuffer(std::move(Other.IBuffer)),
+                                                 Source(Other.Source),
+                                                 IBuffer(std::move(Other.IBuffer)),
                                                  OBuffer(std::move(Other.OBuffer)),
                                                  Setting(Other.Setting)
                 {
@@ -123,6 +127,44 @@ namespace Core
                 {
                     if (OnRemove)
                         OnRemove();
+                }
+
+                void Continue100(Connection::Context &Context)
+                {
+                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
+
+                    // Ensure version is HTTP 1.1
+
+                    if (Parser.Result.Version[5] == '1' && Parser.Result.Version[7] == '0')
+                    {
+                        throw HTTP::Status::ExpectationFailed;
+                    }
+
+                    // Validate Content-Length
+
+                    if (!Parser.HasBody())
+                    {
+                        throw HTTP::Status::LengthRequired;
+                    }
+
+                    // Respond to 100-continue
+
+                    // @todo Maybe handle HTTP 2.0 later too?
+                    // @todo Fix this and use actual request
+
+                    constexpr auto ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
+
+                    Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
+                    Format::Stream ContinueStream(Temp);
+
+                    Temp.CopyFrom(ContinueResponse, sizeof(ContinueResponse));
+
+                    // Send the response
+
+                    while (Temp.Length())
+                    {
+                        Client << ContinueStream;
+                    }
                 }
 
                 void AppendResponse(HTTP::Response &&Response)
@@ -183,8 +225,8 @@ namespace Core
 
                 void operator()(Async::EventLoop::Context &Context, ePoll::Entry &Item)
                 {
-                    Network::Socket &Client = static_cast<Network::Socket&>(Context.Self.File);
-                    Connection::Context ConnContext{Context, Target};
+                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
+                    Connection::Context ConnContext{Context, Target, Source};
 
                     if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error))
                     {
@@ -200,7 +242,7 @@ namespace Core
                             return;
                         }
 
-                        Context.Reschedule(Timeout);
+                        Context.Reschedule(Setting.Timeout);
 
                         OnRead(ConnContext);
                     }
@@ -213,11 +255,21 @@ namespace Core
 
                 void OnRead(Connection::Context &Context)
                 {
-                    Network::Socket &Client = static_cast<Network::Socket&>(Context.Self.File);
+                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
 
                     try
                     {
-                        Parser(Client);
+                        Format::Stream Stream(IBuffer);
+
+                        Client >> Stream;
+
+                        Parser();
+
+                        if (Parser.RequiresContinue100)
+                        {
+                            Continue100(Context);
+                            return;
+                        }
                     }
                     catch (HTTP::Status Method)
                     {
@@ -297,7 +349,7 @@ namespace Core
 
                 void OnWrite(Connection::Context &Context)
                 {
-                    Network::Socket &Client = static_cast<Network::Socket&>(Context.Self.File);
+                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
 
                     // If there is nothing to send
 
@@ -328,7 +380,7 @@ namespace Core
                     {
                         // Write data
 
-                        Context.Self.File << Ser;
+                        Client << Ser;
 
                         if (!Item.Buffer.IsEmpty())
                             return;

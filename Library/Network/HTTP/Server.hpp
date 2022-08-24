@@ -3,6 +3,9 @@
 #include <string>
 #include <optional>
 
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 #include <Network/DNS.hpp>
 #include <Event.hpp>
 #include <Duration.hpp>
@@ -13,35 +16,34 @@
 #include <Network/HTTP/Response.hpp>
 #include <Network/HTTP/Request.hpp>
 #include <Network/HTTP/Parser.hpp>
-#include <Network/TCPServer.hpp>
+#include <Async/ThreadPool.hpp>
 #include <Network/HTTP/Router.hpp>
 #include <Network/HTTP/Connection.hpp>
 
 namespace Core::Network::HTTP
 {
-    class Server
+    class Server : public Async::Runnable
     {
     public:
-        Server() = default;
-        Server(EndPoint const &endPoint, Duration const &timeout, size_t ThreadCount = std::thread::hardware_concurrency())
-            : TCP(
-                  endPoint,
-                  [this](Network::EndPoint const &Target, Duration const &Timeout) -> Connection
-                  {
-                      return Connection(Target, Timeout, Settings);
-                  },
-                  timeout,
-                  ThreadCount,
-                  Duration::FromMilliseconds(500)),
-              _Router(DefaultRoute)
-        {
-        }
+        Connection::Settings Settings{
+            1024 * 1024 * 1,
+            1024 * 1024 * 5,
+            1024 * 1024 * 5,
+            1024 * 10,
+            1024,
+            1024,
+            Network::DNS::HostName(),
+            nullptr,
+            [this](Connection::Context &Context, Network::HTTP::Request &Request)
+            {
+                return _Router.Match(Request, Context, Request);
+            },
+            1024,
+            false,
+            {5, 0}};
 
-        template <typename TCallback>
-        Server(EndPoint const &endPoint, Duration const &timeout, TCallback &&Callback, size_t ThreadCount = std::thread::hardware_concurrency(),
-               std::enable_if_t<!std::is_integral_v<TCallback>> * = nullptr)
-            : TCP(endPoint, std::forward<TCallback>(Callback), timeout, ThreadCount, Duration::FromMilliseconds(500)),
-              _Router(DefaultRoute)
+        Server() = default;
+        Server(size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500)) : Pool(Interval, ThreadCount), _Router(DefaultRoute)
         {
         }
 
@@ -49,23 +51,36 @@ namespace Core::Network::HTTP
 
         inline Async::ThreadPool &ThreadPool()
         {
-            return TCP.ThreadPool();
+            return Pool;
         }
 
         inline Server &Run()
         {
-            TCP.Run();
+            Async::Runnable::Run();
+
+            Pool.Run(
+                [this]
+                {
+                    return Async::Runnable::IsRunning();
+                });
+
             return *this;
         }
 
         inline void GetInPool()
         {
-            TCP.GetInPool();
+            Pool.GetInPool(
+                [this]
+                {
+                    return Async::Runnable::IsRunning();
+                });
         }
 
         inline void Stop()
         {
-            TCP.Stop();
+            Async::Runnable::Stop();
+
+            Pool.Stop();
         }
 
         template <typename TAction>
@@ -175,7 +190,7 @@ namespace Core::Network::HTTP
         template <typename TCallback>
         inline Server &InitStorages(TCallback &&Callback)
         {
-            TCP.InitStorages(Callback);
+            Pool.InitStorages(Callback);
             return *this;
         }
 
@@ -188,15 +203,21 @@ namespace Core::Network::HTTP
 
         // Server settings
 
-        inline Server &MaxConnectionCount(size_t Count)
+        inline Server &MaxConnectionCount(size_t Max)
         {
-            TCP.MaxConnectionCount(Count);
+            Settings.MaxConnectionCount = Max;
             return *this;
         }
 
         inline Server &NoDelay(bool Enable)
         {
-            TCP.NoDelay(Enable);
+            Settings.NoDelay = Enable;
+            return *this;
+        }
+
+        inline Server &Timeout(Duration const &timeout)
+        {
+            Settings.Timeout = timeout;
             return *this;
         }
 
@@ -244,15 +265,78 @@ namespace Core::Network::HTTP
             return *this;
         }
 
-        inline Server &IdleTimeout(Duration const &timeout)
+        inline Server &Listen(Network::EndPoint const &endPoint /*, bool TLS = false*/)
         {
-            TCP.IdleTimeout(timeout);
+            Network::Socket Server(static_cast<Network::Socket::SocketFamily>(endPoint.Address().Family()), Network::Socket::TCP);
+
+            // Set Reuse
+
+            Server.SetOptions(SOL_SOCKET, SO_REUSEADDR, static_cast<int>(1));
+            Server.SetOptions(SOL_SOCKET, SO_REUSEPORT, static_cast<int>(1));
+
+            // Bind socket
+
+            Server.Bind(endPoint);
+
+            Server.Listen();
+
+            Pool[Turn].Assign(
+                std::move(Server),
+                [this, endPoint, Counter = 0ull](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
+                {
+                    Network::Socket &Server = static_cast<Network::Socket &>(Context.Self.File);
+
+                    auto [Client, Info] = Server.Accept();
+
+                    if (!Client)
+                        return;
+
+                    if (ConnectionCount.fetch_add(1, std::memory_order_relaxed) > Settings.MaxConnectionCount)
+                    {
+                        ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
+                        return;
+                    }
+
+                    // Set Non-blocking
+
+                    Client.Blocking(false);
+
+                    // Set NoDelay
+
+                    if (Settings.NoDelay)
+                        Client.SetOptions(IPPROTO_TCP, TCP_NODELAY, static_cast<int>(1));
+
+                    Pool[Counter].Assign(
+                        std::move(Client),
+                        Connection(Info, endPoint, Settings),
+                        [this]
+                        {
+                            ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
+                        },
+                        Settings.Timeout);
+
+                    Counter = (Counter + 1) % Pool.Length();
+                },
+                nullptr,
+                {0, 0});
+
+            Turn = (Turn + 1) % Pool.Length();
+
             return *this;
         }
 
+        // inline Server &ListenTLS(Network::EndPoint const &endPoint /*, bool TLS = false*/)
+        // {
+        //     //
+
+        //     return *this;
+        // }
+
     private:
-        TCPServer TCP;
+        Async::ThreadPool Pool;
+        std::atomic<size_t> ConnectionCount{0};
         Router<std::optional<HTTP::Response>(HTTP::Connection::Context &, Network::HTTP::Request &)> _Router;
+        size_t Turn = 0;
 
         static std::optional<HTTP::Response> DefaultRoute(HTTP::Connection::Context &Context, HTTP::Request &Req)
         {
@@ -261,20 +345,5 @@ namespace Core::Network::HTTP
             Context.SendResponse(HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>"));
             return std::nullopt;
         }
-
-    public:
-        Connection::Settings Settings{
-            1024 * 1024 * 1,
-            1024 * 1024 * 5,
-            1024 * 1024 * 5,
-            1024 * 10,
-            1024,
-            1024,
-            Network::DNS::HostName(),
-            nullptr,
-            [this](Connection::Context &Context, Network::HTTP::Request &Request)
-            {
-                return _Router.Match(Request, Context, Request);
-            }};
     };
 }

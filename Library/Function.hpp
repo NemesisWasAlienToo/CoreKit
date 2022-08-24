@@ -51,7 +51,7 @@ namespace Core
 
               Hash(typeid(TFunctor).name())
         {
-            
+
             using T = std::decay_t<TFunctor>;
 
             if constexpr (!std::is_trivially_destructible_v<T>)
@@ -78,6 +78,14 @@ namespace Core
                 CopyConstructor = nullptr;
             }
         }
+
+        // @todo Maybe introduce in-place construction like iterables?
+
+        // template <typename TFunctor, typename... TArgs>
+        // void Construct(TArgs &&...Args)
+        // {
+        //     //
+        // }
 
         template <typename TFunctor>
         constexpr Function(TFunctor &&Functor) noexcept

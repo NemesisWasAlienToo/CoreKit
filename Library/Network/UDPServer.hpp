@@ -73,7 +73,7 @@ namespace Core
             Queue Outgoing;
 
             std::mutex ILock;
-            Map Incomming;
+            Map Incoming;
 
             // @todo implement this
 
@@ -127,7 +127,7 @@ namespace Core
             {
                 std::lock_guard Lock(ILock);
 
-                auto [Iterator, Inserted] = Incomming.try_emplace(Peer, Entry());
+                auto [Iterator, Inserted] = Incoming.try_emplace(Peer, Entry());
 
                 if (!Inserted)
                 {
@@ -151,7 +151,7 @@ namespace Core
 
                         auto EP = Iterator->first;
 
-                        Incomming.erase(Iterator);
+                        Incoming.erase(Iterator);
 
                         OnClean(EP);
                     });
@@ -204,7 +204,7 @@ namespace Core
         protected:
             void OnSend()
             {
-                // @todo unclock mutex on exception
+                // @todo unlock mutex on exception
 
                 OLock.lock();
 
@@ -238,11 +238,11 @@ namespace Core
                 {
                     std::unique_lock _lock(ILock);
 
-                    auto [Iterator, Inserted] = Incomming.try_emplace(Peer, Entry());
+                    auto [Iterator, Inserted] = Incoming.try_emplace(Peer, Entry());
 
                     if (Inserted)
                     {
-                        // @todo if Data contains multiple packets, Builder must add multiple handelrs
+                        // @todo if Data contains multiple packets, Builder must add multiple handlers
 
                         Iterator->second = Builder(Peer);
 
@@ -259,7 +259,7 @@ namespace Core
 
                                 auto EP = Iterator->first;
 
-                                Incomming.erase(Iterator);
+                                Incoming.erase(Iterator);
 
                                 OnClean(EP);
                             });
@@ -279,7 +279,7 @@ namespace Core
 
                         auto Ent = std::move(Iterator->second);
 
-                        Incomming.erase(Iterator);
+                        Incoming.erase(Iterator);
 
                         ILock.unlock();
 
