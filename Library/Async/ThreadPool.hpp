@@ -83,7 +83,7 @@ namespace Core::Async
 
         inline size_t Length()
         {
-            // @todo Potential buttle neck
+            // @todo Potential bottle neck
 
             return HasJoined.load(std::memory_order_relaxed) ? Loops.Length() : Loops.Length() - 1;
         }
@@ -107,12 +107,12 @@ namespace Core::Async
         Duration Interval;
         std::atomic_bool HasJoined{false};
 
-        std::promise<void> GoPromis;
-        std::shared_future<void> GoFuture{GoPromis.get_future()};
+        std::promise<void> GoPromise;
+        std::shared_future<void> GoFuture{GoPromise.get_future()};
 
         void SignalGo()
         {
-            GoPromis.set_value();
+            GoPromise.set_value();
         }
 
         void AwaitGo()

@@ -12,11 +12,13 @@ using namespace Core::Network;
 
 int main(int, char const *[])
 {
-    HTTP::Server Server({"0.0.0.0:8888"}, {5, 0}, 2);
+    HTTP::Server Server(2);
 
     Test::Log("Server started");
 
-    // Optional default route for the cases that no route matches the request
+    // Default route for the cases that no route matches the request
+
+    // Optional fallback router
 
     Server.SetDefault(
         [](HTTP::Connection::Context &, HTTP::Request &Request)
@@ -142,6 +144,14 @@ int main(int, char const *[])
             return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Hello world, upgraded!</h1>");
         });
 
+    // Simple route which reports from which listening endpoint it was originated
+
+    Server.GET<"/Source">(
+        [](HTTP::Connection::Context &Context, HTTP::Request &Request)
+        {
+            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Context.Source.ToString());
+        });
+
     // Init thread storages and other settings
 
     Server.InitStorages(
@@ -154,15 +164,38 @@ int main(int, char const *[])
             {
                 std::cout << "Error on " << Context.Target << std::endl;
             })
+
+        // Idle time out for connections
+
+        .Timeout({5, 0})
+
+        // It's possible to have multiple listeners
+
+        .Listen({"0.0.0.0:8888"})
+
+        // Zero means no sendfile must be used
+
         .SendFileThreshold(1024 * 100)
         .MaxHeaderSize(1024 * 1024 * 2)
         .MaxBodySize(1024 * 1024 * 10)
         .MaxConnectionCount(1024)
         .RequestBufferSize(256)
         .ResponseBufferSize(256)
+
+        // Enables TCP nodelay
+
         .NoDelay(true)
+
+        // Host name in the response header
+
         .HostName("Benchmark")
+
+        // Starts the thread pool
+
         .Run()
+        
+        // Joins this thread to thread pool
+        
         .GetInPool();
 
     return 0;

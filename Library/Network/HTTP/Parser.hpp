@@ -13,18 +13,20 @@
 
 namespace Core::Network::HTTP
 {
-    struct Parser : Machine<void(Network::Socket const &)>
+    struct Parser : Machine<void()>
     {
         size_t HeaderLimit = 16 * 1024;
         size_t ContentLimit = 8 * 1024 * 1024;
         size_t RequestBufferSize = 1024;
 
-        Parser() = default;
-        Parser(size_t headerLimit, size_t contentLimit, size_t SendBufferSize) : Machine(), HeaderLimit(headerLimit), ContentLimit(contentLimit), RequestBufferSize(SendBufferSize), Queue(RequestBufferSize) {}
+        Parser(size_t headerLimit, size_t contentLimit, size_t SendBufferSize, Iterable::Queue<char> &queue) : Machine(), HeaderLimit(headerLimit), ContentLimit(contentLimit), RequestBufferSize(SendBufferSize), Queue(queue)
+        {
+            Queue = Iterable::Queue<char>(SendBufferSize);
+        }
 
-        Iterable::Queue<char> Queue;
+        Iterable::Queue<char> &Queue;
 
-        size_t ContetLength = 0;
+        size_t ContentLength = 0;
         size_t lenPos = 0;
 
         size_t bodyPos = 0;
@@ -33,19 +35,21 @@ namespace Core::Network::HTTP
         HTTP::Request Result;
         std::unordered_map<std::string, std::string>::iterator Iterator;
 
+        bool RequiresContinue100 = false;
+
         void Reset()
         {
             // Crop buffer's content
 
             Machine::Reset();
-            Queue.Free(bodyPos + ContetLength);
+            Queue.Free(bodyPos + ContentLength);
 
             // @todo Optimize Resize
 
             if (Queue.Length())
                 Queue.Resize(Queue.Capacity());
 
-            ContetLength = 0;
+            ContentLength = 0;
             lenPos = 0;
 
             bodyPos = 0;
@@ -61,71 +65,28 @@ namespace Core::Network::HTTP
             }
 
             Iterator = Result.Headers.end();
+            RequiresContinue100 = false;
         }
 
-        void Clear()
-        {
-            Machine::Reset();
-            Queue.Free();
+        // @todo Make this asynchronous
 
-            ContetLength = 0;
-            lenPos = 0;
-
-            bodyPos = 0;
-            bodyPosTmp = 0;
-
-            Result = HTTP::Request();
-            Iterator = Result.Headers.end();
-        }
-
-        // @todo Make this asynchronus
-
-        void Continue100(Network::Socket const &Client)
+        void Continue100()
         {
             auto ExpectIterator = Result.Headers.find("Expect");
 
             if (ExpectIterator != Result.Headers.end() && ExpectIterator->second == "100-continue")
             {
-                // Ensure version is HTTP 1.1
-
-                if (Result.Version[5] == '1' && Result.Version[7] == '0')
-                {
-                    throw HTTP::Response::From(Result.Version, HTTP::Status::ExpectationFailed, {{"Connection", "close"}}, "");
-                }
-
-                if (ContetLength == 0)
-                {
-                    throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
-                }
-
-                // Respond to 100-continue
-
-                // @todo Maybe hanlde HTTP 2.0 later too?
-
-                constexpr auto ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
-
-                Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
-                Format::Stream ContinueStream(Temp);
-
-                Temp.CopyFrom(ContinueResponse, sizeof(ContinueResponse));
-
-                // Send the response
-
-                while (Temp.Length() > 0)
-                {
-                    Client << ContinueStream;
-                }
+                RequiresContinue100 = true;
             }
         }
 
-        void operator()(Network::Socket const &Client) override
+        bool HasBody()
         {
-            {
-                Format::Stream Stream(Queue);
+            return bool(bodyPos);
+        }
 
-                Client >> Stream;
-            }
-
+        void operator()() override
+        {
             auto [Pointer, Size] = Queue.DataChunk();
 
             std::string_view Message{Pointer, Size};
@@ -145,7 +106,7 @@ namespace Core::Network::HTTP
 
                     if (Message.length() > HeaderLimit)
                     {
-                        throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
+                        throw HTTP::Status::RequestEntityTooLarge;
                     }
 
                     bodyPosTmp = Message.length() - 3;
@@ -156,7 +117,7 @@ namespace Core::Network::HTTP
 
                     if (bodyPos > HeaderLimit)
                     {
-                        throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
+                        throw HTTP::Status::RequestEntityTooLarge;
                     }
 
                     break;
@@ -178,14 +139,14 @@ namespace Core::Network::HTTP
                 }
                 catch (...)
                 {
-                    throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
+                    throw HTTP::Status::BadRequest;
                 }
 
                 // Check for version
 
                 if (Result.Version[0] != '1' || (Result.Version[2] != '0' && Result.Version[2] != '1'))
                 {
-                    throw HTTP::Response::From(Result.Version, HTTP::Status::HTTPVersionNotSupported, {{"Connection", "close"}}, "");
+                    throw HTTP::Status::HTTPVersionNotSupported;
                 }
 
                 Result.ParseHeaders(Message, TempIndex, bodyPos);
@@ -201,34 +162,34 @@ namespace Core::Network::HTTP
 
                 try
                 {
-                    ContetLength = std::stoull(Iterator->second);
+                    ContentLength = std::stoull(Iterator->second);
                 }
                 catch (...)
                 {
-                    throw HTTP::Response::From(Result.Version, HTTP::Status::BadRequest, {{"Connection", "close"}}, "");
+                    throw HTTP::Status::BadRequest;
                 }
 
                 // Check if the length is in valid range
 
-                if (ContetLength > ContentLimit)
+                if (ContentLength > ContentLimit)
                 {
-                    throw HTTP::Response::From(Result.Version, HTTP::Status::RequestEntityTooLarge, {{"Connection", "close"}}, "");
+                    throw HTTP::Status::RequestEntityTooLarge;
                 }
 
                 // Handle 100-continue
 
-                Continue100(Client);
+                Continue100();
 
                 // Get the content
 
-                while (Message.length() - bodyPos < ContetLength)
+                while (Message.length() - bodyPos < ContentLength)
                 {
                     CO_YIELD();
                 }
 
                 // fill the content
 
-                Result.Content = Message.substr(bodyPos, ContetLength);
+                Result.Content = Message.substr(bodyPos, ContentLength);
             }
             else
             {
@@ -238,7 +199,7 @@ namespace Core::Network::HTTP
 
                 if (Iterator == Result.Headers.end())
                 {
-                    Continue100(Client);
+                    Continue100();
 
                     CO_TERMINATE();
                 }
@@ -247,13 +208,10 @@ namespace Core::Network::HTTP
 
                 else if (Iterator->second == "chunked")
                 {
-                    // Read the body chunks untill the end
-
                     // @todo Implement later
                     // @todo Check content length to be in the acceptable range
-                    // throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
 
-                    throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
+                    throw HTTP::Status::NotImplemented;
                 }
                 else if (Iterator->second == "gzip")
                 {
@@ -261,17 +219,14 @@ namespace Core::Network::HTTP
 
                     // @todo Implement later
                     // @todo Check content length to be in the acceptable range
-                    // throw HTTP::Response::RequestEntityTooLarge(Result.Version, {{"Connection", "close"}});
 
-                    // @todo Implement later
-
-                    throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
+                    throw HTTP::Status::NotImplemented;
                 }
                 else
                 {
                     // Not implemented
 
-                    throw HTTP::Response::From(Result.Version, HTTP::Status::NotImplemented, {{"Connection", "close"}}, "");
+                    throw HTTP::Status::NotImplemented;
                 }
             }
 

@@ -177,7 +177,7 @@ namespace Core::Network::HTTP
             return *this;
         }
 
-        size_t ParseFirstLine(std::string_view const &Text)
+        size_t ParseFirstLine(std::string_view Text)
         {
             // @todo Hanlde null case
 
@@ -224,7 +224,7 @@ namespace Core::Network::HTTP
             return CursorTmp + 2;
         }
 
-        static Response From(std::string_view const &Text, size_t BodyIndex = 0)
+        static Response From(std::string_view Text, size_t BodyIndex = 0)
         {
             Response ret;
             size_t Index = 0;
@@ -236,7 +236,7 @@ namespace Core::Network::HTTP
             return ret;
         }
 
-        static Response From(std::string_view const &Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, std::string Content = "")
+        static Response From(std::string_view Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, std::string Content = "")
         {
             Response response;
             response.Status = Status;
@@ -248,7 +248,7 @@ namespace Core::Network::HTTP
             return response;
         }
 
-        static Response From(std::string_view const &Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, File Content = File{})
+        static Response From(std::string_view Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, File Content = File{})
         {
             Response response;
             response.Status = Status;
@@ -263,56 +263,56 @@ namespace Core::Network::HTTP
 
         // String
 
-        static Response Type(std::string_view const &Version, HTTP::Status Status, std::string_view const &ContentType, std::string Content)
+        static Response Type(std::string_view Version, HTTP::Status Status, std::string_view ContentType, std::string Content)
         {
             return From(Version, Status, {{"Content-Type", std::string{ContentType}}}, std::move(Content));
         }
 
-        static Response Text(std::string_view const &Version, HTTP::Status Status, std::string Content)
+        static Response Text(std::string_view Version, HTTP::Status Status, std::string Content)
         {
             return Type(Version, Status, "text/plain", std::move(Content));
         }
 
-        static Response HTML(std::string_view const &Version, HTTP::Status Status, std::string Content)
+        static Response HTML(std::string_view Version, HTTP::Status Status, std::string Content)
         {
             return Type(Version, Status, "text/html", std::move(Content));
         }
 
-        static Response Json(std::string_view const &Version, HTTP::Status Status, std::string Content)
+        static Response Json(std::string_view Version, HTTP::Status Status, std::string Content)
         {
             return Type(Version, Status, "application/json", std::move(Content));
         }
 
         // File
 
-        static Response Type(std::string_view const &Version, HTTP::Status Status, std::string_view const &ContentType, File Content = File{})
+        static Response Type(std::string_view Version, HTTP::Status Status, std::string_view ContentType, File Content = File{})
         {
             return From(Version, Status, {{"Content-Type", std::string{ContentType}}}, std::move(Content));
         }
 
-        static Response FromPath(std::string_view const &Version, HTTP::Status Status, std::string const &Path)
+        static Response FromPath(std::string_view Version, HTTP::Status Status, std::string const &Path)
         {
             return Type(Version, Status, GetContentType(GetExtension(Path)), File::Open(Path));
         }
 
-        static Response Text(std::string_view const &Version, HTTP::Status Status, File Content = File{})
+        static Response Text(std::string_view Version, HTTP::Status Status, File Content = File{})
         {
             return Type(Version, Status, "text/plain", std::move(Content));
         }
 
-        static Response HTML(std::string_view const &Version, HTTP::Status Status, File Content = File{})
+        static Response HTML(std::string_view Version, HTTP::Status Status, File Content = File{})
         {
             return Type(Version, Status, "text/html", std::move(Content));
         }
 
-        static Response Json(std::string_view const &Version, HTTP::Status Status, File Content)
+        static Response Json(std::string_view Version, HTTP::Status Status, File Content)
         {
             return Type(Version, Status, "application/json", std::move(Content));
         }
 
         // Redirect
 
-        static inline Response Redirect(std::string_view const &Version, HTTP::Status Status, std::string_view const &Location, std::unordered_map<std::string, std::string> Parameters = {})
+        static inline Response Redirect(std::string_view Version, HTTP::Status Status, std::string_view Location, std::unordered_map<std::string, std::string> Parameters = {})
         {
             std::stringstream str;
 
@@ -323,7 +323,7 @@ namespace Core::Network::HTTP
             return From(Version, Status, std::move(Parameters), "");
         }
 
-        static inline Response Redirect(std::string_view const &Version, std::string_view const &Location, std::unordered_map<std::string, std::string> Parameters = {})
+        static inline Response Redirect(std::string_view Version, std::string_view Location, std::unordered_map<std::string, std::string> Parameters = {})
         {
             return Redirect(Version, HTTP::Status::Found, std::move(Location), std::move(Parameters));
         }

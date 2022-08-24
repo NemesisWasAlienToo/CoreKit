@@ -67,7 +67,7 @@ public:
     }
 
     template <typename TRet, typename TCallback, typename... TArgs>
-    static constexpr inline auto Apply(TRet &Result, std::string_view const &Path, TCallback Callback, TArgs &&...Args)
+    static constexpr inline auto Apply(TRet &Result, std::string_view Path, TCallback Callback, TArgs &&...Args)
     {
         return _Apply(Result, Path, Sequence{}, Arguments{}, Callback, std::forward<TArgs>(Args)...);
     }
@@ -97,7 +97,7 @@ public:
 //     }
 
 //     template <typename TCallback, typename... TArgs>
-//     static constexpr inline auto Apply(std::string_view const &Path, TCallback Callback, TArgs &&...Args)
+//     static constexpr inline auto Apply(std::string_view Path, TCallback Callback, TArgs &&...Args)
 //     {
 //         using TRet = typename std::invoke_result<TCallback, TArgs..., std::string_view, std::string_view, std::string_view>::type;
 
