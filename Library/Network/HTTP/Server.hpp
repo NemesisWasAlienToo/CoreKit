@@ -325,12 +325,129 @@ namespace Core::Network::HTTP
             return *this;
         }
 
-        // inline Server &ListenTLS(Network::EndPoint const &endPoint /*, bool TLS = false*/)
-        // {
-        //     //
+        inline Server &Listen(Network::EndPoint const &endPoint, std::string_view Certification, std::string_view Key)
+        {
+            struct TLSContext
+            {
+                SSL_CTX *ctx = nullptr;
 
-        //     return *this;
-        // }
+                TLSContext(std::string_view Certification, std::string_view Key)
+                {
+                    ctx = Create();
+
+                    if (SSL_CTX_use_certificate_file(ctx, Certification.begin(), SSL_FILETYPE_PEM) <= 0)
+                    {
+                        ERR_print_errors_fp(stderr);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    if (SSL_CTX_use_PrivateKey_file(ctx, Key.begin(), SSL_FILETYPE_PEM) <= 0)
+                    {
+                        ERR_print_errors_fp(stderr);
+                        exit(EXIT_FAILURE);
+                    }
+                }
+
+                TLSContext(TLSContext &&Other) : ctx(Other.ctx)
+                {
+                    Other.ctx = nullptr;
+                }
+
+                TLSContext &operator=(TLSContext &&Other)
+                {
+                    ctx = Other.ctx;
+                    Other.ctx = nullptr;
+                    return *this;
+                }
+
+                ~TLSContext()
+                {
+                    SSL_CTX_free(ctx);
+                }
+
+                static SSL_CTX *Create()
+                {
+                    const SSL_METHOD *method;
+                    SSL_CTX *ctx;
+
+                    method = TLS_server_method();
+
+                    ctx = SSL_CTX_new(method);
+                    if (!ctx)
+                    {
+                        perror("Unable to create SSL context");
+                        ERR_print_errors_fp(stderr);
+                        exit(EXIT_FAILURE);
+                    }
+
+                    return ctx;
+                }
+            };
+
+            TLSContext TLS(Certification, Key);
+
+            Network::Socket Server(static_cast<Network::Socket::SocketFamily>(endPoint.Address().Family()), Network::Socket::TCP);
+
+            // Set Reuse
+
+            Server.SetOptions(SOL_SOCKET, SO_REUSEADDR, static_cast<int>(1));
+            Server.SetOptions(SOL_SOCKET, SO_REUSEPORT, static_cast<int>(1));
+
+            // Bind socket
+
+            Server.Bind(endPoint);
+
+            Server.Listen();
+
+            Pool[Turn].Assign(
+                std::move(Server),
+                [this, endPoint, Counter = 0ull, TLS = std::move(TLS)](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
+                {
+                    Network::Socket &Server = static_cast<Network::Socket &>(Context.Self.File);
+
+                    auto [Client, Info] = Server.Accept();
+
+                    if (!Client)
+                        return;
+
+                    if (ConnectionCount.fetch_add(1, std::memory_order_relaxed) > Settings.MaxConnectionCount)
+                    {
+                        ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
+                        return;
+                    }
+
+                    // Set Non-blocking
+
+                    Client.Blocking(false);
+
+                    // Set NoDelay
+
+                    if (Settings.NoDelay)
+                        Client.SetOptions(IPPROTO_TCP, TCP_NODELAY, static_cast<int>(1));
+
+                    Connection::SecureSocket SS(TLS.ctx, Client);
+
+                    if (!SS.Accept())
+                        return;
+
+                    Pool[Counter].Assign(
+                        std::move(Client),
+                        Connection(Info, endPoint, Settings, std::move(SS)),
+                        [this]
+                        {
+                            ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
+                        },
+                        Settings.Timeout);
+
+                    Counter = (Counter + 1) % Pool.Length();
+                },
+                nullptr,
+                {0, 0});
+
+            Turn = (Turn + 1) % Pool.Length();
+
+            return *this;
+        }
 
     private:
         Async::ThreadPool Pool;
