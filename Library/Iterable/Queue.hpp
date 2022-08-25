@@ -208,7 +208,7 @@ namespace Core::Iterable
             return std::make_tuple(&_Content[FirstEmpty], _First <= FirstEmpty ? Capacity() - (FirstEmpty) : _First - FirstEmpty);
         }
 
-        constexpr bool DataVector(struct iovec *Vector)
+        constexpr bool DataVectors(struct iovec *Vector)
         {
             auto [FPointer, FSize] = DataChunk();
 
@@ -228,7 +228,7 @@ namespace Core::Iterable
             return false;
         }
 
-        constexpr bool EmptyVector(struct iovec *Vector)
+        constexpr bool EmptyVectors(struct iovec *Vector)
         {
             auto [FPointer, FSize] = EmptyChunk();
 
@@ -417,13 +417,12 @@ namespace Core::Iterable
             std::construct_at(&_ElementAt(_Length++), std::forward<TArgs>(Args)...);
         }
 
-        template <typename... TArgs>
-        constexpr void Insert(T &&Item)
-        {
-            IncreaseCapacity();
+        // constexpr void Insert(T &&Item)
+        // {
+        //     IncreaseCapacity();
 
-            std::construct_at(&_ElementAt(_Length++), std::move(Item));
-        }
+        //     std::construct_at(&_ElementAt(_Length++), std::move(Item));
+        // }
 
         template <typename... TArgs>
         constexpr void Insert(T const &Item)

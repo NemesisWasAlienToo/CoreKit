@@ -251,13 +251,12 @@ namespace Core::Iterable
             std::construct_at(&_ElementAt(_Length++), std::forward<TArgs>(Args)...);
         }
 
-        template <typename... TArgs>
-        constexpr void Insert(T &&Item)
-        {
-            IncreaseCapacity();
+        // constexpr void Insert(T &&Item)
+        // {
+        //     IncreaseCapacity();
 
-            std::construct_at(&_ElementAt(_Length++), std::move(Item));
-        }
+        //     std::construct_at(&_ElementAt(_Length++), std::move(Item));
+        // }
 
         template <typename... TArgs>
         constexpr void Insert(T const &Item)

@@ -62,7 +62,6 @@ namespace Core
 
         int Received() const
         {
-
             int Count = 0;
             int Result = ioctl(_INode, FIONREAD, &Count);
 
@@ -290,7 +289,7 @@ namespace Core
             return Result;
         }
 
-        // ### Peroperties
+        // ### Properties
 
         inline int INode() const { return _INode; }
 
@@ -345,7 +344,7 @@ namespace Core
 
             do
             {
-                Read = descriptor.Read(Vectors, 1 + Ser.Queue.EmptyVector(Vectors));
+                Read = descriptor.Read(Vectors, 1 + Ser.Queue.EmptyVectors(Vectors));
 
                 Ser.Queue.AdvanceTail(Read);
 
