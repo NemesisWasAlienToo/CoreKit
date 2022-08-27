@@ -13,6 +13,7 @@
 #include <Iterable/List.hpp>
 #include <Network/HTTP/HTTP.hpp>
 #include <Format/Stream.hpp>
+#include <Network/SecureSocket.hpp>
 #include <Network/HTTP/Response.hpp>
 #include <Network/HTTP/Request.hpp>
 #include <Network/HTTP/Parser.hpp>
@@ -265,7 +266,7 @@ namespace Core::Network::HTTP
             return *this;
         }
 
-        inline Server &Listen(Network::EndPoint const &endPoint /*, bool TLS = false*/)
+        inline Server &Listen(Network::EndPoint const &endPoint)
         {
             Network::Socket Server(static_cast<Network::Socket::SocketFamily>(endPoint.Address().Family()), Network::Socket::TCP);
 
@@ -327,65 +328,6 @@ namespace Core::Network::HTTP
 
         inline Server &Listen(Network::EndPoint const &endPoint, std::string_view Certification, std::string_view Key)
         {
-            struct TLSContext
-            {
-                SSL_CTX *ctx = nullptr;
-
-                TLSContext(std::string_view Certification, std::string_view Key)
-                {
-                    ctx = Create();
-
-                    if (SSL_CTX_use_certificate_file(ctx, Certification.begin(), SSL_FILETYPE_PEM) <= 0)
-                    {
-                        ERR_print_errors_fp(stderr);
-                        exit(EXIT_FAILURE);
-                    }
-
-                    if (SSL_CTX_use_PrivateKey_file(ctx, Key.begin(), SSL_FILETYPE_PEM) <= 0)
-                    {
-                        ERR_print_errors_fp(stderr);
-                        exit(EXIT_FAILURE);
-                    }
-                }
-
-                TLSContext(TLSContext &&Other) : ctx(Other.ctx)
-                {
-                    Other.ctx = nullptr;
-                }
-
-                TLSContext &operator=(TLSContext &&Other)
-                {
-                    ctx = Other.ctx;
-                    Other.ctx = nullptr;
-                    return *this;
-                }
-
-                ~TLSContext()
-                {
-                    SSL_CTX_free(ctx);
-                }
-
-                static SSL_CTX *Create()
-                {
-                    const SSL_METHOD *method;
-                    SSL_CTX *ctx;
-
-                    method = TLS_server_method();
-
-                    ctx = SSL_CTX_new(method);
-                    if (!ctx)
-                    {
-                        perror("Unable to create SSL context");
-                        ERR_print_errors_fp(stderr);
-                        exit(EXIT_FAILURE);
-                    }
-
-                    return ctx;
-                }
-            };
-
-            TLSContext TLS(Certification, Key);
-
             Network::Socket Server(static_cast<Network::Socket::SocketFamily>(endPoint.Address().Family()), Network::Socket::TCP);
 
             // Set Reuse
@@ -401,7 +343,7 @@ namespace Core::Network::HTTP
 
             Pool[Turn].Assign(
                 std::move(Server),
-                [this, endPoint, Counter = 0ull, TLS = std::move(TLS)](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
+                [this, endPoint, Counter = 0ull, TLS = TLSContext(Certification, Key)](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
                 {
                     Network::Socket &Server = static_cast<Network::Socket &>(Context.Self.File);
 
@@ -425,14 +367,9 @@ namespace Core::Network::HTTP
                     if (Settings.NoDelay)
                         Client.SetOptions(IPPROTO_TCP, TCP_NODELAY, static_cast<int>(1));
 
-                    Connection::SecureSocket SS(TLS.ctx, Client);
-
-                    if (!SS.Accept())
-                        return;
-
                     Pool[Counter].Assign(
                         std::move(Client),
-                        Connection(Info, endPoint, Settings, std::move(SS)),
+                        Connection(Info, endPoint, Settings, Network::SecureSocket(TLS, Client)),
                         [this]
                         {
                             ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
@@ -457,8 +394,6 @@ namespace Core::Network::HTTP
 
         static std::optional<HTTP::Response> DefaultRoute(HTTP::Connection::Context &Context, HTTP::Request &Req)
         {
-            // this is a bit faster than returning the response
-
             Context.SendResponse(HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>"));
             return std::nullopt;
         }

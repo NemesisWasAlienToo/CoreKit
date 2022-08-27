@@ -1,10 +1,6 @@
 #pragma once
 
 #include <string>
-#include <tuple>
-#include <memory>
-#include <variant>
-#include <future>
 
 #include <Event.hpp>
 #include <Duration.hpp>
@@ -13,6 +9,7 @@
 #include <Network/HTTP/HTTP.hpp>
 #include <Format/Stream.hpp>
 #include <Network/HTTP/Response.hpp>
+#include <Network/SecureSocket.hpp>
 #include <Network/HTTP/Request.hpp>
 #include <Network/HTTP/Parser.hpp>
 #include <Network/TCPServer.hpp>
@@ -33,121 +30,6 @@ namespace Core
                     std::shared_ptr<File> FilePtr;
                     size_t FileContentLength;
                     bool SendFile;
-                };
-
-                struct SecureSocket
-                {
-                    SSL *ssl = nullptr;
-
-                    SecureSocket() = default;
-
-                    SecureSocket(SSL_CTX *ctx, Network::Socket const &Socket) : ssl(SSL_new(ctx))
-                    {
-                        SSL_set_fd(ssl, Socket.INode());
-                    }
-
-                    SecureSocket(SecureSocket &&Other) : ssl(Other.ssl)
-                    {
-                        Other.ssl = nullptr;
-                    }
-
-                    ~SecureSocket()
-                    {
-                        if (ssl)
-                        {
-                            SSL_shutdown(ssl);
-                            SSL_free(ssl);
-                        }
-                    }
-
-                    inline bool Accept()
-                    {
-                        return SSL_accept(ssl) == 1;
-
-                        // if (SSL_accept(ssl) <= 0)
-                        // {
-                        //     ERR_print_errors_fp(stderr);
-                        //     // SSL_shutdown(ssl);
-                        //     // SSL_free(ssl);
-                        // }
-                    }
-
-                    ssize_t Write(void const *Data, size_t Size) const
-                    {
-                        ssize_t Result = SSL_write(ssl, Data, Size);
-
-                        if (Result < 0)
-                        {
-                            // @todo Fix this
-
-                            // throw std::system_error(errno, std::generic_category());
-
-                            ERR_print_errors_fp(stderr);
-                            exit(EXIT_FAILURE);
-                        }
-
-                        return Result;
-                    }
-
-                    ssize_t Read(void *Data, size_t Size) const
-                    {
-                        ssize_t Result = SSL_read(ssl, Data, Size);
-
-                        if (Result < 0)
-                        {
-                            // @todo Fix this
-
-                            // throw std::system_error(errno, std::generic_category());
-
-                            ERR_print_errors_fp(stderr);
-                            exit(EXIT_FAILURE);
-                        }
-
-                        return Result;
-                    }
-
-                    ssize_t SendFile(Descriptor const &Other, size_t Size, off_t Offset) const
-                    {
-                        int Result = SSL_sendfile(ssl, Other.INode(), Offset, Size, 0);
-
-                        // Error handling here
-
-                        if (Result < 0)
-                        {
-                            // @todo Fix this
-
-                            // throw std::system_error(errno, std::generic_category());
-
-                            ERR_print_errors_fp(stderr);
-                            exit(EXIT_FAILURE);
-                        }
-
-                        return Result;
-                    }
-
-                    friend SecureSocket &operator<<(SecureSocket &descriptor, Format::Stream &Stream)
-                    {
-                        auto [Pointer, Size] = Stream.Queue.DataChunk();
-
-                        Stream.Queue.Free(descriptor.Write(Pointer, Size));
-
-                        return descriptor;
-                    }
-
-                    friend SecureSocket &operator>>(SecureSocket &descriptor, Format::Stream &Stream)
-                    {
-                        auto [Pointer, Size] = Stream.Queue.EmptyChunk();
-
-                        Stream.Queue.IncreaseCapacity(1024);
-                        Stream.Queue.AdvanceTail(descriptor.Read(Pointer, Size));
-
-                        return descriptor;
-                    }
-
-                    inline operator bool()
-                    {
-                        return bool(ssl);
-                    }
                 };
 
                 struct Context : public Async::EventLoop::Context
@@ -234,7 +116,7 @@ namespace Core
 
                 // TLS Connection
 
-                Connection(Network::EndPoint const &target, Network::EndPoint const &source, Settings &setting, SecureSocket && SS)
+                Connection(Network::EndPoint const &target, Network::EndPoint const &source, Settings &setting, SecureSocket &&SS)
                     : Target(target),
                       Source(source),
                       Setting(setting),
@@ -362,6 +244,14 @@ namespace Core
                         return;
                     }
 
+                    if (SSL && !SSL.ShakeHand)
+                    {
+                        // @todo Maybe fix this with upgrade?
+
+                        SSL.Handshake();
+                        return;
+                    }
+
                     if (Item.Happened(ePoll::In) || Item.Happened(ePoll::UrgentIn))
                     {
                         if (!Client.Received())
@@ -389,8 +279,6 @@ namespace Core
                     {
                         Format::Stream Stream(IBuffer);
 
-                        // Client >> Stream;
-                        // (bool(SSL) ? SSL : Client) >> Stream;
                         bool(SSL) ? SSL >> Stream : Client >> Stream;
 
                         Parser();
@@ -510,8 +398,6 @@ namespace Core
                     {
                         // Write data
 
-                        // Client << Ser;
-                        // (bool(SSL) ? SSL : Client) << Ser;
                         bool(SSL) ? SSL << Ser : Client << Ser;
 
                         if (!Item.Buffer.IsEmpty())
