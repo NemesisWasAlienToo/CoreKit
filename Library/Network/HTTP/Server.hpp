@@ -13,7 +13,7 @@
 #include <Iterable/List.hpp>
 #include <Network/HTTP/HTTP.hpp>
 #include <Format/Stream.hpp>
-#include <Network/SecureSocket.hpp>
+#include <Network/TLSContext.hpp>
 #include <Network/HTTP/Response.hpp>
 #include <Network/HTTP/Request.hpp>
 #include <Network/HTTP/Parser.hpp>
@@ -367,9 +367,20 @@ namespace Core::Network::HTTP
                     if (Settings.NoDelay)
                         Client.SetOptions(IPPROTO_TCP, TCP_NODELAY, static_cast<int>(1));
 
+// #ifdef TLS_1_2_VERSION
+                    // if (true /*Settings.KernelTLS*/)
+                    //     Client.SetOptions(SOL_TCP, TCP_ULP, "tls");
+// #endif
+
+                    auto SS = TLS.NewSocket();
+
+                    SS.SetDescriptor(Client);
+                    SS.SetAccept();
+                    // SS.SetVerify(SSL_VERIFY_NONE, nullptr);
+
                     Pool[Counter].Assign(
                         std::move(Client),
-                        Connection(Info, endPoint, Settings, Network::SecureSocket(TLS, Client)),
+                        Connection(Info, endPoint, Settings, std::move(SS)),
                         [this]
                         {
                             ConnectionCount.fetch_sub(1, std::memory_order_relaxed);

@@ -9,7 +9,7 @@
 #include <Network/HTTP/HTTP.hpp>
 #include <Format/Stream.hpp>
 #include <Network/HTTP/Response.hpp>
-#include <Network/SecureSocket.hpp>
+#include <Network/TLSContext.hpp>
 #include <Network/HTTP/Request.hpp>
 #include <Network/HTTP/Parser.hpp>
 #include <Network/TCPServer.hpp>
@@ -36,6 +36,11 @@ namespace Core
                 {
                     Network::EndPoint const &Target;
                     Network::EndPoint const &Source;
+
+                    inline bool IsSecure()
+                    {
+                        return Self.CallbackAs<HTTP::Connection>()->IsSecure();
+                    }
 
                     inline void SendResponse(HTTP::Response &&Response) const
                     {
@@ -96,7 +101,7 @@ namespace Core
                 Iterable::Queue<char> IBuffer;
                 Iterable::Queue<OutEntry> OBuffer;
                 Settings const &Setting;
-                SecureSocket SSL;
+                TLSContext::SecureSocket SSL;
 
                 // Events
                 std::function<void()> OnRemove;
@@ -116,7 +121,7 @@ namespace Core
 
                 // TLS Connection
 
-                Connection(Network::EndPoint const &target, Network::EndPoint const &source, Settings &setting, SecureSocket &&SS)
+                Connection(Network::EndPoint const &target, Network::EndPoint const &source, Settings &setting, TLSContext::SecureSocket &&SS)
                     : Target(target),
                       Source(source),
                       Setting(setting),
@@ -137,6 +142,11 @@ namespace Core
                 {
                     if (OnRemove)
                         OnRemove();
+                }
+
+                inline bool IsSecure()
+                {
+                    return bool(SSL);
                 }
 
                 void Continue100(Connection::Context &Context)
@@ -165,15 +175,28 @@ namespace Core
                     constexpr auto ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
 
                     Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
-                    Format::Stream ContinueStream(Temp);
+                    Format::Stream Stream(Temp);
 
-                    Temp.CopyFrom(ContinueResponse, sizeof(ContinueResponse));
+                    Temp.CopyFrom(ContinueResponse, sizeof(Stream));
 
                     // Send the response
 
                     while (Temp.Length())
                     {
-                        (bool(SSL) ? SSL : Client) << ContinueStream;
+                        // (bool(SSL) ? SSL : Client) << Stream;
+
+                        if (SSL)
+                        {
+                            if (!(SSL << Stream))
+                            {
+                                Context.Remove();
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            Client << Stream;
+                        }
                     }
                 }
 
@@ -201,7 +224,9 @@ namespace Core
 
                     // Decide if we need to use sendfile
 
-                    bool UseSendFile = Setting.SendFileThreshold && HasFile && (FileLength > Setting.SendFileThreshold);
+                    // Until figure out Kernel TLS we wont use sendfile if TLS is enabled for this connection
+
+                    bool UseSendFile = Setting.SendFileThreshold && HasFile && (FileLength > Setting.SendFileThreshold) && !SSL;
 
                     Response.Headers.insert_or_assign("Content-Length", std::to_string(HasFile ? FileLength : StringLength));
                     Response.Headers.insert_or_assign("Host", Setting.HostName);
@@ -260,8 +285,6 @@ namespace Core
                             return;
                         }
 
-                        Context.Reschedule(Setting.Timeout);
-
                         OnRead(ConnContext);
                     }
 
@@ -279,7 +302,22 @@ namespace Core
                     {
                         Format::Stream Stream(IBuffer);
 
-                        bool(SSL) ? SSL >> Stream : Client >> Stream;
+                        // bool(SSL) ? SSL >> Stream : Client >> Stream;
+
+                        if (SSL)
+                        {
+                            if (!(SSL >> Stream))
+                            {
+                                Context.Remove();
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            Client >> Stream;
+                        }
+
+                        Context.Reschedule(Setting.Timeout);
 
                         Parser();
 
@@ -390,7 +428,7 @@ namespace Core
                     }
 
                     auto &Item = OBuffer.Head();
-                    Format::Stream Ser(Item.Buffer);
+                    Format::Stream Stream(Item.Buffer);
 
                     // Send data in buffer
 
@@ -398,7 +436,20 @@ namespace Core
                     {
                         // Write data
 
-                        bool(SSL) ? SSL << Ser : Client << Ser;
+                        // bool(SSL) ? SSL << Stream : Client << Stream;
+
+                        if (SSL)
+                        {
+                            if (!(SSL << Stream))
+                            {
+                                Context.Remove();
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            Client << Stream;
+                        }
 
                         if (!Item.Buffer.IsEmpty())
                             return;
@@ -409,6 +460,11 @@ namespace Core
                     if (Item.FileContentLength && Item.SendFile)
                     {
                         Item.FileContentLength -= Client.SendFile(*Item.FilePtr, Item.FileContentLength);
+
+                        // if (SSL)
+                        //     Item.FileContentLength -= SSL.SendFile(*Item.FilePtr, Item.FileContentLength);
+                        // else
+                        //     Item.FileContentLength -= Client.SendFile(*Item.FilePtr, Item.FileContentLength);
                     }
 
                     // Pop buffer if we're done

@@ -329,28 +329,14 @@ namespace Core
             return _INode < Other._INode;
         }
 
-        operator bool() const
+        inline operator bool() const
         {
             return _INode != -1;
         }
 
-        // Stream operators
-
-        friend Format::Serializer &operator>>(Format::Serializer &Ser, Descriptor const &descriptor)
+        inline operator int() const
         {
-            size_t Read = 0;
-            struct iovec Vectors[2];
-            Ser.Queue.IncreaseCapacity(descriptor.Received());
-
-            do
-            {
-                Read = descriptor.Read(Vectors, 1 + Ser.Queue.EmptyVectors(Vectors));
-
-                Ser.Queue.AdvanceTail(Read);
-
-            } while (Read);
-
-            return Ser;
+            return _INode;
         }
     };
 }
