@@ -401,23 +401,6 @@ namespace Core::Async
                     Timeout,
                     [this, Iterator]
                     {
-                        // Remove(Iterator);
-
-                        /**
-                         * @brief Important note
-                         * Remove cannot be used here
-                         * because this function is called on time out
-                         * event in which an iterator will loop through
-                         * the list's entries and clean it.
-                         * Calling normal Remove will cause the iterator itself
-                         * to be removed in between iterating through that list
-                         * and will cause segmentation fault.
-                         * RemoveHandler in turn, will only remove the descriptor
-                         * and its handler but not the time-out entry inside our
-                         * time wheel object so after executing this callback,
-                         * the time wheel handles the task of cleaning the time-out
-                         * handler and iterator itself.
-                         */
                         RemoveHandler(Iterator);
                     });
             }
@@ -428,6 +411,7 @@ namespace Core::Async
 
             _Poll.Modify(Iterator->File, ePoll::In, (size_t) & *Iterator);
 
+            RemoveTimer(Item);
             Handlers.erase(Item);
 
             return Iterator;
