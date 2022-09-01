@@ -75,19 +75,11 @@ namespace Core
                         HandlerAs<HTTP::Connection>().OnSent = std::forward<TCallback>(Callback);
                     }
 
-                    // template <typename TCallback>
-                    // inline void Upgrade(TCallback &&Callback, ePoll::Event Events = ePoll::In)
-                    // {
-                    //     ListenFor(ePoll::Out);
-
-                    //     OnIdle(
-                    //         [*this, Events, Callback = std::forward<TCallback>(Callback)]() mutable
-                    //         {
-                    //             ListenFor(Events);
-
-                    //             Self.Callback = std::forward<TCallback>(Callback);
-                    //         });
-                    // }
+                    template <typename TCallback>
+                    inline void Upgrade(TCallback &&Callback, Duration Timeout /*, ePoll::Event Events = ePoll::In*/)
+                    {
+                        Loop.Upgrade(Self, std::forward<TCallback>(Callback), Timeout);
+                    }
 
                     // inline void InsertHandler();
                 };

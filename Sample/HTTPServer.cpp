@@ -13,7 +13,7 @@ using namespace Core::Network;
 int main(int, char const *[])
 {
     // Create an instance of http runner with a 2 working threads
-    
+
     HTTP::Server Server(2);
 
     Test::Log("Server started");
@@ -29,22 +29,24 @@ int main(int, char const *[])
         });
 
     // Global Filter will be called if no route is matched and before Default is called
+    // This is an extremely simple static file filter
 
     Server.Filter(
-        [](HTTP::Connection::Context &Context, HTTP::Request &Request, auto &&Next) -> std::optional<HTTP::Response>
+        [SendFileThreshold = static_cast<size_t>(1024 * 100)](HTTP::Connection::Context &Context, HTTP::Request &Request, auto &&Next) -> std::optional<HTTP::Response>
         {
             auto FileName = Request.Path.substr(1);
 
-            try
+            if (File::IsRegular(FileName))
             {
-                if (File::IsRegular(FileName))
-                {
-                    return HTTP::Response::FromPath(Request.Version, HTTP::Status::OK, FileName);
-                }
-            }
-            catch (std::system_error const &e)
-            {
-                std::cout << FileName << " does not exist" << std::endl;
+                auto StaticFile = File::Open(FileName, File::Binary | File::ReadOnly);
+
+                if (!Context.CanUseSendFile() || StaticFile.Size() <= SendFileThreshold)
+                    return Context.SendResponse(
+                        HTTP::Response::Type(Request.Version, HTTP::Status::OK, HTTP::GetContentType(File::GetExtension(FileName)), StaticFile.ReadAll()));
+
+                return Context.SendResponse(
+                    HTTP::Response::Type(Request.Version, HTTP::Status::OK, HTTP::GetContentType(File::GetExtension(FileName))),
+                    std::move(StaticFile));
             }
 
             return Next(Context, Request);
@@ -126,21 +128,28 @@ int main(int, char const *[])
     Server.GET<"/Upgrade">(
         [](HTTP::Connection::Context &Context, HTTP::Request &Request) -> std::optional<HTTP::Response>
         {
-            Context.Upgrade(
-                [](Async::EventLoop::Context &Context, ePoll::Entry &Entry) mutable
+            Context.ListenFor(ePoll::Out);
+
+            Context.OnSent(
+                [Context]() mutable
                 {
-                    if (Entry.Happened(ePoll::In))
-                    {
-                        if (!Context.FileAs<Network::Socket>().Received())
+                    Context.Upgrade(
+                        [](Async::EventLoop::Context &Context, ePoll::Entry &Entry) mutable
                         {
-                            Context.Remove();
-                            return;
-                        }
+                            if (Entry.Happened(ePoll::In))
+                            {
+                                if (!Context.FileAs<Network::Socket>().Received())
+                                {
+                                    Context.Remove();
+                                    return;
+                                }
 
-                        Iterable::Span<char> Data = Context.FileAs<Network::Socket>().Receive();
+                                std::cout << "Got data\n";
 
-                        Context.Reschedule({5, 0});
-                    }
+                                Iterable::Span<char> Data = Context.FileAs<Network::Socket>().Receive();
+                            }
+                        },
+                        {0, 0});
                 });
 
             return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Hello world, upgraded!</h1>");
@@ -151,21 +160,30 @@ int main(int, char const *[])
     Server.GET<"/Source">(
         [](HTTP::Connection::Context &Context, HTTP::Request &Request)
         {
-            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Context.Source.ToString());
+            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Context.Source.ToString() + (Context.IsSecure() ? " Is secure" : " Isn't secure"));
         });
 
-    // Init thread storages and other settings
+    Server
 
-    Server.InitStorages(
-              [](std::shared_ptr<void> &Storage)
-              {
-                  Storage = std::make_shared<std::string>("Storage data");
-              })
+        // Init thread storages and other settings
+
+        .InitStorages(
+            [](std::shared_ptr<void> &Storage)
+            {
+                Storage = std::make_shared<std::string>("Storage data");
+            })
+
+        //
+
         .OnError(
             [](HTTP::Connection::Context &Context, Network::HTTP::Response &)
             {
                 std::cout << "Error on " << Context.Target << std::endl;
             })
+
+        // Ignore SIGPIPE
+
+        .IgnoreBrokenPipe()
 
         // Idle time out for connections
 
@@ -173,11 +191,18 @@ int main(int, char const *[])
 
         // It's possible to have multiple listeners
 
+        // HTTP Listener
+
         .Listen({"0.0.0.0:8888"})
 
-        // Zero means no sendfile must be used
+        // HTTPS Listener
 
-        .SendFileThreshold(1024 * 100)
+        .Listen({"0.0.0.0:4444"}, "Cert.pem", "Key.pem")
+
+        // Size configurations
+        // Zero means no limit
+
+        .MaxFileSize(1024 * 1024 * 10)
         .MaxHeaderSize(1024 * 1024 * 2)
         .MaxBodySize(1024 * 1024 * 10)
         .MaxConnectionCount(1024)
@@ -195,9 +220,9 @@ int main(int, char const *[])
         // Starts the thread pool
 
         .Run()
-        
+
         // Joins this thread to thread pool
-        
+
         .GetInPool();
 
     return 0;

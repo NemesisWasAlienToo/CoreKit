@@ -3,8 +3,10 @@
 #include <string>
 #include <optional>
 #include <signal.h>
+#include <netinet/tcp.h>
 
 #include <Duration.hpp>
+#include <Network/Socket.hpp>
 #include <Network/DNS.hpp>
 #include <Format/Stream.hpp>
 #include <Network/HTTP/Response.hpp>
@@ -12,6 +14,7 @@
 #include <Async/ThreadPool.hpp>
 #include <Network/HTTP/Router.hpp>
 #include <Network/HTTP/Connection.hpp>
+#include <Async/Runnable.hpp>
 
 namespace Core::Network::HTTP
 {
