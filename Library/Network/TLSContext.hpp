@@ -24,9 +24,11 @@ namespace Core::Network
 
             inline void SetDescriptor(Descriptor const &descriptor)
             {
-                if (!SSL_set_fd(ssl, descriptor))
+                int Result = SSL_set_fd(ssl, descriptor);
+
+                if (!Result)
                 {
-                    throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
+                    throw std::runtime_error(std::to_string(GetError(Result)));
                 }
             }
 
@@ -55,9 +57,21 @@ namespace Core::Network
                 }
             }
 
-            bool Handshake()
+            inline auto Handshake()
             {
-                return (ShakeHand = (SSL_do_handshake(ssl) == 1));
+                auto Res = SSL_do_handshake(ssl);
+                ShakeHand = (Res == 1);
+                return Res;
+            }
+
+            inline int Shutdown() const
+            {
+                return SSL_shutdown(ssl);
+            }
+
+            inline int GetError(int Result) const
+            {
+                return SSL_get_error(ssl, Result);
             }
 
             ssize_t Write(void const *Data, size_t Size) const
@@ -66,7 +80,7 @@ namespace Core::Network
 
                 if (Result < 0)
                 {
-                    throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
+                    throw std::runtime_error(std::to_string(GetError(Result)));
                 }
 
                 return Result;
@@ -78,7 +92,7 @@ namespace Core::Network
 
                 if (Result < 0)
                 {
-                    throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
+                    throw std::runtime_error(std::to_string(GetError(Result)));
                 }
 
                 return Result;
@@ -92,7 +106,7 @@ namespace Core::Network
 
                 if (Result < 0)
                 {
-                    throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
+                    throw std::runtime_error(std::to_string(GetError(Result)));
                 }
 
                 return Result;
@@ -172,23 +186,9 @@ namespace Core::Network
 
             // @todo Fix Handle errors properly
 
-            if (SSL_CTX_use_certificate_file(ctx, Certification.begin(), SSL_FILETYPE_PEM) <= 0)
-            {
-                // ERR_print_errors_fp(stderr);
-                // exit(EXIT_FAILURE);
-
-                throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
-            }
-
-            if (SSL_CTX_use_PrivateKey_file(ctx, Key.begin(), SSL_FILETYPE_PEM) <= 0)
-            {
-                throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
-            }
-
-            if (!SSL_CTX_check_private_key(ctx))
-            {
-                throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
-            }
+            SetCertificate(Certification, SSL_FILETYPE_PEM);
+            SetPrivateKey(Key, SSL_FILETYPE_PEM);
+            CheckPrivateKey();
         }
 
         TLSContext(TLSContext &&Other) : ctx(Other.ctx)
@@ -208,12 +208,36 @@ namespace Core::Network
             SSL_CTX_free(ctx);
         }
 
+        inline void SetCertificate(std::string_view Certification, int Type = SSL_FILETYPE_PEM)
+        {
+            if (SSL_CTX_use_certificate_file(ctx, Certification.begin(), Type) <= 0)
+            {
+                throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
+            }
+        }
+
+        inline void SetPrivateKey(std::string_view Key, int Type = SSL_FILETYPE_PEM)
+        {
+            if (SSL_CTX_use_PrivateKey_file(ctx, Key.begin(), Type) <= 0)
+            {
+                throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
+            }
+        }
+
+        inline void CheckPrivateKey()
+        {
+            if (!SSL_CTX_check_private_key(ctx))
+            {
+                throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
+            }
+        }
+
         inline SecureSocket NewSocket()
         {
             return SecureSocket(ctx);
         }
 
-        static SSL_CTX *Create()
+        static SSL_CTX *Create(Iterable::List<std::pair<std::string, std::string>> const &Commands = {})
         {
             static std::once_flag once;
 
@@ -234,16 +258,20 @@ namespace Core::Network
                 throw std::runtime_error(ERR_reason_error_string(ERR_get_error()));
             }
 
-            SSL_CONF_CTX *cctx = SSL_CONF_CTX_new();
-            SSL_CONF_CTX_set_flags(cctx, SSL_CONF_FLAG_SERVER);
-            SSL_CONF_CTX_set_flags(cctx, SSL_CONF_FLAG_CLIENT);
-            SSL_CONF_CTX_set_flags(cctx, SSL_CONF_FLAG_CERTIFICATE);
-            SSL_CONF_CTX_set_flags(cctx, SSL_CONF_FLAG_FILE);
-            SSL_CONF_CTX_set_ssl_ctx(cctx, ctx);
-            SSL_CONF_CTX_finish(cctx);
-            SSL_CONF_CTX_free(cctx);
+            SSL_CONF_CTX *confctx = SSL_CONF_CTX_new();
+            SSL_CONF_CTX_set_flags(confctx, SSL_CONF_FLAG_SERVER);
+            SSL_CONF_CTX_set_flags(confctx, SSL_CONF_FLAG_CERTIFICATE);
+            SSL_CONF_CTX_set_flags(confctx, SSL_CONF_FLAG_FILE);
+            SSL_CONF_CTX_set_ssl_ctx(confctx, ctx);
+            Commands.ForEach(
+                [&confctx](auto const &Pair)
+                {
+                    SSL_CONF_cmd(confctx, Pair.first.c_str(), Pair.second.c_str());
+                });
+            SSL_CONF_CTX_finish(confctx);
+            SSL_CONF_CTX_free(confctx);
 
-            // SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+            SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
 
             return ctx;
         }

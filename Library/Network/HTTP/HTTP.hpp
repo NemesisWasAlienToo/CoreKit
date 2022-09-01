@@ -219,14 +219,6 @@ namespace Core::Network::HTTP
             {"class", "application/java"},
             {"csh", "application/x-csh"}};
 
-    std::string_view GetExtension(std::string_view Path)
-    {
-        auto pos = Path.find_last_of('.');
-        if (pos == std::string_view::npos)
-            return "";
-        return Path.substr(pos + 1);
-    }
-
     std::string_view GetContentType(std::string_view Extension)
     {
         if (Extension == "")

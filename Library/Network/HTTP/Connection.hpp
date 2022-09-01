@@ -2,19 +2,13 @@
 
 #include <string>
 
-#include <Event.hpp>
+#include <File.hpp>
 #include <Duration.hpp>
-#include <ePoll.hpp>
-#include <Iterable/List.hpp>
-#include <Network/HTTP/HTTP.hpp>
 #include <Format/Stream.hpp>
 #include <Network/HTTP/Response.hpp>
-#include <Network/TLSContext.hpp>
 #include <Network/HTTP/Request.hpp>
+#include <Network/TLSContext.hpp>
 #include <Network/HTTP/Parser.hpp>
-#include <Network/TCPServer.hpp>
-#include <Network/HTTP/Router.hpp>
-#include <File.hpp>
 
 namespace Core
 {
@@ -27,9 +21,8 @@ namespace Core
                 struct OutEntry
                 {
                     Iterable::Queue<char> Buffer;
-                    std::shared_ptr<File> FilePtr;
+                    File FilePtr;
                     size_t FileContentLength;
-                    bool SendFile;
                 };
 
                 struct Context : public Async::EventLoop::Context
@@ -42,13 +35,26 @@ namespace Core
                         return Self.CallbackAs<HTTP::Connection>()->IsSecure();
                     }
 
-                    inline void SendResponse(HTTP::Response &&Response) const
+                    inline bool HasKTLS()
+                    {
+                        return false;
+                    }
+
+                    inline bool CanUseSendFile()
+                    {
+                        auto s = IsSecure();
+                        return !s || (s && HasKTLS());
+                    }
+
+                    inline std::nullopt_t SendResponse(HTTP::Response &&Response, File file = {}, size_t FileLength = 0) const
                     {
                         Loop.AssertPermission();
 
-                        Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response));
+                        Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response), std::move(file), FileLength);
 
                         ListenFor(ePoll::In | ePoll::Out);
+
+                        return std::nullopt;
                     }
 
                     template <typename TCallback>
@@ -58,24 +64,30 @@ namespace Core
                     }
 
                     template <typename TCallback>
-                    inline void OnIdle(TCallback &&Callback)
+                    inline void OnReceived(TCallback &&Callback)
                     {
-                        HandlerAs<HTTP::Connection>().OnIdle = std::forward<TCallback>(Callback);
+                        HandlerAs<HTTP::Connection>().OnReceived = std::forward<TCallback>(Callback);
                     }
 
                     template <typename TCallback>
-                    inline void Upgrade(TCallback &&Callback, ePoll::Event Events = ePoll::In)
+                    inline void OnSent(TCallback &&Callback)
                     {
-                        ListenFor(ePoll::Out);
-
-                        OnIdle(
-                            [*this, Events, Callback = std::forward<TCallback>(Callback)]() mutable
-                            {
-                                ListenFor(Events);
-
-                                Self.Callback = std::forward<TCallback>(Callback);
-                            });
+                        HandlerAs<HTTP::Connection>().OnSent = std::forward<TCallback>(Callback);
                     }
+
+                    // template <typename TCallback>
+                    // inline void Upgrade(TCallback &&Callback, ePoll::Event Events = ePoll::In)
+                    // {
+                    //     ListenFor(ePoll::Out);
+
+                    //     OnIdle(
+                    //         [*this, Events, Callback = std::forward<TCallback>(Callback)]() mutable
+                    //         {
+                    //             ListenFor(Events);
+
+                    //             Self.Callback = std::forward<TCallback>(Callback);
+                    //         });
+                    // }
 
                     // inline void InsertHandler();
                 };
@@ -85,7 +97,6 @@ namespace Core
                     size_t MaxHeaderSize;
                     size_t MaxBodySize;
                     size_t MaxFileSize;
-                    size_t SendFileThreshold;
                     size_t RequestBufferSize;
                     size_t ResponseBufferSize;
                     std::string HostName;
@@ -105,7 +116,8 @@ namespace Core
 
                 // Events
                 std::function<void()> OnRemove;
-                std::function<void()> OnIdle;
+                std::function<void()> OnReceived;
+                std::function<void()> OnSent;
 
                 // @todo Fix this limitations
                 HTTP::Parser Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize, IBuffer};
@@ -200,7 +212,7 @@ namespace Core
                     }
                 }
 
-                void AppendResponse(HTTP::Response &&Response)
+                void AppendResponse(HTTP::Response &&Response, File file = {}, size_t FileLength = 0)
                 {
                     // Handle keep-alive
 
@@ -213,48 +225,66 @@ namespace Core
                         Response.Headers.insert_or_assign("Connection", "close");
                     }
 
-                    bool HasFile = std::holds_alternative<std::shared_ptr<File>>(Response.Content);
-                    size_t FileLength = 0;
+                    bool HasFile = bool(file);
                     size_t StringLength = 0;
 
                     // Trim content if its too big
+                    // @todo What should we do if content is too large? Trim? Exception? or HTTP::Status::RequestedRangeNotSatisfiable
 
-                    HasFile ? FileLength = std::min(std::get<std::shared_ptr<File>>(Response.Content)->Size(), Setting.MaxFileSize)
-                            : StringLength = std::min(std::get<std::string>(Response.Content).length(), Setting.MaxBodySize);
+                    if (HasFile)
+                    {
+                        FileLength = (FileLength && Setting.MaxFileSize) ? FileLength : std::min(file.Size(), Setting.MaxFileSize);
 
-                    // Decide if we need to use sendfile
+                        // if (Offset)
+                        //     file.Seek(Offset);
+                    }
+                    else
+                    {
+                        StringLength = std::min(Response.Content.length(), Setting.MaxBodySize);
+                    }
 
-                    // Until figure out Kernel TLS we wont use sendfile if TLS is enabled for this connection
-
-                    bool UseSendFile = Setting.SendFileThreshold && HasFile && (FileLength > Setting.SendFileThreshold) && !SSL;
-
-                    Response.Headers.insert_or_assign("Content-Length", std::to_string(HasFile ? FileLength : StringLength));
+                    Response.Headers.insert_or_assign("Content-Length", std::to_string(FileLength + StringLength));
                     Response.Headers.insert_or_assign("Host", Setting.HostName);
 
                     OBuffer.Insert(
                         {Iterable::Queue<char>(Setting.ResponseBufferSize),
                          // @todo Remove pointer
-                         HasFile ? std::get<std::shared_ptr<File>>(Response.Content) : nullptr,
-                         FileLength,
-                         UseSendFile});
+                         HasFile ? std::move(file) : std::move(File{}),
+                         FileLength});
 
                     auto &Item = OBuffer.Tail();
 
                     Format::Stream Ser(Item.Buffer);
 
                     Ser << Response;
+                }
 
-                    // Append file content
+                void Handshake(Connection::Context &Context)
+                {
+                    // @todo Maybe do this with upgrade?
 
-                    if (Item.SendFile)
-                        return;
+                    auto Result = SSL.Handshake();
 
-                    // if (Item.FileContentLength)
-                    //     Item.FilePtr->ReadAll(Item.Buffer);
-
-                    while (Item.FileContentLength)
+                    if (Result == 1)
                     {
-                        Item.FileContentLength -= Ser.ReadOnce(*Item.FilePtr, Item.FileContentLength);
+                        SSL.ShakeHand = true;
+                        Context.ListenFor(ePoll::In);
+                        return;
+                    }
+
+                    auto Error = SSL.GetError(Result);
+
+                    if (Error == SSL_ERROR_WANT_WRITE)
+                    {
+                        Context.ListenFor(ePoll::Out | ePoll::In);
+                    }
+                    else if (Error == SSL_ERROR_WANT_READ)
+                    {
+                        Context.ListenFor(ePoll::In);
+                    }
+                    else
+                    {
+                        Context.Remove();
                     }
                 }
 
@@ -271,9 +301,7 @@ namespace Core
 
                     if (SSL && !SSL.ShakeHand)
                     {
-                        // @todo Maybe fix this with upgrade?
-
-                        SSL.Handshake();
+                        Handshake(ConnContext);
                         return;
                     }
 
@@ -285,7 +313,15 @@ namespace Core
                             return;
                         }
 
-                        OnRead(ConnContext);
+                        bool Exit = false;
+
+                        OnRead(ConnContext, Exit);
+
+                        if (Exit)
+                        {
+                            Handshake(ConnContext);
+                            return;
+                        }
                     }
 
                     if (Item.Happened(ePoll::Out))
@@ -294,7 +330,7 @@ namespace Core
                     }
                 }
 
-                void OnRead(Connection::Context &Context)
+                void OnRead(Connection::Context &Context, bool &Exit)
                 {
                     Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
 
@@ -302,13 +338,11 @@ namespace Core
                     {
                         Format::Stream Stream(IBuffer);
 
-                        // bool(SSL) ? SSL >> Stream : Client >> Stream;
-
                         if (SSL)
                         {
                             if (!(SSL >> Stream))
                             {
-                                Context.Remove();
+                                Exit = true;
                                 return;
                             }
                         }
@@ -393,6 +427,9 @@ namespace Core
                         // Same as bellow
 
                         // Context.SendResponse(std::move(Result.value()));
+
+                        if (OnReceived)
+                            OnReceived();
                     }
 
                     if (ShouldClose)
@@ -421,8 +458,8 @@ namespace Core
 
                         Context.ListenFor(ePoll::In);
 
-                        if (OnIdle)
-                            OnIdle();
+                        if (OnSent)
+                            OnSent();
 
                         return;
                     }
@@ -457,14 +494,12 @@ namespace Core
 
                     // Send file
 
-                    if (Item.FileContentLength && Item.SendFile)
+                    if (Item.FileContentLength)
                     {
-                        Item.FileContentLength -= Client.SendFile(*Item.FilePtr, Item.FileContentLength);
-
-                        // if (SSL)
-                        //     Item.FileContentLength -= SSL.SendFile(*Item.FilePtr, Item.FileContentLength);
-                        // else
-                        //     Item.FileContentLength -= Client.SendFile(*Item.FilePtr, Item.FileContentLength);
+                        if (SSL)
+                            Item.FileContentLength -= SSL.SendFile(Item.FilePtr, Item.FileContentLength);
+                        else
+                            Item.FileContentLength -= Client.SendFile(Item.FilePtr, Item.FileContentLength);
                     }
 
                     // Pop buffer if we're done

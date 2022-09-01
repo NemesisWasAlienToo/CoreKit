@@ -2,21 +2,13 @@
 
 #include <string>
 #include <optional>
+#include <signal.h>
 
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-
-#include <Network/DNS.hpp>
-#include <Event.hpp>
 #include <Duration.hpp>
-#include <ePoll.hpp>
-#include <Iterable/List.hpp>
-#include <Network/HTTP/HTTP.hpp>
+#include <Network/DNS.hpp>
 #include <Format/Stream.hpp>
-#include <Network/TLSContext.hpp>
 #include <Network/HTTP/Response.hpp>
 #include <Network/HTTP/Request.hpp>
-#include <Network/HTTP/Parser.hpp>
 #include <Async/ThreadPool.hpp>
 #include <Network/HTTP/Router.hpp>
 #include <Network/HTTP/Connection.hpp>
@@ -30,7 +22,6 @@ namespace Core::Network::HTTP
             1024 * 1024 * 1,
             1024 * 1024 * 5,
             1024 * 1024 * 5,
-            1024 * 10,
             1024,
             1024,
             Network::DNS::HostName(),
@@ -240,14 +231,6 @@ namespace Core::Network::HTTP
             return *this;
         }
 
-        // Zero means no sendfile will be used
-
-        inline Server &SendFileThreshold(size_t Size)
-        {
-            Settings.SendFileThreshold = Size;
-            return *this;
-        }
-
         inline Server &HostName(std::string Name)
         {
             Settings.HostName = std::move(Name);
@@ -266,7 +249,8 @@ namespace Core::Network::HTTP
             return *this;
         }
 
-        inline Server &Listen(Network::EndPoint const &endPoint)
+        template <typename TCallback, typename TEndCallback>
+        inline Server &ListenWith(Network::EndPoint const &endPoint, TCallback &&Callback, TEndCallback &&EndCallback)
         {
             Network::Socket Server(static_cast<Network::Socket::SocketFamily>(endPoint.Address().Family()), Network::Socket::TCP);
 
@@ -283,6 +267,19 @@ namespace Core::Network::HTTP
 
             Pool[Turn].Assign(
                 std::move(Server),
+                std::forward<TCallback>(Callback),
+                std::forward<TEndCallback>(EndCallback),
+                {0, 0});
+
+            Turn = Pool.Length() ? (Turn + 1) % Pool.Length() : 0;
+
+            return *this;
+        }
+
+        inline Server &Listen(Network::EndPoint const &endPoint)
+        {
+            return ListenWith(
+                endPoint,
                 [this, endPoint, Counter = 0ull](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
                 {
                     Network::Socket &Server = static_cast<Network::Socket &>(Context.Self.File);
@@ -316,33 +313,15 @@ namespace Core::Network::HTTP
                         },
                         Settings.Timeout);
 
-                    Counter = (Counter + 1) % Pool.Length();
+                    Counter = Pool.Length() ? (Counter + 1) % Pool.Length() : 0;
                 },
-                nullptr,
-                {0, 0});
-
-            Turn = (Turn + 1) % Pool.Length();
-
-            return *this;
+                nullptr);
         }
 
         inline Server &Listen(Network::EndPoint const &endPoint, std::string_view Certification, std::string_view Key)
         {
-            Network::Socket Server(static_cast<Network::Socket::SocketFamily>(endPoint.Address().Family()), Network::Socket::TCP);
-
-            // Set Reuse
-
-            Server.SetOptions(SOL_SOCKET, SO_REUSEADDR, static_cast<int>(1));
-            Server.SetOptions(SOL_SOCKET, SO_REUSEPORT, static_cast<int>(1));
-
-            // Bind socket
-
-            Server.Bind(endPoint);
-
-            Server.Listen();
-
-            Pool[Turn].Assign(
-                std::move(Server),
+            return ListenWith(
+                endPoint,
                 [this, endPoint, Counter = 0ull, TLS = TLSContext(Certification, Key)](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
                 {
                     Network::Socket &Server = static_cast<Network::Socket &>(Context.Self.File);
@@ -365,12 +344,12 @@ namespace Core::Network::HTTP
                     // Set NoDelay
 
                     if (Settings.NoDelay)
-                        Client.SetOptions(IPPROTO_TCP, TCP_NODELAY, static_cast<int>(1));
+                        Client.SetOptions(IPPROTO_TCP, TCP_NODELAY, 1);
 
-// #ifdef TLS_1_2_VERSION
+                    // #ifdef TLS_1_2_VERSION
                     // if (true /*Settings.KernelTLS*/)
                     //     Client.SetOptions(SOL_TCP, TCP_ULP, "tls");
-// #endif
+                    // #endif
 
                     auto SS = TLS.NewSocket();
 
@@ -387,15 +366,18 @@ namespace Core::Network::HTTP
                         },
                         Settings.Timeout);
 
-                    Counter = (Counter + 1) % Pool.Length();
+                    Counter = Pool.Length() ? (Counter + 1) % Pool.Length() : 0;
                 },
-                nullptr,
-                {0, 0});
+                nullptr);
+        }
 
-            Turn = (Turn + 1) % Pool.Length();
-
+#ifdef __linux__
+        inline Server &IgnoreBrokenPipe()
+        {
+            signal(SIGPIPE, SIG_IGN);
             return *this;
         }
+#endif
 
     private:
         Async::ThreadPool Pool;
