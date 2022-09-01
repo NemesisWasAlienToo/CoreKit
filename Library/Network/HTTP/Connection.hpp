@@ -57,6 +57,11 @@ namespace Core
                         return std::nullopt;
                     }
 
+                    inline bool WillClose()
+                    {
+                        return HandlerAs<HTTP::Connection>().ShouldClose;
+                    }
+
                     template <typename TCallback>
                     inline void OnRemove(TCallback &&Callback)
                     {
@@ -78,6 +83,9 @@ namespace Core
                     template <typename TCallback>
                     inline void Upgrade(TCallback &&Callback, Duration Timeout /*, ePoll::Event Events = ePoll::In*/)
                     {
+                        if (WillClose())
+                            return;
+
                         Loop.Upgrade(Self, std::forward<TCallback>(Callback), Timeout);
                     }
 
