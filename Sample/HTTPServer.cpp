@@ -144,8 +144,6 @@ int main(int, char const *[])
                                     return;
                                 }
 
-                                std::cout << "Got data\n";
-
                                 Iterable::Span<char> Data = Context.FileAs<Network::Socket>().Receive();
                             }
                         },
@@ -163,15 +161,13 @@ int main(int, char const *[])
             return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Context.Source.ToString() + (Context.IsSecure() ? " Is secure" : " Isn't secure"));
         });
 
-    Server
+    // Init thread storages and other settings
 
-        // Init thread storages and other settings
-
-        .InitStorages(
-            [](std::shared_ptr<void> &Storage)
-            {
-                Storage = std::make_shared<std::string>("Storage data");
-            })
+    Server.InitStorages(
+              [](std::shared_ptr<void> &Storage)
+              {
+                  Storage = std::make_shared<std::string>("Storage data");
+              })
 
         //
 
