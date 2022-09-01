@@ -13,7 +13,7 @@ namespace Core::Cryptography
 {
     struct Key
     {
-        // @todo maybr add endianness?
+        // @todo maybe add endianness?
 
         // ### Constants
 

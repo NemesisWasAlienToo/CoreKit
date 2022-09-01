@@ -104,7 +104,7 @@ namespace Core::Network::HTTP
                     // @todo Optimize this
                     // Check header size
 
-                    if (Message.length() > HeaderLimit)
+                    if (HeaderLimit && Message.length() > HeaderLimit)
                     {
                         throw HTTP::Status::RequestEntityTooLarge;
                     }
@@ -115,7 +115,7 @@ namespace Core::Network::HTTP
                 {
                     bodyPos = bodyPosTmp + 4;
 
-                    if (bodyPos > HeaderLimit)
+                    if (HeaderLimit && bodyPos > HeaderLimit)
                     {
                         throw HTTP::Status::RequestEntityTooLarge;
                     }
@@ -171,7 +171,7 @@ namespace Core::Network::HTTP
 
                 // Check if the length is in valid range
 
-                if (ContentLength > ContentLimit)
+                if (ContentLimit && ContentLength > ContentLimit)
                 {
                     throw HTTP::Status::RequestEntityTooLarge;
                 }

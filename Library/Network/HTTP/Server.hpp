@@ -2,23 +2,19 @@
 
 #include <string>
 #include <optional>
+#include <signal.h>
+#include <netinet/tcp.h>
 
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-
-#include <Network/DNS.hpp>
-#include <Event.hpp>
 #include <Duration.hpp>
-#include <ePoll.hpp>
-#include <Iterable/List.hpp>
-#include <Network/HTTP/HTTP.hpp>
+#include <Network/Socket.hpp>
+#include <Network/DNS.hpp>
 #include <Format/Stream.hpp>
 #include <Network/HTTP/Response.hpp>
 #include <Network/HTTP/Request.hpp>
-#include <Network/HTTP/Parser.hpp>
 #include <Async/ThreadPool.hpp>
 #include <Network/HTTP/Router.hpp>
 #include <Network/HTTP/Connection.hpp>
+#include <Async/Runnable.hpp>
 
 namespace Core::Network::HTTP
 {
@@ -29,7 +25,6 @@ namespace Core::Network::HTTP
             1024 * 1024 * 1,
             1024 * 1024 * 5,
             1024 * 1024 * 5,
-            1024 * 10,
             1024,
             1024,
             Network::DNS::HostName(),
@@ -239,14 +234,6 @@ namespace Core::Network::HTTP
             return *this;
         }
 
-        // Zero means no sendfile will be used
-
-        inline Server &SendFileThreshold(size_t Size)
-        {
-            Settings.SendFileThreshold = Size;
-            return *this;
-        }
-
         inline Server &HostName(std::string Name)
         {
             Settings.HostName = std::move(Name);
@@ -265,7 +252,8 @@ namespace Core::Network::HTTP
             return *this;
         }
 
-        inline Server &Listen(Network::EndPoint const &endPoint /*, bool TLS = false*/)
+        template <typename TCallback, typename TEndCallback>
+        inline Server &ListenWith(Network::EndPoint const &endPoint, TCallback &&Callback, TEndCallback &&EndCallback)
         {
             Network::Socket Server(static_cast<Network::Socket::SocketFamily>(endPoint.Address().Family()), Network::Socket::TCP);
 
@@ -282,6 +270,19 @@ namespace Core::Network::HTTP
 
             Pool[Turn].Assign(
                 std::move(Server),
+                std::forward<TCallback>(Callback),
+                std::forward<TEndCallback>(EndCallback),
+                {0, 0});
+
+            Turn = Pool.Length() ? (Turn + 1) % Pool.Length() : 0;
+
+            return *this;
+        }
+
+        inline Server &Listen(Network::EndPoint const &endPoint)
+        {
+            return ListenWith(
+                endPoint,
                 [this, endPoint, Counter = 0ull](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
                 {
                     Network::Socket &Server = static_cast<Network::Socket &>(Context.Self.File);
@@ -315,22 +316,71 @@ namespace Core::Network::HTTP
                         },
                         Settings.Timeout);
 
-                    Counter = (Counter + 1) % Pool.Length();
+                    Counter = Pool.Length() ? (Counter + 1) % Pool.Length() : 0;
                 },
-                nullptr,
-                {0, 0});
-
-            Turn = (Turn + 1) % Pool.Length();
-
-            return *this;
+                nullptr);
         }
 
-        // inline Server &ListenTLS(Network::EndPoint const &endPoint /*, bool TLS = false*/)
-        // {
-        //     //
+        inline Server &Listen(Network::EndPoint const &endPoint, std::string_view Certification, std::string_view Key)
+        {
+            return ListenWith(
+                endPoint,
+                [this, endPoint, Counter = 0ull, TLS = TLSContext(Certification, Key)](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
+                {
+                    Network::Socket &Server = static_cast<Network::Socket &>(Context.Self.File);
 
-        //     return *this;
-        // }
+                    auto [Client, Info] = Server.Accept();
+
+                    if (!Client)
+                        return;
+
+                    if (ConnectionCount.fetch_add(1, std::memory_order_relaxed) > Settings.MaxConnectionCount)
+                    {
+                        ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
+                        return;
+                    }
+
+                    // Set Non-blocking
+
+                    Client.Blocking(false);
+
+                    // Set NoDelay
+
+                    if (Settings.NoDelay)
+                        Client.SetOptions(IPPROTO_TCP, TCP_NODELAY, 1);
+
+                    // #ifdef TLS_1_2_VERSION
+                    // if (true /*Settings.KernelTLS*/)
+                    //     Client.SetOptions(SOL_TCP, TCP_ULP, "tls");
+                    // #endif
+
+                    auto SS = TLS.NewSocket();
+
+                    SS.SetDescriptor(Client);
+                    SS.SetAccept();
+                    // SS.SetVerify(SSL_VERIFY_NONE, nullptr);
+
+                    Pool[Counter].Assign(
+                        std::move(Client),
+                        Connection(Info, endPoint, Settings, std::move(SS)),
+                        [this]
+                        {
+                            ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
+                        },
+                        Settings.Timeout);
+
+                    Counter = Pool.Length() ? (Counter + 1) % Pool.Length() : 0;
+                },
+                nullptr);
+        }
+
+#ifdef __linux__
+        inline Server &IgnoreBrokenPipe()
+        {
+            signal(SIGPIPE, SIG_IGN);
+            return *this;
+        }
+#endif
 
     private:
         Async::ThreadPool Pool;
@@ -340,8 +390,6 @@ namespace Core::Network::HTTP
 
         static std::optional<HTTP::Response> DefaultRoute(HTTP::Connection::Context &Context, HTTP::Request &Req)
         {
-            // this is a bit faster than returning the response
-
             Context.SendResponse(HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>"));
             return std::nullopt;
         }

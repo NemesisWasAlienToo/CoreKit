@@ -60,6 +60,8 @@ namespace Core
             Directory = O_DIRECTORY,
 #ifdef O_BINARY
             Binary = O_BINARY,
+#else
+            Binary = 4,
 #endif
 #ifdef O_TEXT
             Text = O_TEXT,
@@ -100,6 +102,15 @@ namespace Core
             }
 
             return Result;
+        }
+
+        static std::string_view GetExtension(std::string_view Path)
+        {
+            auto pos = Path.find_last_of('.');
+            if (pos == std::string_view::npos)
+                return "";
+
+            return Path.substr(pos + 1);
         }
 
         // enum LockFlags
@@ -306,37 +317,72 @@ namespace Core
 
         inline static bool IsDirectory(std::string const &Path)
         {
-            return S_ISDIR(Stat(Path).st_mode);
+            struct stat st;
+
+            if(stat(Path.c_str(), &st) < 0)
+                return false;
+
+            return S_ISDIR(st.st_mode);
         }
 
         inline static bool IsChar(std::string const &Path)
         {
-            return S_ISCHR(Stat(Path).st_mode);
+            struct stat st;
+
+            if(stat(Path.c_str(), &st) < 0)
+                return false;
+
+            return S_ISCHR(st.st_mode);
         }
 
         inline static bool IsBulk(std::string const &Path)
         {
-            return S_ISBLK(Stat(Path).st_mode);
+            struct stat st;
+
+            if(stat(Path.c_str(), &st) < 0)
+                return false;
+
+            return S_ISBLK(st.st_mode);
         }
 
         inline static bool IsFIFO(std::string const &Path)
         {
-            return S_ISFIFO(Stat(Path).st_mode);
+            struct stat st;
+
+            if(stat(Path.c_str(), &st) < 0)
+                return false;
+
+            return S_ISFIFO(st.st_mode);
         }
 
         inline static bool IsLink(std::string const &Path)
         {
-            return S_ISLNK(Stat(Path).st_mode);
+            struct stat st;
+
+            if(stat(Path.c_str(), &st) < 0)
+                return false;
+
+            return S_ISLNK(st.st_mode);
         }
 
         inline static bool IsSocket(std::string const &Path)
         {
-            return S_ISSOCK(Stat(Path).st_mode);
+            struct stat st;
+
+            if(stat(Path.c_str(), &st) < 0)
+                return false;
+
+            return S_ISSOCK(st.st_mode);
         }
 
         inline static bool IsRegular(std::string const &Path)
         {
-            return S_ISREG(Stat(Path).st_mode);
+            struct stat st;
+
+            if(stat(Path.c_str(), &st) < 0)
+                return false;
+
+            return S_ISREG(st.st_mode);
         }
 
         inline static size_t SizeOf(std::string const &Path)

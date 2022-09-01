@@ -144,6 +144,51 @@ namespace Core
                   }),
               Hash(typeid(decltype(Function)).name()) {}
 
+        template <typename TFunctor>
+        constexpr Function &operator=(TFunctor &&Functor) noexcept
+            requires(!std::is_same_v<std::decay_t<TFunctor>, Function> && sizeof(std::decay_t<TFunctor>) > SmallSize)
+        {
+            Clear();
+
+            Object = new std::decay_t<TFunctor>(std::forward<TFunctor>(Functor));
+
+            Invoker = [](void *Item, TArgs &&...Args)
+            {
+                using T = std::decay_t<TFunctor>;
+                return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
+            };
+
+            Hash = typeid(TFunctor).name();
+
+            using T = std::decay_t<TFunctor>;
+
+            if constexpr (!std::is_trivially_destructible_v<T>)
+            {
+                Destructor = [](void const *Item)
+                {
+                    static_cast<T const *>(Item)->~T();
+                };
+            }
+            else
+            {
+                Destructor = nullptr;
+            }
+
+            if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
+            {
+                CopyConstructor = [](void **Self, void const *Other)
+                {
+                    *Self = new T(*static_cast<T const *>(Other));
+                };
+            }
+            else
+            {
+                CopyConstructor = nullptr;
+            }
+
+            return *this;
+        }
+
         constexpr Function &operator=(Function &&Other) noexcept
         {
             if (this != &Other)

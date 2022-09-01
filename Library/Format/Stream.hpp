@@ -10,7 +10,7 @@
 #include <Iterable/Queue.hpp>
 #include <Network/EndPoint.hpp>
 
-// @todo Seperate serializer and deserializer IMPORTANT
+// @todo Separate serializer and deserializer IMPORTANT
 
 namespace Core::Format
 {
@@ -27,7 +27,7 @@ namespace Core::Format
 
         Stream(const Stream &) = delete;
 
-        // Peroperties
+        // Properties
 
         // @todo Fix this
 
@@ -65,6 +65,37 @@ namespace Core::Format
             return *this;
         }
 
+        // @todo Implement
+        // ReadAll for file
+        // WriteAll for file
+        // ReadLine
+        // WriteLine
+
+        ssize_t ReadOnce(Descriptor const &descriptor, size_t Length)
+        {
+            ssize_t Read = 0;
+            struct iovec Vectors[2];
+            Queue.IncreaseCapacity(Length);
+
+            Read = descriptor.Read(Vectors, 1 + Queue.EmptyVectors(Vectors));
+
+            Queue.AdvanceTail(Read);
+
+            return Read;
+        }
+
+        ssize_t WriteOnce(Descriptor const &descriptor)
+        {
+            ssize_t Read = 0;
+            struct iovec Vectors[2];
+
+            Read = descriptor.Write(Vectors, 1 + Queue.DataVectors(Vectors));
+
+            Queue.AdvanceTail(Read);
+
+            return Read;
+        }
+
         // Input operators
 
         template <typename T>
@@ -81,7 +112,7 @@ namespace Core::Format
             return *this;
         }
 
-        // @todo Remove this after unifiying iterable and span
+        // @todo Remove this after unifying iterable and span
 
         template <typename TValue>
         Stream &operator<<(const Iterable::Span<TValue> &Value)
@@ -116,28 +147,12 @@ namespace Core::Format
             return *this;
         }
 
-        Stream &operator<<(std::string_view const &Value)
+        Stream &operator<<(std::string_view Value)
         {
             Queue.CopyFrom(Value.begin(), Value.length());
 
             return *this;
         }
-
-        // @todo Add this
-
-        // Stream &operator<<(std::string_view Value)
-        // {
-        //     Queue.CopyFrom(Value.begin(), Value.length());
-
-        //     return *this;
-        // }
-
-        // Stream &operator<<(const Cryptography::Key &Value)
-        // {
-        //     auto str = Value.ToString();
-
-        //     return *this << str;
-        // }
 
         Stream &operator<<(const Network::Address &Value)
         {
@@ -174,7 +189,7 @@ namespace Core::Format
         {
             struct iovec Vectors[2];
 
-            Stream.Queue.Free(descriptor.Write(Vectors, 1 + Stream.Queue.DataVector(Vectors)));
+            Stream.Queue.Free(descriptor.Write(Vectors, 1 + Stream.Queue.DataVectors(Vectors)));
 
             return descriptor;
         }
@@ -183,38 +198,9 @@ namespace Core::Format
         {
             struct iovec Vectors[2];
 
-            Stream.Queue.Free(descriptor.Write(Vectors, 1 + Stream.Queue.DataVector(Vectors)));
+            Stream.Queue.Free(descriptor.Write(Vectors, 1 + Stream.Queue.DataVectors(Vectors)));
 
             return descriptor;
-        }
-
-        ssize_t ReadOnce(Descriptor const &descriptor, size_t Length)
-        {
-            size_t Read = 0;
-            struct iovec Vectors[2];
-            Queue.IncreaseCapacity(Length);
-
-            Read = descriptor.Read(Vectors, 1 + Queue.EmptyVector(Vectors));
-
-            Queue.AdvanceTail(Read);
-
-            return Read;
-        }
-
-        // @todo Implement
-        // ReadAll
-        // WriteAll
-
-        ssize_t WriteOnce(Descriptor const &descriptor)
-        {
-            size_t Read = 0;
-            struct iovec Vectors[2];
-
-            Read = descriptor.Write(Vectors, 1 + Queue.DataVector(Vectors));
-
-            Queue.AdvanceTail(Read);
-
-            return Read;
         }
 
         friend Descriptor const &operator>>(Descriptor const &descriptor, Stream &Stream)
@@ -222,7 +208,7 @@ namespace Core::Format
             struct iovec Vectors[2];
 
             Stream.Queue.IncreaseCapacity(descriptor.Received());
-            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVector(Vectors) ? 2 : 1));
+            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVectors(Vectors) ? 2 : 1));
 
             return descriptor;
         }
@@ -232,7 +218,7 @@ namespace Core::Format
             struct iovec Vectors[2];
 
             Stream.Queue.IncreaseCapacity(descriptor.Received());
-            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVector(Vectors) ? 2 : 1));
+            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVectors(Vectors) ? 2 : 1));
 
             return descriptor;
         }
