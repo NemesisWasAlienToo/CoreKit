@@ -33,7 +33,8 @@ namespace Core::Network::HTTP
                     Ser << "Set-Cookie: " << Cookie << "\r\n";
                 });
 
-            return Ser << "\r\n" << R.Content;
+            return Ser << "\r\n"
+                       << R.Content;
         }
 
         std::string ToString() const

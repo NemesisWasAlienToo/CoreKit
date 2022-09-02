@@ -462,6 +462,11 @@ namespace Core::Iterable
 
                 for (size_t i = 0; i < Size && Index < Count; i++)
                 {
+                    // if constexpr (std::is_trivially_constructible_v<T>)
+                    //     Pointer[i] = Data[Index++];
+                    // else
+                    //     std::construct_at(&Pointer[i], Data[Index++]);
+
                     std::construct_at(&Pointer[i], Data[Index++]);
                 }
             }

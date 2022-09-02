@@ -24,7 +24,6 @@ namespace Core::Network::HTTP
         Connection::Settings Settings{
             1024 * 1024 * 1,
             1024 * 1024 * 5,
-            1024 * 1024 * 5,
             1024,
             1024,
             Network::DNS::HostName(),
@@ -228,12 +227,6 @@ namespace Core::Network::HTTP
             return *this;
         }
 
-        inline Server &MaxFileSize(size_t Size)
-        {
-            Settings.MaxFileSize = Size;
-            return *this;
-        }
-
         inline Server &HostName(std::string Name)
         {
             Settings.HostName = std::move(Name);
@@ -386,12 +379,11 @@ namespace Core::Network::HTTP
         Async::ThreadPool Pool;
         std::atomic<size_t> ConnectionCount{0};
         Router<std::optional<HTTP::Response>(HTTP::Connection::Context &, Network::HTTP::Request &)> _Router;
-        size_t Turn = 0;
+        volatile size_t Turn = 0;
 
         static std::optional<HTTP::Response> DefaultRoute(HTTP::Connection::Context &Context, HTTP::Request &Req)
         {
-            Context.SendResponse(HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>"));
-            return std::nullopt;
+            return Context.SendResponse(HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>"));
         }
     };
 }

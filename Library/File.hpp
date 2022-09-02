@@ -406,6 +406,22 @@ namespace Core
             return static_cast<size_t>(Result);
         }
 
+        size_t BytesLeft() const
+        {
+            auto CurPos = Offset();
+
+            auto Result = lseek(_INode, 0, SEEK_END);
+
+            if (Result < 0)
+            {
+                throw std::system_error(errno, std::generic_category());
+            }
+
+            Seek(static_cast<ssize_t>(CurPos));
+
+            return static_cast<size_t>(Result - CurPos);
+        }
+
         size_t Seek(ssize_t Offset = 0, SeekType Start = SeekType::Start) const
         {
             auto Result = lseek(_INode, Offset, Start);

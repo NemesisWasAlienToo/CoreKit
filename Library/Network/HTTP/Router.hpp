@@ -73,47 +73,6 @@ public:
     }
 };
 
-// template <ctll::fixed_string Pattern>
-// struct ControllerRoute
-// {
-// protected:
-//     static_assert(Find<Pattern, "[Controller]">(0) != static_cast<size_t>(-1), "No [Controller] place holder was found in the route");
-//     static_assert(Find<Pattern, "[Action]">(0) != static_cast<size_t>(-1), "No [Action] place holder was found in the route");
-
-//     constexpr static ctll::fixed_string ActionCapture{"(?<Action>[^/?]+)"};
-//     constexpr static ctll::fixed_string ControllerCapture{"(?<Controller>[^/?]+)"};
-
-//     constexpr static auto _Regex()
-//     {
-//         return Concatenate<Replace<Replace<Pattern, "[Controller]", ControllerCapture>(0), "[Action]", ActionCapture>(0), "(?:\\/(?<Route>[^?]*))?(?:\\/|\\?.*)?">();
-//     }
-
-// public:
-//     constexpr static auto Regex = _Regex();
-
-//     static constexpr auto Match(std::string_view Path)
-//     {
-//         return ctre::match<Regex>(Path);
-//     }
-
-//     template <typename TCallback, typename... TArgs>
-//     static constexpr inline auto Apply(std::string_view Path, TCallback Callback, TArgs &&...Args)
-//     {
-//         using TRet = typename std::invoke_result<TCallback, TArgs..., std::string_view, std::string_view, std::string_view>::type;
-
-//         if (auto m = Match(Path))
-//         {
-//             return std::make_optional(
-//                 std::invoke(Callback, std::forward<TArgs>(Args)...,
-//                             m.template get<"Controller">(),
-//                             m.template get<"Action">(),
-//                             m.template get<"Route">()));
-//         }
-
-//         return std::optional<TRet>(std::nullopt);
-//     }
-// };
-
 template <typename>
 struct Router
 {
@@ -136,24 +95,24 @@ public:
     template <typename TCallback>
     Router(TCallback &&Callback) : Default(std::forward<TCallback>(Callback)) {}
 
-    // Had to redefine args to enable universal refrence
+    // Had to redefine args to enable universal reference
 
     template <typename... RTArgs>
     TRet Match(Network::HTTP::Request &Request, RTArgs &&...Args) const
     {
-        TRet RetrunValue;
+        TRet ReturnValue;
         std::string_view Path{Request.Path};
 
         for (size_t i = 0; i < Routes.Length(); i++)
         {
-            auto &RouteMethod = std::get<0>(Routes[i]);
+            auto RouteMethod = std::get<0>(Routes[i]);
             auto &Route = std::get<1>(Routes[i]);
 
             if (RouteMethod == Network::HTTP::Methods::Any || RouteMethod == Request.Method)
             {
-                if (auto Result = Route(RetrunValue, Path, std::forward<RTArgs>(Args)...))
+                if (auto Result = Route(ReturnValue, Path, std::forward<RTArgs>(Args)...))
                 {
-                    return RetrunValue;
+                    return ReturnValue;
                 }
             }
         }
@@ -161,10 +120,10 @@ public:
         return Default(Args...);
     }
 
-    template <ctll::fixed_string TSigniture, bool Group = false, typename TCallback>
+    template <ctll::fixed_string TSignature, bool Group = false, typename TCallback>
     void Add(Network::HTTP::Methods Method, TCallback &&Callback)
     {
-        using T = Route<TSigniture, Group>;
+        using T = Route<TSignature, Group>;
 
         Routes.Add(
             Method,

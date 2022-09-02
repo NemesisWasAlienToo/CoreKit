@@ -46,11 +46,22 @@ namespace Core
                         return !s || (s && HasKTLS());
                     }
 
-                    inline std::nullopt_t SendResponse(HTTP::Response &&Response, File file = {}, size_t FileLength = 0) const
+                    inline std::nullopt_t SendResponse(HTTP::Response const &Response, File file = {}, size_t FileLength = 0) const
                     {
                         Loop.AssertPermission();
 
-                        Self.CallbackAs<HTTP::Connection>()->AppendResponse(std::move(Response), std::move(file), FileLength);
+                        Self.CallbackAs<HTTP::Connection>()->AppendResponse(Response, std::move(file), FileLength);
+
+                        ListenFor(ePoll::In | ePoll::Out);
+
+                        return std::nullopt;
+                    }
+
+                    inline std::nullopt_t SendBuffer(Iterable::Queue<char> Buffer, File file = {}, size_t FileLength = 0) const
+                    {
+                        Loop.AssertPermission();
+
+                        Self.CallbackAs<HTTP::Connection>()->AppendBuffer(std::move(Buffer), std::move(file), FileLength);
 
                         ListenFor(ePoll::In | ePoll::Out);
 
@@ -96,7 +107,6 @@ namespace Core
                 {
                     size_t MaxHeaderSize;
                     size_t MaxBodySize;
-                    size_t MaxFileSize;
                     size_t RequestBufferSize;
                     size_t ResponseBufferSize;
                     std::string HostName;
@@ -212,51 +222,59 @@ namespace Core
                     }
                 }
 
-                void AppendResponse(HTTP::Response &&Response, File file = {}, size_t FileLength = 0)
+                inline void AppendBuffer(Iterable::Queue<char> Buffer, File file = {}, size_t FileLength = 0)
                 {
+                    OBuffer.Insert({std::move(Buffer), std::move(file), FileLength});
+                }
+
+                void AppendResponse(HTTP::Response const &Response, File file = {}, size_t FileLength = 0)
+                {
+                    [[maybe_unused]] size_t StringLength = 0;
+                    auto Buffer = Iterable::Queue<char>(Setting.ResponseBufferSize);
+                    Format::Stream Ser(Buffer);
+
+                    // Serialize first line
+
+                    Ser << "HTTP/" << Response.Version << ' ' << std::to_string(static_cast<unsigned short>(Response.Status)) << ' ' << Response.Brief << "\r\n";
+
+                    // Serialize headers
+                    
+                    for (auto const &[k, v] : Response.Headers)
+                        Ser << k << ':' << v << "\r\n";
+
                     // Handle keep-alive
 
-                    if (!ShouldClose && Response.Version == HTTP::HTTP10)
+                    if (!this->ShouldClose && Response.Version == HTTP::HTTP10)
                     {
-                        Response.Headers.insert_or_assign("Connection", "keep-alive");
+                        Ser << "Connection:keep-alive\r\n";
                     }
-                    else if (ShouldClose && Response.Version == HTTP::HTTP11)
+                    else if (this->ShouldClose && Response.Version == HTTP::HTTP11)
                     {
-                        Response.Headers.insert_or_assign("Connection", "close");
+                        Ser << "Connection:close\r\n";
                     }
 
-                    bool HasFile = bool(file);
-                    size_t StringLength = 0;
-
-                    // Trim content if its too big
-                    // @todo What should we do if content is too large? Trim? Exception? or HTTP::Status::RequestedRangeNotSatisfiable
-
-                    if (HasFile)
+                    if (file)
                     {
-                        FileLength = (FileLength && Setting.MaxFileSize) ? FileLength : std::min(file.Size(), Setting.MaxFileSize);
-
-                        // if (Offset)
-                        //     file.Seek(Offset);
+                        FileLength = FileLength ? FileLength : file.BytesLeft();
                     }
                     else
                     {
-                        StringLength = std::min(Response.Content.length(), Setting.MaxBodySize);
+                        StringLength = Response.Content.length();
                     }
 
-                    Response.Headers.insert_or_assign("Content-Length", std::to_string(FileLength + StringLength));
-                    Response.Headers.insert_or_assign("Host", Setting.HostName);
+                    Ser << "Content-Length:" << std::to_string(FileLength + StringLength) << "\r\n";
+                    Ser << "Host:" << Setting.HostName << "\r\n";
 
-                    OBuffer.Insert(
-                        {Iterable::Queue<char>(Setting.ResponseBufferSize),
-                         // @todo Remove pointer
-                         HasFile ? std::move(file) : std::move(File{}),
-                         FileLength});
+                    Response.SetCookies.ForEach(
+                        [&](auto const &Cookie)
+                        {
+                            Ser << "Set-Cookie:" << Cookie << "\r\n";
+                        });
 
-                    auto &Item = OBuffer.Tail();
+                    Ser << "\r\n" << Response.Content;
 
-                    Format::Stream Ser(Item.Buffer);
-
-                    Ser << Response;
+                    // OBuffer.Insert({std::move(Buffer), std::move(file), FileLength});
+                    AppendBuffer(std::move(Buffer), std::move(file), FileLength);
                 }
 
                 void Handshake(Connection::Context &Context)
