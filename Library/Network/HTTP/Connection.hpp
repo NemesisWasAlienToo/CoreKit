@@ -90,17 +90,6 @@ namespace Core
                     {
                         HandlerAs<HTTP::Connection>().OnSent = std::forward<TCallback>(Callback);
                     }
-
-                    template <typename TCallback>
-                    inline void Upgrade(TCallback &&Callback, Duration Timeout /*, ePoll::Event Events = ePoll::In*/)
-                    {
-                        if (WillClose())
-                            return;
-
-                        Loop.Upgrade(Self, std::forward<TCallback>(Callback), Timeout);
-                    }
-
-                    // inline void InsertHandler();
                 };
 
                 struct Settings
@@ -109,7 +98,6 @@ namespace Core
                     size_t MaxBodySize;
                     size_t RequestBufferSize;
                     size_t ResponseBufferSize;
-                    std::string HostName;
                     std::function<void(Context &, Network::HTTP::Response &)> OnError;
                     std::function<std::optional<Network::HTTP::Response>(Context &, Network::HTTP::Request &)> OnRequest;
                     size_t MaxConnectionCount;
@@ -263,7 +251,7 @@ namespace Core
                     }
 
                     Ser << "Content-Length:" << std::to_string(FileLength + StringLength) << "\r\n";
-                    Ser << "Host:" << Setting.HostName << "\r\n";
+                    // Ser << "Host:" << Setting.HostName << "\r\n";
 
                     Response.SetCookies.ForEach(
                         [&](auto const &Cookie)
@@ -273,37 +261,7 @@ namespace Core
 
                     Ser << "\r\n" << Response.Content;
 
-                    // OBuffer.Insert({std::move(Buffer), std::move(file), FileLength});
                     AppendBuffer(std::move(Buffer), std::move(file), FileLength);
-                }
-
-                void Handshake(Connection::Context &Context)
-                {
-                    // @todo Maybe do this with upgrade?
-
-                    auto Result = SSL.Handshake();
-
-                    if (Result == 1)
-                    {
-                        SSL.ShakeHand = true;
-                        Context.ListenFor(ePoll::In);
-                        return;
-                    }
-
-                    auto Error = SSL.GetError(Result);
-
-                    if (Error == SSL_ERROR_WANT_WRITE)
-                    {
-                        Context.ListenFor(ePoll::Out | ePoll::In);
-                    }
-                    else if (Error == SSL_ERROR_WANT_READ)
-                    {
-                        Context.ListenFor(ePoll::In);
-                    }
-                    else
-                    {
-                        Context.Remove();
-                    }
                 }
 
                 void operator()(Async::EventLoop::Context &Context, ePoll::Entry &Item)
@@ -314,12 +272,6 @@ namespace Core
                     if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error))
                     {
                         Context.Remove();
-                        return;
-                    }
-
-                    if (SSL && !SSL.ShakeHand)
-                    {
-                        Handshake(ConnContext);
                         return;
                     }
 
@@ -337,7 +289,6 @@ namespace Core
 
                         if (Exit)
                         {
-                            Handshake(ConnContext);
                             return;
                         }
                     }

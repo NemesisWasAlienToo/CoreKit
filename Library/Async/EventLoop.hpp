@@ -115,6 +115,12 @@ namespace Core::Async
 
                 return Loop.Reschedule(Iterator, Timeout);
             }
+
+            template <typename TCallback>
+            inline void Upgrade(TCallback &&Callback, Duration Timeout /*, ePoll::Event Events = ePoll::In*/)
+            {
+                Loop.Upgrade(Self, std::forward<TCallback>(Callback), Timeout);
+            }
         };
 
         EventLoop() = default;

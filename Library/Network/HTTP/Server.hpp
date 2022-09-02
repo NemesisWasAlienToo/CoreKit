@@ -26,7 +26,6 @@ namespace Core::Network::HTTP
             1024 * 1024 * 5,
             1024,
             1024,
-            Network::DNS::HostName(),
             nullptr,
             [this](Connection::Context &Context, Network::HTTP::Request &Request)
             {
@@ -227,12 +226,6 @@ namespace Core::Network::HTTP
             return *this;
         }
 
-        inline Server &HostName(std::string Name)
-        {
-            Settings.HostName = std::move(Name);
-            return *this;
-        }
-
         inline Server &RequestBufferSize(size_t Size)
         {
             Settings.RequestBufferSize = Size;
@@ -355,7 +348,41 @@ namespace Core::Network::HTTP
 
                     Pool[Counter].Assign(
                         std::move(Client),
-                        Connection(Info, endPoint, Settings, std::move(SS)),
+                        [this, endPoint, Info, SSL = std::move(SS)](Async::EventLoop::Context &Context, ePoll::Entry &Item) mutable
+                        {
+                            if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error))
+                            {
+                                Context.Remove();
+                                return;
+                            }
+
+                            //
+
+                            auto Result = SSL.Handshake();
+
+                            if (Result == 1)
+                            {
+                                SSL.ShakeHand = true;
+                                Context.ListenFor(ePoll::In);
+                                Context.Upgrade(Connection(Info, endPoint, Settings, std::move(SSL)), Settings.Timeout);
+                                return;
+                            }
+
+                            auto Error = SSL.GetError(Result);
+
+                            if (Error == SSL_ERROR_WANT_WRITE)
+                            {
+                                Context.ListenFor(ePoll::Out | ePoll::In);
+                            }
+                            else if (Error == SSL_ERROR_WANT_READ)
+                            {
+                                Context.ListenFor(ePoll::In);
+                            }
+                            else
+                            {
+                                Context.Remove();
+                            }
+                        },
                         [this]
                         {
                             ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
