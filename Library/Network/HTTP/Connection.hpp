@@ -251,7 +251,6 @@ namespace Core
                     }
 
                     Ser << "Content-Length:" << std::to_string(FileLength + StringLength) << "\r\n";
-                    // Ser << "Host:" << Setting.HostName << "\r\n";
 
                     Response.SetCookies.ForEach(
                         [&](auto const &Cookie)
@@ -320,6 +319,8 @@ namespace Core
                             Client >> Stream;
                         }
 
+                        // Client >> Stream;
+
                         Context.Reschedule(Setting.Timeout);
 
                         Parser();
@@ -337,7 +338,7 @@ namespace Core
                         if (Setting.OnError)
                             Setting.OnError(Context, Response);
 
-                        AppendResponse(std::move(Response));
+                        AppendResponse(Response);
 
                         Context.ListenFor(ePoll::Out);
 
@@ -389,7 +390,7 @@ namespace Core
 
                     if (auto Result = Setting.OnRequest(Context, Parser.Result))
                     {
-                        AppendResponse(std::move(Result.value()));
+                        AppendResponse(Result.value());
 
                         Context.ListenFor(ePoll::In | ePoll::Out);
 
@@ -456,6 +457,8 @@ namespace Core
                         {
                             Client << Stream;
                         }
+
+                        // Client << Stream;
 
                         if (!Item.Buffer.IsEmpty())
                             return;
