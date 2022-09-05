@@ -27,9 +27,9 @@ namespace Core::Network::HTTP
             1024,
             1024,
             nullptr,
-            [this](Connection::Context &Context, Network::HTTP::Request &Request)
+            [this](Connection::Context &Context, Network::HTTP::Request &Request) -> void
             {
-                return _Router.Match(Request, Context, Request);
+                _Router.Match(Request.Path, Request.Method, Context, Request);
             },
             1024,
             false,
@@ -405,12 +405,14 @@ namespace Core::Network::HTTP
     private:
         Async::ThreadPool Pool;
         std::atomic<size_t> ConnectionCount{0};
-        Router<std::optional<HTTP::Response>(HTTP::Connection::Context &, Network::HTTP::Request &)> _Router;
+        Router<void(HTTP::Connection::Context &, HTTP::Request &)> _Router;
         volatile size_t Turn = 0;
 
-        static std::optional<HTTP::Response> DefaultRoute(HTTP::Connection::Context &Context, HTTP::Request &Req)
+        static void DefaultRoute(HTTP::Connection::Context &Context, HTTP::Request &Req)
         {
-            return Context.SendResponse(HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>"));
+            // @todo Optimize this by saving the response
+
+            Context.SendResponse(HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>"));
         }
     };
 }

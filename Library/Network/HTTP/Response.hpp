@@ -202,11 +202,11 @@ namespace Core::Network::HTTP
             Status = HTTP::Status(std::stoul(std::string(Text.substr(Cursor, CursorTmp - Cursor))));
             Cursor = CursorTmp + 1;
 
-            // Parse breif
+            // Parse brief
 
             if ((CursorTmp = Text.find('\r', Cursor)) == std::string::npos)
             {
-                throw std::invalid_argument("Invalid breif");
+                throw std::invalid_argument("Invalid brief");
             }
 
             Brief = Text.substr(Cursor, CursorTmp - Cursor);
@@ -220,7 +220,7 @@ namespace Core::Network::HTTP
             size_t Index = 0;
 
             Index = ret.ParseFirstLine(Text);
-            Index = ret.ParseHeaders(Text, Index, BodyIndex);
+            Index = ret.ParseHeaders(Text, Index, BodyIndex - 4);
             ret.ParseContent(Text, Index);
 
             return ret;

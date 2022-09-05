@@ -217,7 +217,7 @@ namespace Core
                     size_t Index = 0;
 
                     Index = ret.ParseFirstLine(Text);
-                    Index = ret.ParseHeaders(Text, Index, BodyIndex);
+                    Index = ret.ParseHeaders(Text, Index, BodyIndex - 4);
                     ret.ParseContent(Text, Index);
 
                     return ret;

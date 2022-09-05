@@ -46,6 +46,21 @@ protected:
 
         return false;
     }
+
+    template <typename TCallback, size_t... S, typename... TArgs, typename... TupleTArgs>
+    static constexpr auto _Apply(std::string_view Path, std::integer_sequence<size_t, S...>, std::tuple<TupleTArgs...>, TCallback &&Callback, TArgs &&...Args)
+    {
+        // using TRet = typename std::invoke_result<TCallback, TArgs..., TupleTArgs...>::type;
+
+        if (auto m = Match(Path))
+        {
+            std::invoke(Callback, std::forward<TArgs>(Args)..., m.template get<S + 1>()...);
+            return true;
+        }
+
+        return false;
+    }
+
     constexpr static auto _Regex()
     {
         if constexpr (Group)
@@ -71,12 +86,20 @@ public:
     {
         return _Apply(Result, Path, Sequence{}, Arguments{}, Callback, std::forward<TArgs>(Args)...);
     }
+
+    template <typename TCallback, typename... TArgs>
+    static constexpr inline auto Apply(std::string_view Path, TCallback Callback, TArgs &&...Args)
+    {
+        return _Apply(Path, Sequence{}, Arguments{}, Callback, std::forward<TArgs>(Args)...);
+    }
 };
 
 template <typename>
 struct Router
 {
 };
+
+// @todo Remove this because its so inefficient!
 
 template <typename TRet, typename... TArgs>
 class Router<TRet(TArgs...)>
@@ -98,22 +121,18 @@ public:
     // Had to redefine args to enable universal reference
 
     template <typename... RTArgs>
-    TRet Match(Network::HTTP::Request &Request, RTArgs &&...Args) const
+    TRet Match(std::string_view Path, Network::HTTP::Methods Method, RTArgs &&...Args) const
     {
         TRet ReturnValue;
-        std::string_view Path{Request.Path};
 
         for (size_t i = 0; i < Routes.Length(); i++)
         {
             auto RouteMethod = std::get<0>(Routes[i]);
             auto &Route = std::get<1>(Routes[i]);
 
-            if (RouteMethod == Network::HTTP::Methods::Any || RouteMethod == Request.Method)
+            if ((RouteMethod == Network::HTTP::Methods::Any || RouteMethod == Method) && Route(ReturnValue, Path, std::forward<RTArgs>(Args)...))
             {
-                if (auto Result = Route(ReturnValue, Path, std::forward<RTArgs>(Args)...))
-                {
-                    return ReturnValue;
-                }
+                return ReturnValue;
             }
         }
 
@@ -130,6 +149,56 @@ public:
             [CB = std::forward<TCallback>(Callback)](TRet &Result, std::string_view Path, TArgs &&...Args)
             {
                 return T::Apply(Result, Path, CB, std::forward<TArgs>(Args)...);
+            });
+    }
+};
+
+template <typename... TArgs>
+class Router<void(TArgs...)>
+{
+protected:
+    using TDefault = std::function<void(TArgs...)>;
+    using TMatcher = std::function<bool(std::string_view, TArgs...)>;
+
+    Iterable::List<std::tuple<Network::HTTP::Methods, TMatcher>> Routes;
+
+public:
+    TDefault Default;
+
+    Router() = default;
+
+    template <typename TCallback>
+    Router(TCallback &&Callback) : Default(std::forward<TCallback>(Callback)) {}
+
+    // Had to redefine args to enable universal reference
+
+    template <typename... RTArgs>
+    void Match(std::string_view Path, Network::HTTP::Methods Method, RTArgs &&...Args) const
+    {
+        for (size_t i = 0; i < Routes.Length(); i++)
+        {
+            auto RouteMethod = std::get<0>(Routes[i]);
+            auto &Route = std::get<1>(Routes[i]);
+
+            if ((RouteMethod == Network::HTTP::Methods::Any || RouteMethod == Method) && Route(Path, std::forward<RTArgs>(Args)...))
+            {
+                return;
+            }
+        }
+
+        Default(Args...);
+    }
+
+    template <ctll::fixed_string TSignature, bool Group = false, typename TCallback>
+    void Add(Network::HTTP::Methods Method, TCallback &&Callback)
+    {
+        using T = Route<TSignature, Group>;
+
+        Routes.Add(
+            Method,
+            [CB = std::forward<TCallback>(Callback)](std::string_view Path, TArgs &&...Args)
+            {
+                return T::Apply(Path, CB, std::forward<TArgs>(Args)...);
             });
     }
 };

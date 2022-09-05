@@ -97,31 +97,21 @@ namespace Core::Network::HTTP
 
             while (bodyPos == 0)
             {
+                if (HeaderLimit && Message.length() > HeaderLimit)
+                {
+                    throw HTTP::Status::RequestEntityTooLarge;
+                }
+
                 bodyPosTmp = Message.find("\r\n\r\n", bodyPosTmp);
 
-                if (bodyPosTmp == std::string::npos)
-                {
-                    // @todo Optimize this
-                    // Check header size
-
-                    if (HeaderLimit && Message.length() > HeaderLimit)
-                    {
-                        throw HTTP::Status::RequestEntityTooLarge;
-                    }
-
-                    bodyPosTmp = Message.length() - 3;
-                }
-                else
+                if (bodyPosTmp != std::string::npos)
                 {
                     bodyPos = bodyPosTmp + 4;
 
-                    if (HeaderLimit && bodyPos > HeaderLimit)
-                    {
-                        throw HTTP::Status::RequestEntityTooLarge;
-                    }
-
                     break;
                 }
+
+                bodyPosTmp = Message.length() - 3;
 
                 CO_YIELD();
             }

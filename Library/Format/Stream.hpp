@@ -164,27 +164,6 @@ namespace Core::Format
             return *this << Value.ToString();
         }
 
-        friend std::ostream &operator<<(std::ostream &os, Stream &Stream)
-        {
-            while (!Stream.Queue.IsEmpty())
-            {
-                os << Stream.Queue.Take();
-            }
-
-            return os;
-        }
-
-        friend std::istream &operator>>(std::istream &is, Stream &Stream)
-        {
-            std::string Inpt;
-
-            is >> Inpt;
-
-            Stream.Add(Inpt.c_str(), Inpt.length());
-
-            return is;
-        }
-
         friend Descriptor &operator<<(Descriptor &descriptor, Stream &Stream)
         {
             struct iovec Vectors[2];
@@ -208,7 +187,7 @@ namespace Core::Format
             struct iovec Vectors[2];
 
             Stream.Queue.IncreaseCapacity(descriptor.Received());
-            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVectors(Vectors) ? 2 : 1));
+            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVectors(Vectors) + 1));
 
             return descriptor;
         }
@@ -218,7 +197,7 @@ namespace Core::Format
             struct iovec Vectors[2];
 
             Stream.Queue.IncreaseCapacity(descriptor.Received());
-            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVectors(Vectors) ? 2 : 1));
+            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVectors(Vectors) + 1));
 
             return descriptor;
         }
