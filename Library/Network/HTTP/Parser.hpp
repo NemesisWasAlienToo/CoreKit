@@ -43,11 +43,8 @@ namespace Core::Network::HTTP
 
             Machine::Reset();
             Queue.Free(bodyPos + ContentLength);
+            Queue.Resize(Queue.Length() + RequestBufferSize);
 
-            // @todo Optimize Resize
-
-            if (Queue.Length())
-                Queue.Resize(Queue.Capacity());
 
             ContentLength = 0;
             lenPos = 0;
@@ -57,11 +54,8 @@ namespace Core::Network::HTTP
 
             // Clean request
 
-            // Result = HTTP::Request();
-
             {
                 Result.Headers.clear();
-                Queue.Resize(1024);
             }
 
             Iterator = Result.Headers.end();
@@ -97,31 +91,21 @@ namespace Core::Network::HTTP
 
             while (bodyPos == 0)
             {
+                if (HeaderLimit && Message.length() > HeaderLimit)
+                {
+                    throw HTTP::Status::RequestEntityTooLarge;
+                }
+
                 bodyPosTmp = Message.find("\r\n\r\n", bodyPosTmp);
 
-                if (bodyPosTmp == std::string::npos)
-                {
-                    // @todo Optimize this
-                    // Check header size
-
-                    if (Message.length() > HeaderLimit)
-                    {
-                        throw HTTP::Status::RequestEntityTooLarge;
-                    }
-
-                    bodyPosTmp = Message.length() - 3;
-                }
-                else
+                if (bodyPosTmp != std::string::npos)
                 {
                     bodyPos = bodyPosTmp + 4;
 
-                    if (bodyPos > HeaderLimit)
-                    {
-                        throw HTTP::Status::RequestEntityTooLarge;
-                    }
-
                     break;
                 }
+
+                bodyPosTmp = Message.length() - 3;
 
                 CO_YIELD();
             }
@@ -171,7 +155,7 @@ namespace Core::Network::HTTP
 
                 // Check if the length is in valid range
 
-                if (ContentLength > ContentLimit)
+                if (ContentLimit && ContentLength > ContentLimit)
                 {
                     throw HTTP::Status::RequestEntityTooLarge;
                 }

@@ -208,7 +208,7 @@ namespace Core::Iterable
             return std::make_tuple(&_Content[FirstEmpty], _First <= FirstEmpty ? Capacity() - (FirstEmpty) : _First - FirstEmpty);
         }
 
-        constexpr bool DataVector(struct iovec *Vector)
+        constexpr size_t DataVectors(struct iovec *Vector)
         {
             auto [FPointer, FSize] = DataChunk();
 
@@ -222,13 +222,13 @@ namespace Core::Iterable
                 Vector[1].iov_base = reinterpret_cast<void *>(SPointer);
                 Vector[1].iov_len = SSize;
 
-                return true;
+                return 2;
             }
 
-            return false;
+            return 1;
         }
 
-        constexpr bool EmptyVector(struct iovec *Vector)
+        constexpr size_t EmptyVectors(struct iovec *Vector)
         {
             auto [FPointer, FSize] = EmptyChunk();
 
@@ -242,10 +242,10 @@ namespace Core::Iterable
                 Vector[1].iov_base = reinterpret_cast<void *>(SPointer);
                 Vector[1].iov_len = SSize;
 
-                return true;
+                return 2;
             }
 
-            return false;
+            return 1;
         }
 
         // Helper Functions
@@ -417,7 +417,6 @@ namespace Core::Iterable
             std::construct_at(&_ElementAt(_Length++), std::forward<TArgs>(Args)...);
         }
 
-        template <typename... TArgs>
         constexpr void Insert(T &&Item)
         {
             IncreaseCapacity();
@@ -425,7 +424,6 @@ namespace Core::Iterable
             std::construct_at(&_ElementAt(_Length++), std::move(Item));
         }
 
-        template <typename... TArgs>
         constexpr void Insert(T const &Item)
         {
             IncreaseCapacity();
@@ -464,6 +462,11 @@ namespace Core::Iterable
 
                 for (size_t i = 0; i < Size && Index < Count; i++)
                 {
+                    // if constexpr (std::is_trivially_constructible_v<T>)
+                    //     Pointer[i] = Data[Index++];
+                    // else
+                    //     std::construct_at(&Pointer[i], Data[Index++]);
+
                     std::construct_at(&Pointer[i], Data[Index++]);
                 }
             }

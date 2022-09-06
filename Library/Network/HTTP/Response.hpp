@@ -2,10 +2,7 @@
 
 #include <iostream>
 #include <string>
-#include <variant>
-#include <memory>
 
-#include <File.hpp>
 #include <Duration.hpp>
 #include <DateTime.hpp>
 #include <Network/HTTP/HTTP.hpp>
@@ -20,7 +17,7 @@ namespace Core::Network::HTTP
         HTTP::Status Status;
         std::string Brief;
         Iterable::List<std::string> SetCookies;
-        std::variant<std::string, std::shared_ptr<File>> Content;
+        std::string Content;
 
         // friend Format::Stream &operator>>(Format::Stream &Ser, Response const &R)
         friend Format::Stream &operator<<(Format::Stream &Ser, Response const &R)
@@ -36,15 +33,8 @@ namespace Core::Network::HTTP
                     Ser << "Set-Cookie: " << Cookie << "\r\n";
                 });
 
-            Ser << "\r\n";
-
-            if (std::holds_alternative<std::string>(R.Content))
-                Ser << std::get<0>(R.Content);
-
-            // else
-            // What should we do?
-
-            return Ser;
+            return Ser << "\r\n"
+                       << R.Content;
         }
 
         std::string ToString() const
@@ -61,7 +51,7 @@ namespace Core::Network::HTTP
                             const std::string &Path = "", const std::string &Domain = "",
                             bool Secure = false, bool HttpOnly = false)
         {
-            // @todo Change stringsream to Format::Stream
+            // @todo Change stringstream to Format::Stream
 
             std::stringstream ResultStream;
 
@@ -212,11 +202,11 @@ namespace Core::Network::HTTP
             Status = HTTP::Status(std::stoul(std::string(Text.substr(Cursor, CursorTmp - Cursor))));
             Cursor = CursorTmp + 1;
 
-            // Parse breif
+            // Parse brief
 
             if ((CursorTmp = Text.find('\r', Cursor)) == std::string::npos)
             {
-                throw std::invalid_argument("Invalid breif");
+                throw std::invalid_argument("Invalid brief");
             }
 
             Brief = Text.substr(Cursor, CursorTmp - Cursor);
@@ -230,7 +220,7 @@ namespace Core::Network::HTTP
             size_t Index = 0;
 
             Index = ret.ParseFirstLine(Text);
-            Index = ret.ParseHeaders(Text, Index, BodyIndex);
+            Index = ret.ParseHeaders(Text, Index, BodyIndex - 4);
             ret.ParseContent(Text, Index);
 
             return ret;
@@ -248,22 +238,9 @@ namespace Core::Network::HTTP
             return response;
         }
 
-        static Response From(std::string_view Version, HTTP::Status Status, std::unordered_map<std::string, std::string> Headers = {}, File Content = File{})
-        {
-            Response response;
-            response.Status = Status;
-            response.Brief = StatusMessage.at(Status);
-            response.Version = Version;
-
-            response.Headers = std::move(Headers);
-            response.Content = std::make_shared<File>(std::move(Content));
-
-            return response;
-        }
-
         // String
 
-        static Response Type(std::string_view Version, HTTP::Status Status, std::string_view ContentType, std::string Content)
+        static Response Type(std::string_view Version, HTTP::Status Status, std::string_view ContentType, std::string Content = "")
         {
             return From(Version, Status, {{"Content-Type", std::string{ContentType}}}, std::move(Content));
         }
@@ -279,33 +256,6 @@ namespace Core::Network::HTTP
         }
 
         static Response Json(std::string_view Version, HTTP::Status Status, std::string Content)
-        {
-            return Type(Version, Status, "application/json", std::move(Content));
-        }
-
-        // File
-
-        static Response Type(std::string_view Version, HTTP::Status Status, std::string_view ContentType, File Content = File{})
-        {
-            return From(Version, Status, {{"Content-Type", std::string{ContentType}}}, std::move(Content));
-        }
-
-        static Response FromPath(std::string_view Version, HTTP::Status Status, std::string const &Path)
-        {
-            return Type(Version, Status, GetContentType(GetExtension(Path)), File::Open(Path));
-        }
-
-        static Response Text(std::string_view Version, HTTP::Status Status, File Content = File{})
-        {
-            return Type(Version, Status, "text/plain", std::move(Content));
-        }
-
-        static Response HTML(std::string_view Version, HTTP::Status Status, File Content = File{})
-        {
-            return Type(Version, Status, "text/html", std::move(Content));
-        }
-
-        static Response Json(std::string_view Version, HTTP::Status Status, File Content)
         {
             return Type(Version, Status, "application/json", std::move(Content));
         }
@@ -326,50 +276,6 @@ namespace Core::Network::HTTP
         static inline Response Redirect(std::string_view Version, std::string_view Location, std::unordered_map<std::string, std::string> Parameters = {})
         {
             return Redirect(Version, HTTP::Status::Found, std::move(Location), std::move(Parameters));
-        }
-
-        bool HasString()
-        {
-            return std::holds_alternative<std::string>(Content);
-        }
-
-        std::string GetContent()
-        {
-            if (std::holds_alternative<std::string>(Content))
-            {
-                return std::get<std::string>(Content);
-            }
-            else
-            {
-                return "";
-            }
-        }
-
-        bool HasFile()
-        {
-            return std::holds_alternative<std::shared_ptr<File>>(Content);
-        }
-
-        std::shared_ptr<File> GetFile()
-        {
-            if (std::holds_alternative<std::shared_ptr<File>>(Content))
-            {
-                return std::get<std::shared_ptr<File>>(Content);
-            }
-            else
-            {
-                return nullptr;
-            }
-        }
-
-        void SetContent(std::string_view NewContent)
-        {
-            Content = std::string{NewContent};
-        }
-
-        void SetContent(File NewContent)
-        {
-            Content = std::make_shared<File>(std::move(NewContent));
         }
     };
 }

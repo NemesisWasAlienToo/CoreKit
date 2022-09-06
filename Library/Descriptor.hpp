@@ -13,7 +13,7 @@
 #include <algorithm>
 
 #include <Iterable/Span.hpp>
-#include <Format/Serializer.hpp>
+#include <Format/Stream.hpp>
 
 namespace Core
 {
@@ -62,7 +62,6 @@ namespace Core
 
         int Received() const
         {
-
             int Count = 0;
             int Result = ioctl(_INode, FIONREAD, &Count);
 
@@ -290,7 +289,7 @@ namespace Core
             return Result;
         }
 
-        // ### Peroperties
+        // ### Properties
 
         inline int INode() const { return _INode; }
 
@@ -330,28 +329,36 @@ namespace Core
             return _INode < Other._INode;
         }
 
-        operator bool() const
+        inline operator bool() const
         {
             return _INode != -1;
         }
 
-        // Stream operators
-
-        friend Format::Serializer &operator>>(Format::Serializer &Ser, Descriptor const &descriptor)
+        inline operator int() const
         {
-            size_t Read = 0;
+            return _INode;
+        }
+
+        ssize_t Write(Format::Stream &Stream)
+        {
             struct iovec Vectors[2];
-            Ser.Queue.IncreaseCapacity(descriptor.Received());
+            ssize_t Result = Write(Vectors, Stream.Queue.DataVectors(Vectors));
 
-            do
-            {
-                Read = descriptor.Read(Vectors, 1 + Ser.Queue.EmptyVector(Vectors));
+            if (Result > 0)
+                Stream.Queue.Free(Result);
 
-                Ser.Queue.AdvanceTail(Read);
+            return Result;
+        }
 
-            } while (Read);
+        ssize_t Read(Format::Stream &Stream)
+        {
+            struct iovec Vectors[2];
+            ssize_t Result = Read(Vectors, Stream.Queue.EmptyVectors(Vectors));
 
-            return Ser;
+            if (Result > 0)
+                Stream.Queue.AdvanceTail(Result);
+
+            return Result;
         }
     };
 }

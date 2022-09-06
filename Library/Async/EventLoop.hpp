@@ -42,11 +42,9 @@ namespace Core::Async
             TimeWheelType::Bucket::Iterator Timer;
 
             template <typename T>
-            T *CallbackAs()
+            inline T *CallbackAs()
             {
                 return Callback.Target<T>();
-
-                // return Callback.target<T>();
             }
         };
 
@@ -116,6 +114,12 @@ namespace Core::Async
                 // Loop.AssertPermission();
 
                 return Loop.Reschedule(Iterator, Timeout);
+            }
+
+            template <typename TCallback>
+            inline void Upgrade(TCallback &&Callback, Duration Timeout /*, ePoll::Event Events = ePoll::In*/)
+            {
+                Loop.Upgrade(Self, std::forward<TCallback>(Callback), Timeout);
             }
         };
 
@@ -294,6 +298,16 @@ namespace Core::Async
                 std::move(Client), std::move(Callback), std::move(End), Interval);
         }
 
+        void Upgrade(Entry &Self, CallbackType &&Callback, Duration const &Interval = {0, 0})
+        {
+            Execute(
+                [this](Container::iterator si, CallbackType &&cb, Duration const &to) mutable
+                {
+                    Insert(si, std::move(cb), to);
+                },
+                Self.Iterator, std::move(Callback), Interval);
+        }
+
         void Notify(uint64_t Value = 1)
         {
             Interrupt->Emit(Value);
@@ -378,6 +392,33 @@ namespace Core::Async
             }
 
             _Poll.Add(Iterator->File, ePoll::In, (size_t) & *Iterator);
+
+            return Iterator;
+        }
+
+        Container::iterator Insert(Container::iterator Item, CallbackType &&handler, Duration const &Timeout)
+        {
+            auto Iterator = Handlers.insert(Handlers.end(), {std::move(Item->File), std::move(handler), std::move(Item->End), Handlers.end(), Wheel.end()});
+            Iterator->Iterator = Iterator;
+
+            if (Timeout.AsMilliseconds() > 0)
+            {
+                Iterator->Timer = Wheel.Add(
+                    Timeout,
+                    [this, Iterator]
+                    {
+                        RemoveHandler(Iterator);
+                    });
+            }
+            else
+            {
+                Iterator->Timer = Wheel.At(0, 0).Entries.end();
+            }
+
+            _Poll.Modify(Iterator->File, ePoll::In, (size_t) & *Iterator);
+
+            RemoveTimer(Item);
+            Handlers.erase(Item);
 
             return Iterator;
         }
