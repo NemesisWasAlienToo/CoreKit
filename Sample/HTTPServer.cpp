@@ -32,7 +32,7 @@ int main(int, char const *[])
     // This is an extremely simple static file filter
 
     Server.Filter(
-        [SendFileThreshold = static_cast<size_t>(1024 * 100)](HTTP::Connection::Context &Context, HTTP::Request &Request, auto &&Next) -> std::optional<HTTP::Response>
+        [SendFileThreshold = static_cast<size_t>(1024 * 100)](HTTP::Connection::Context &Context, HTTP::Request &Request, auto &&Next)
         {
             auto FileName = Request.Path.substr(1);
 
@@ -41,15 +41,15 @@ int main(int, char const *[])
                 auto StaticFile = File::Open(FileName, File::Binary | File::ReadOnly);
 
                 if (!Context.CanUseSendFile() || StaticFile.Size() <= SendFileThreshold)
-                    return Context.SendResponse(
+                    Context.SendResponse(
                         HTTP::Response::Type(Request.Version, HTTP::Status::OK, HTTP::GetContentType(File::GetExtension(FileName)), StaticFile.ReadAll()));
 
-                return Context.SendResponse(
+                Context.SendResponse(
                     HTTP::Response::Type(Request.Version, HTTP::Status::OK, HTTP::GetContentType(File::GetExtension(FileName))),
                     std::move(StaticFile));
             }
 
-            return Next(Context, Request);
+            Next(Context, Request);
         });
 
     // Global middleware
@@ -57,29 +57,29 @@ int main(int, char const *[])
     Server.Middleware(
         [](HTTP::Connection::Context &Context, Network::HTTP::Request &Request, auto &&Next)
         {
-            return Next(Context, Request);
+            Next(Context, Request);
         });
 
     // Simple route
 
     Server.GET<"/">(
-        [](HTTP::Connection::Context &, HTTP::Request &Request)
+        [](HTTP::Connection::Context &Context, HTTP::Request &Request)
         {
-            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Hello world</h1>");
+            Context.SendResponse(HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Hello world</h1>"));
         });
 
     // Route with one argument
 
     Server.GET<"/Static/[]">(
-        [](HTTP::Connection::Context &, HTTP::Request &Request, std::string_view &&Param)
+        [](HTTP::Connection::Context &Context, HTTP::Request &Request, std::string_view &&Param)
         {
-            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, std::string{Param});
+            Context.SendResponse(HTTP::Response::HTML(Request.Version, HTTP::Status::OK, std::string{Param}));
         });
 
     // Async route which delays response for 2 seconds
 
     Server.GET<"/Delayed">(
-        [](HTTP::Connection::Context &Context, HTTP::Request &Request) -> std::optional<HTTP::Response>
+        [](HTTP::Connection::Context &Context, HTTP::Request &Request)
         {
             Context.Schedule(
                 {2, 0},
@@ -87,14 +87,12 @@ int main(int, char const *[])
                 {
                     Context.SendResponse(HTTP::Response::HTML(Version, HTTP::Status::OK, "<h1>Hello world, but delayed!</h1>"));
                 });
-
-            return std::nullopt;
         });
 
     // Route which watches for connections to disconnect after visiting this route
 
     Server.GET<"/Notify">(
-        [&](HTTP::Connection::Context &Context, HTTP::Request &Request) -> std::optional<HTTP::Response>
+        [&](HTTP::Connection::Context &Context, HTTP::Request &Request)
         {
             static std::set<EndPoint> Peers;
             static std::mutex Lock;
@@ -120,37 +118,38 @@ int main(int, char const *[])
                 }
             }
 
-            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Hello world, but notified!</h1>");
+            Context.SendResponse(HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Hello world, but notified!</h1>"));
         });
 
     // Route which will switch to some other protocol after sending a response
 
     Server.GET<"/Upgrade">(
-        [](HTTP::Connection::Context &Context, HTTP::Request &Request) -> std::optional<HTTP::Response>
+        [](HTTP::Connection::Context &Context, HTTP::Request &Request)
         {
             Context.ListenFor(ePoll::Out);
 
             Context.OnSent(
                 [Context]() mutable
                 {
-                    Context.Upgrade(
-                        [](Async::EventLoop::Context &Context, ePoll::Entry &Entry) mutable
-                        {
-                            if (Entry.Happened(ePoll::In))
+                    if (!Context.WillClose())
+                        Context.Upgrade(
+                            [](Async::EventLoop::Context &Context, ePoll::Entry &Entry) mutable
                             {
-                                if (!Context.FileAs<Network::Socket>().Received())
+                                if (Entry.Happened(ePoll::In))
                                 {
-                                    Context.Remove();
-                                    return;
-                                }
+                                    if (!Context.FileAs<Network::Socket>().Received())
+                                    {
+                                        Context.Remove();
+                                        return;
+                                    }
 
-                                Iterable::Span<char> Data = Context.FileAs<Network::Socket>().Receive();
-                            }
-                        },
-                        {0, 0});
+                                    Iterable::Span<char> Data = Context.FileAs<Network::Socket>().Receive();
+                                }
+                            },
+                            {0, 0});
                 });
 
-            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Hello world, upgraded!</h1>");
+            Context.SendResponse(HTTP::Response::HTML(Request.Version, HTTP::Status::OK, "<h1>Hello world, upgraded!</h1>"));
         });
 
     // Simple route which reports from which listening endpoint it was originated
@@ -158,7 +157,7 @@ int main(int, char const *[])
     Server.GET<"/Source">(
         [](HTTP::Connection::Context &Context, HTTP::Request &Request)
         {
-            return HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Context.Source.ToString() + (Context.IsSecure() ? " Is secure" : " Isn't secure"));
+            Context.SendResponse(HTTP::Response::HTML(Request.Version, HTTP::Status::OK, Context.Source.ToString() + (Context.IsSecure() ? " Is secure" : " Isn't secure")));
         });
 
     // Init thread storages and other settings
@@ -198,7 +197,6 @@ int main(int, char const *[])
         // Size configurations
         // Zero means no limit
 
-        .MaxFileSize(1024 * 1024 * 10)
         .MaxHeaderSize(1024 * 1024 * 2)
         .MaxBodySize(1024 * 1024 * 10)
         .MaxConnectionCount(1024)
@@ -208,10 +206,6 @@ int main(int, char const *[])
         // Enables TCP nodelay
 
         .NoDelay(true)
-
-        // Host name in the response header
-
-        .HostName("Benchmark")
 
         // Starts the thread pool
 

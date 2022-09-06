@@ -156,7 +156,7 @@ namespace Core
                     return bool(SSL);
                 }
 
-                void Continue100(Connection::Context &Context)
+                void Continue100(Connection::Context &)
                 {
                     return;
 
