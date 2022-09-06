@@ -43,11 +43,8 @@ namespace Core::Network::HTTP
 
             Machine::Reset();
             Queue.Free(bodyPos + ContentLength);
+            Queue.Resize(Queue.Length() + RequestBufferSize);
 
-            // @todo Optimize Resize
-
-            if (Queue.Length())
-                Queue.Resize(Queue.Capacity());
 
             ContentLength = 0;
             lenPos = 0;
@@ -57,11 +54,8 @@ namespace Core::Network::HTTP
 
             // Clean request
 
-            // Result = HTTP::Request();
-
             {
                 Result.Headers.clear();
-                Queue.Resize(1024);
             }
 
             Iterator = Result.Headers.end();

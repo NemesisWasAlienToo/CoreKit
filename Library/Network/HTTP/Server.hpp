@@ -348,7 +348,7 @@ namespace Core::Network::HTTP
 
                     Pool[Counter].Assign(
                         std::move(Client),
-                        [this, endPoint, Info, SSL = std::move(SS)](Async::EventLoop::Context &Context, ePoll::Entry &Item) mutable
+                        [this, endPoint, Info = Info, SSL = std::move(SS)](Async::EventLoop::Context &Context, ePoll::Entry &Item) mutable
                         {
                             if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error))
                             {

@@ -158,53 +158,55 @@ namespace Core
 
                 void Continue100(Connection::Context &Context)
                 {
-                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
+                    return;
 
-                    // Ensure version is HTTP 1.1
+                    // Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
 
-                    if (Parser.Result.Version[5] == '1' && Parser.Result.Version[7] == '0')
-                    {
-                        throw HTTP::Status::ExpectationFailed;
-                    }
+                    // // Ensure version is HTTP 1.1
 
-                    // Validate Content-Length
+                    // if (Parser.Result.Version[5] == '1' && Parser.Result.Version[7] == '0')
+                    // {
+                    //     throw HTTP::Status::ExpectationFailed;
+                    // }
 
-                    if (!Parser.HasBody())
-                    {
-                        throw HTTP::Status::LengthRequired;
-                    }
+                    // // Validate Content-Length
 
-                    // Respond to 100-continue
+                    // if (!Parser.HasBody())
+                    // {
+                    //     throw HTTP::Status::LengthRequired;
+                    // }
 
-                    // @todo Maybe handle HTTP 2.0 later too?
-                    // @todo Fix this and use actual request
+                    // // Respond to 100-continue
 
-                    constexpr auto ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
+                    // // @todo Maybe handle HTTP 2.0 later too?
+                    // // @todo Fix this and use actual request
 
-                    Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
-                    Format::Stream Stream(Temp);
+                    // constexpr auto ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
 
-                    Temp.CopyFrom(ContinueResponse, sizeof(Stream));
+                    // Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
+                    // Format::Stream Stream(Temp);
 
-                    // Send the response
+                    // Temp.CopyFrom(ContinueResponse, sizeof(Stream));
 
-                    while (Temp.Length())
-                    {
-                        // (bool(SSL) ? SSL : Client) << Stream;
+                    // // Send the response
 
-                        if (SSL)
-                        {
-                            if (!(SSL << Stream))
-                            {
-                                Context.Remove();
-                                return;
-                            }
-                        }
-                        else
-                        {
-                            Client << Stream;
-                        }
-                    }
+                    // while (Temp.Length())
+                    // {
+                    //     // (bool(SSL) ? SSL : Client) << Stream;
+
+                    //     if (SSL)
+                    //     {
+                    //         if (!(SSL << Stream))
+                    //         {
+                    //             Context.Remove();
+                    //             return;
+                    //         }
+                    //     }
+                    //     else
+                    //     {
+                    //         Client << Stream;
+                    //     }
+                    // }
                 }
 
                 inline void AppendBuffer(Iterable::Queue<char> Buffer, File file = {}, size_t FileLength = 0)
@@ -272,7 +274,7 @@ namespace Core
                         Context.Remove();
                         return;
                     }
-                    
+
                     Context.Reschedule(Setting.Timeout);
                 }
 
@@ -287,19 +289,16 @@ namespace Core
                     {
                         Format::Stream Stream(IBuffer);
 
-                        if (SSL)
-                        {
-                            if (!(SSL >> Stream))
-                            {
-                                return false;
-                            }
-                        }
-                        else
-                        {
-                            Client >> Stream;
-                        }
+                        static constexpr size_t Threshold = 1024 * 2;
+                        size_t Free = Stream.Queue.IsFree();
 
-                        
+                        if (Free < Threshold)
+                            Stream.Queue.IncreaseCapacity(Threshold - Free);
+
+                        if ((SSL ? SSL.Read(Stream) : Client.Read(Stream)) <= 0)
+                        {
+                            return false;
+                        }
 
                         Parser();
 
@@ -406,21 +405,10 @@ namespace Core
                     {
                         // Write data
 
-                        // bool(SSL) ? SSL << Stream : Client << Stream;
-
-                        if (SSL)
+                        if ((SSL ? SSL.Write(Stream) : Client.Write(Stream)) <= 0)
                         {
-                            if (!(SSL << Stream))
-                            {
-                                return false;
-                            }
+                            return false;
                         }
-                        else
-                        {
-                            Client << Stream;
-                        }
-
-                        // Client << Stream;
 
                         if (!Item.Buffer.IsEmpty())
                             return true;

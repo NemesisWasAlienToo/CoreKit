@@ -4,13 +4,10 @@
 #include <string>
 #include <type_traits>
 
-#include <Descriptor.hpp>
 #include <Iterable/Span.hpp>
 #include <Iterable/List.hpp>
 #include <Iterable/Queue.hpp>
 #include <Network/EndPoint.hpp>
-
-// @todo Separate serializer and deserializer IMPORTANT
 
 namespace Core::Format
 {
@@ -63,37 +60,6 @@ namespace Core::Format
         {
             *this << Object;
             return *this;
-        }
-
-        // @todo Implement
-        // ReadAll for file
-        // WriteAll for file
-        // ReadLine
-        // WriteLine
-
-        ssize_t ReadOnce(Descriptor const &descriptor, size_t Length)
-        {
-            ssize_t Read = 0;
-            struct iovec Vectors[2];
-            Queue.IncreaseCapacity(Length);
-
-            Read = descriptor.Read(Vectors, 1 + Queue.EmptyVectors(Vectors));
-
-            Queue.AdvanceTail(Read);
-
-            return Read;
-        }
-
-        ssize_t WriteOnce(Descriptor const &descriptor)
-        {
-            ssize_t Read = 0;
-            struct iovec Vectors[2];
-
-            Read = descriptor.Write(Vectors, 1 + Queue.DataVectors(Vectors));
-
-            Queue.AdvanceTail(Read);
-
-            return Read;
         }
 
         // Input operators
@@ -154,6 +120,8 @@ namespace Core::Format
             return *this;
         }
 
+        // @todo Remove this from here
+
         Stream &operator<<(const Network::Address &Value)
         {
             return *this << Value.ToString();
@@ -162,44 +130,6 @@ namespace Core::Format
         Stream &operator<<(const Network::EndPoint &Value)
         {
             return *this << Value.ToString();
-        }
-
-        friend Descriptor &operator<<(Descriptor &descriptor, Stream &Stream)
-        {
-            struct iovec Vectors[2];
-
-            Stream.Queue.Free(descriptor.Write(Vectors, 1 + Stream.Queue.DataVectors(Vectors)));
-
-            return descriptor;
-        }
-
-        friend Descriptor const &operator<<(Descriptor const &descriptor, Stream &Stream)
-        {
-            struct iovec Vectors[2];
-
-            Stream.Queue.Free(descriptor.Write(Vectors, 1 + Stream.Queue.DataVectors(Vectors)));
-
-            return descriptor;
-        }
-
-        friend Descriptor const &operator>>(Descriptor const &descriptor, Stream &Stream)
-        {
-            struct iovec Vectors[2];
-
-            Stream.Queue.IncreaseCapacity(descriptor.Received());
-            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVectors(Vectors) + 1));
-
-            return descriptor;
-        }
-
-        friend Descriptor &operator>>(Descriptor &descriptor, Stream &Stream)
-        {
-            struct iovec Vectors[2];
-
-            Stream.Queue.IncreaseCapacity(descriptor.Received());
-            Stream.Queue.AdvanceTail(descriptor.Read(Vectors, Stream.Queue.EmptyVectors(Vectors) + 1));
-
-            return descriptor;
         }
 
         Stream &operator=(const Stream &) = delete;

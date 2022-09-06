@@ -208,7 +208,7 @@ namespace Core::Iterable
             return std::make_tuple(&_Content[FirstEmpty], _First <= FirstEmpty ? Capacity() - (FirstEmpty) : _First - FirstEmpty);
         }
 
-        constexpr bool DataVectors(struct iovec *Vector)
+        constexpr size_t DataVectors(struct iovec *Vector)
         {
             auto [FPointer, FSize] = DataChunk();
 
@@ -222,13 +222,13 @@ namespace Core::Iterable
                 Vector[1].iov_base = reinterpret_cast<void *>(SPointer);
                 Vector[1].iov_len = SSize;
 
-                return true;
+                return 2;
             }
 
-            return false;
+            return 1;
         }
 
-        constexpr bool EmptyVectors(struct iovec *Vector)
+        constexpr size_t EmptyVectors(struct iovec *Vector)
         {
             auto [FPointer, FSize] = EmptyChunk();
 
@@ -242,10 +242,10 @@ namespace Core::Iterable
                 Vector[1].iov_base = reinterpret_cast<void *>(SPointer);
                 Vector[1].iov_len = SSize;
 
-                return true;
+                return 2;
             }
 
-            return false;
+            return 1;
         }
 
         // Helper Functions

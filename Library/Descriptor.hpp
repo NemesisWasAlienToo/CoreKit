@@ -13,7 +13,7 @@
 #include <algorithm>
 
 #include <Iterable/Span.hpp>
-#include <Format/Serializer.hpp>
+#include <Format/Stream.hpp>
 
 namespace Core
 {
@@ -337,6 +337,28 @@ namespace Core
         inline operator int() const
         {
             return _INode;
+        }
+
+        ssize_t Write(Format::Stream &Stream)
+        {
+            struct iovec Vectors[2];
+            ssize_t Result = Write(Vectors, Stream.Queue.DataVectors(Vectors));
+
+            if (Result > 0)
+                Stream.Queue.Free(Result);
+
+            return Result;
+        }
+
+        ssize_t Read(Format::Stream &Stream)
+        {
+            struct iovec Vectors[2];
+            ssize_t Result = Read(Vectors, Stream.Queue.EmptyVectors(Vectors));
+
+            if (Result > 0)
+                Stream.Queue.AdvanceTail(Result);
+
+            return Result;
         }
     };
 }

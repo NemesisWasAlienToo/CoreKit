@@ -54,6 +54,7 @@ namespace Core::Network
                 {
                     SSL_shutdown(ssl);
                     SSL_free(ssl);
+                    ssl = nullptr;
                 }
             }
 
@@ -96,6 +97,78 @@ namespace Core::Network
                 }
 
                 return Result;
+            }
+
+            ssize_t Write(Format::Stream &Stream)
+            {
+                ssize_t Sent = 0;
+                ERR_clear_error();
+
+                while (!Stream.Queue.IsEmpty())
+                {
+                    auto [Pointer, Size] = Stream.Queue.DataChunk();
+
+                    auto Result = SSL_write(ssl, Pointer, Size);
+
+                    if (Result <= 0)
+                    {
+                        int Error = SSL_get_error(ssl, Result);
+
+                        if (Error == SSL_ERROR_WANT_WRITE)
+                        {
+                            return Sent;
+                        }
+
+                        return -1;
+
+                        // throw std::runtime_error("SSL Failure : " + std::to_string(Error));
+                    }
+
+                    Sent += Result;
+                    Stream.Queue.AdvanceHead(Result);
+                }
+
+                return Sent;
+            }
+
+            ssize_t Read(Format::Stream &Stream)
+            {
+                int Result = 0;
+                size_t Size = 0;
+                ssize_t GotBytes = 0;
+
+                do
+                {
+                    // size_t Free = Stream.Queue.IsFree();
+
+                    // if (Free < 1024)
+                    //     Stream.Queue.IncreaseCapacity(1024 - Free);
+
+                    auto [Pointer, S] = Stream.Queue.EmptyChunk();
+                    Size = S;
+
+                    Result = SSL_read(ssl, Pointer, Size);
+
+                    if (Result <= 0)
+                    {
+                        int Error = SSL_get_error(ssl, Result);
+
+                        if (Error == SSL_ERROR_WANT_READ)
+                        {
+                            return GotBytes;
+                        }
+
+                        return -1;
+
+                        // throw std::runtime_error("SSL Failure : " + std::to_string(Error));
+                    }
+
+                    GotBytes += Result;
+                    Stream.Queue.AdvanceTail(Result);
+
+                } while (static_cast<size_t>(Result) == Size);
+
+                return GotBytes;
             }
 
             ssize_t SendFile(Descriptor const &descriptor, size_t Size, off_t Offset = 0) const

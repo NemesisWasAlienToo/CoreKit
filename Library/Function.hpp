@@ -58,7 +58,7 @@ namespace Core
             {
                 Destructor = [](void const *Item)
                 {
-                    static_cast<T const *>(Item)->~T();
+                    delete static_cast<T const *>(Item);
                 };
             }
             else
@@ -166,7 +166,7 @@ namespace Core
             {
                 Destructor = [](void const *Item)
                 {
-                    static_cast<T const *>(Item)->~T();
+                    delete static_cast<T const *>(Item);
                 };
             }
             else
