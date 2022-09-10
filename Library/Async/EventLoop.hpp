@@ -62,7 +62,7 @@ namespace Core::Async
             }
 
             template <typename T>
-            inline T &HandlerAs()
+            inline T &HandlerAs() const
             {
                 return *Self.CallbackAs<T>();
             }
@@ -117,9 +117,9 @@ namespace Core::Async
             }
 
             template <typename TCallback>
-            inline void Upgrade(TCallback &&Callback, Duration Timeout /*, ePoll::Event Events = ePoll::In*/)
+            inline void Upgrade(TCallback &&Callback, Duration Timeout, ePoll::Event Events = ePoll::In)
             {
-                Loop.Upgrade(Self, std::forward<TCallback>(Callback), Timeout);
+                Loop.Upgrade(Self, std::forward<TCallback>(Callback), Timeout, Events);
             }
         };
 
@@ -288,22 +288,22 @@ namespace Core::Async
             }
         }
 
-        void Assign(Descriptor &&Client, CallbackType &&Callback, EndCallbackType &&End = nullptr, Duration const &Interval = {0, 0})
+        void Assign(Descriptor &&Client, CallbackType &&Callback, EndCallbackType &&End = nullptr, Duration const &Interval = {0, 0}, ePoll::Event Events = ePoll::In)
         {
             Execute(
-                [this](Descriptor &&c, CallbackType &&cb, EndCallbackType &&ecb, Duration const &to) mutable
+                [this, Events](Descriptor &&c, CallbackType &&cb, EndCallbackType &&ecb, Duration const &to) mutable
                 {
-                    Insert(std::move(c), std::move(cb), std::move(ecb), to);
+                    Insert(std::move(c), std::move(cb), std::move(ecb), to, Events);
                 },
                 std::move(Client), std::move(Callback), std::move(End), Interval);
         }
 
-        void Upgrade(Entry &Self, CallbackType &&Callback, Duration const &Interval = {0, 0})
+        void Upgrade(Entry &Self, CallbackType &&Callback, Duration const &Interval = {0, 0}, ePoll::Event Events = ePoll::In)
         {
             Execute(
-                [this](Container::iterator si, CallbackType &&cb, Duration const &to) mutable
+                [this, Events](Container::iterator si, CallbackType &&cb, Duration const &to) mutable
                 {
-                    Insert(si, std::move(cb), to);
+                    Insert(si, std::move(cb), to, Events);
                 },
                 Self.Iterator, std::move(Callback), Interval);
         }
@@ -355,7 +355,7 @@ namespace Core::Async
         }
 
     private:
-        Container::iterator Insert(Descriptor &&descriptor, CallbackType &&handler, EndCallbackType &&end, Duration const &Timeout)
+        Container::iterator Insert(Descriptor &&descriptor, CallbackType &&handler, EndCallbackType &&end, Duration const &Timeout, ePoll::Event Events = ePoll::In)
         {
             auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), std::move(end), Handlers.end(), Wheel.end()});
             Iterator->Iterator = Iterator;
@@ -391,12 +391,12 @@ namespace Core::Async
                 Iterator->Timer = Wheel.At(0, 0).Entries.end();
             }
 
-            _Poll.Add(Iterator->File, ePoll::In, (size_t) & *Iterator);
+            _Poll.Add(Iterator->File, Events, (size_t) & *Iterator);
 
             return Iterator;
         }
 
-        Container::iterator Insert(Container::iterator Item, CallbackType &&handler, Duration const &Timeout)
+        Container::iterator Insert(Container::iterator Item, CallbackType &&handler, Duration const &Timeout, ePoll::Event Events = ePoll::In)
         {
             auto Iterator = Handlers.insert(Handlers.end(), {std::move(Item->File), std::move(handler), std::move(Item->End), Handlers.end(), Wheel.end()});
             Iterator->Iterator = Iterator;
@@ -415,7 +415,7 @@ namespace Core::Async
                 Iterator->Timer = Wheel.At(0, 0).Entries.end();
             }
 
-            _Poll.Modify(Iterator->File, ePoll::In, (size_t) & *Iterator);
+            _Poll.Modify(Iterator->File, Events, (size_t) & *Iterator);
 
             RemoveTimer(Item);
             Handlers.erase(Item);

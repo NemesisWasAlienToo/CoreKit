@@ -1,10 +1,6 @@
 #pragma once
 
-#include <iostream>
 #include <string>
-#include <sstream>
-#include <map>
-
 #include <Machine.hpp>
 #include <Format/Stream.hpp>
 #include <Iterable/Queue.hpp>

@@ -3,8 +3,7 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
-#include <regex>
-#include <Extra/compile-time-regular-expressions/single-header/ctre.hpp>
+// #include <Extra/compile-time-regular-expressions/single-header/ctre.hpp>
 
 #include <Duration.hpp>
 #include <Iterable/Queue.hpp>
@@ -63,110 +62,110 @@ namespace Core
 
                     Ser << *this;
 
-                    return Ser.ToString();
+                    return std::string{&Buffer.Head(), Buffer.Length()};
                 }
 
-                void Cookies(std::unordered_map<std::string, std::string> &Result) const
-                {
-                    auto Iterator = Headers.find("Cookie");
+                // void Cookies(std::unordered_map<std::string, std::string> &Result) const
+                // {
+                //     auto Iterator = Headers.find("Cookie");
 
-                    if (Iterator == Headers.end())
-                    {
-                        return;
-                    }
+                //     if (Iterator == Headers.end())
+                //     {
+                //         return;
+                //     }
 
-                    std::string_view Cookie = Iterator->second;
+                //     std::string_view Cookie = Iterator->second;
 
-                    // for (auto match : ctre::range<"([^;]+)=([^;]+)(?:;\\s)?">(Cookie))
-                    for (auto match : ctre::range<"([^;]+)=([^;]+)">(Cookie))
-                    {
-                        Result.emplace(match.get<1>(), match.get<2>());
-                    }
-                }
+                //     // for (auto match : ctre::range<"([^;]+)=([^;]+)(?:;\\s)?">(Cookie))
+                //     for (auto match : ctre::range<"([^;]+)=([^;]+)">(Cookie))
+                //     {
+                //         Result.emplace(match.get<1>(), match.get<2>());
+                //     }
+                // }
 
-                std::unordered_map<std::string, std::string> Cookies() const
-                {
-                    std::unordered_map<std::string, std::string> Result;
+                // std::unordered_map<std::string, std::string> Cookies() const
+                // {
+                //     std::unordered_map<std::string, std::string> Result;
 
-                    Cookies(Result);
+                //     Cookies(Result);
 
-                    return Result;
-                }
+                //     return Result;
+                // }
 
-                void QueryParams(std::unordered_map<std::string, std::string> &Result) const
-                {
-                    std::string_view PathView{Path};
+                // void QueryParams(std::unordered_map<std::string, std::string> &Result) const
+                // {
+                //     std::string_view PathView{Path};
 
-                    auto Start = PathView.find('?');
+                //     auto Start = PathView.find('?');
 
-                    if (Start == std::string_view::npos || PathView.length() == ++Start)
-                    {
-                        return;
-                    }
+                //     if (Start == std::string_view::npos || PathView.length() == ++Start)
+                //     {
+                //         return;
+                //     }
 
-                    std::string_view Params = PathView.substr(Start);
+                //     std::string_view Params = PathView.substr(Start);
 
-                    for (auto match : ctre::range<"([^&]+)=([^&]+)">(Params))
-                    {
-                        Result.emplace(match.get<1>(), match.get<2>());
-                    }
-                }
+                //     for (auto match : ctre::range<"([^&]+)=([^&]+)">(Params))
+                //     {
+                //         Result.emplace(match.get<1>(), match.get<2>());
+                //     }
+                // }
 
-                void QueryParamViews(std::unordered_map<std::string, std::string_view> &Result) const
-                {
-                    std::string_view PathView{Path};
+                // void QueryParamViews(std::unordered_map<std::string, std::string_view> &Result) const
+                // {
+                //     std::string_view PathView{Path};
 
-                    auto Start = PathView.find('?');
+                //     auto Start = PathView.find('?');
 
-                    if (Start == std::string_view::npos || PathView.length() == ++Start)
-                    {
-                        return;
-                    }
+                //     if (Start == std::string_view::npos || PathView.length() == ++Start)
+                //     {
+                //         return;
+                //     }
 
-                    std::string_view Params = PathView.substr(Start);
+                //     std::string_view Params = PathView.substr(Start);
 
-                    for (auto match : ctre::range<"([^&]+)=([^&]+)">(Params))
-                    {
-                        Result.emplace(match.get<1>(), match.get<2>());
-                    }
-                }
+                //     for (auto match : ctre::range<"([^&]+)=([^&]+)">(Params))
+                //     {
+                //         Result.emplace(match.get<1>(), match.get<2>());
+                //     }
+                // }
 
-                std::unordered_map<std::string, std::string_view> QueryParamViews() const
-                {
-                    std::unordered_map<std::string, std::string_view> Result;
+                // std::unordered_map<std::string, std::string_view> QueryParamViews() const
+                // {
+                //     std::unordered_map<std::string, std::string_view> Result;
 
-                    QueryParamViews(Result);
+                //     QueryParamViews(Result);
 
-                    return Result;
-                }
+                //     return Result;
+                // }
 
-                std::unordered_map<std::string, std::string> QueryParams() const
-                {
-                    std::unordered_map<std::string, std::string> Result;
+                // std::unordered_map<std::string, std::string> QueryParams() const
+                // {
+                //     std::unordered_map<std::string, std::string> Result;
 
-                    QueryParams(Result);
+                //     QueryParams(Result);
 
-                    return Result;
-                }
+                //     return Result;
+                // }
 
-                void FormData(std::unordered_map<std::string, std::string> &Result) const
-                {
-                    for (auto match : ctre::range<"([^&]+)=([^&]+)">(Content))
-                    {
-                        // @todo Optimize string
+                // void FormData(std::unordered_map<std::string, std::string> &Result) const
+                // {
+                //     for (auto match : ctre::range<"([^&]+)=([^&]+)">(Content))
+                //     {
+                //         // @todo Optimize string
 
-                        Result.emplace(match.get<1>(), match.get<2>());
-                    }
-                }
+                //         Result.emplace(match.get<1>(), match.get<2>());
+                //     }
+                // }
 
-                std::unordered_map<std::string, std::string> FormData() const
-                {
-                    std::unordered_map<std::string, std::string> Result;
+                // std::unordered_map<std::string, std::string> FormData() const
+                // {
+                //     std::unordered_map<std::string, std::string> Result;
 
-                    FormData(Result);
+                //     FormData(Result);
 
-                    return Result;
-                }
+                //     return Result;
+                // }
 
                 size_t ParseFirstLine(std::string_view Text)
                 {
@@ -264,7 +263,7 @@ namespace Core
                         Content);
                 }
 
-                static Request Delete(std::string_view  Version, std::string_view Path)
+                static Request Delete(std::string_view Version, std::string_view Path)
                 {
                     return Request::From(
                         Version,
@@ -280,7 +279,7 @@ namespace Core
                         Path);
                 }
 
-                static Request Head(std::string_view  Version, std::string_view Path)
+                static Request Head(std::string_view Version, std::string_view Path)
                 {
                     return Request::From(
                         Version,

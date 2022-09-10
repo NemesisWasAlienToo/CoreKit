@@ -7,6 +7,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <Format/Serializer.hpp>
+#include <Format/Stream.hpp>
 
 namespace Core::Network
 {
@@ -259,6 +260,13 @@ namespace Core::Network
             }
 
             return true;
+        }
+
+        // @todo Optimize this
+
+        friend Format::Stream &operator<<(Format::Stream &Stream, Network::Address const &Value)
+        {
+            return Stream << Value.ToString();
         }
 
         friend std::ostream &operator<<(std::ostream &os, const Address &tc)

@@ -41,31 +41,6 @@ namespace Core
                 return endPoints;
             }
 
-            EndPoint ResolveSingle(const std::string &Domain, const std::string &Service, Address::AddressFamily Family = Address::IPv4, Socket::SocketType Type = Socket::TCP)
-            {
-                struct addrinfo hints, *res;
-                int status;
-                EndPoint endPoint{Network::Address{0}, 0};
-
-                std::memset(&hints, 0, sizeof hints);
-                hints.ai_family = Family;
-                hints.ai_socktype = Type;
-                // hints.ai_flags = 0; Maybe add later
-
-                if ((status = getaddrinfo(Domain.c_str(), Service.c_str(), &hints, &res)) != 0)
-                    return endPoint;
-
-                if(res != NULL)
-                {
-
-                    endPoint = EndPoint(res->ai_addr);
-                }
-
-                freeaddrinfo(res);
-
-                return endPoint;
-            }
-
             Iterable::List<Address> Resolve(const std::string &Domain, Address::AddressFamily Family = Address::Unspecified, Socket::SocketType Type = Socket::TCP)
             {
                 struct addrinfo hints, *res, *p;
@@ -94,37 +69,6 @@ namespace Core
                 freeaddrinfo(res);
 
                 return addresses;
-            }
-
-            Address ResolveSingle(const std::string &Domain, Address::AddressFamily Family = Address::Unspecified, Socket::SocketType Type = Socket::TCP)
-            {
-                struct addrinfo hints, *res;
-                int status;
-                Address address;
-
-                std::memset(&hints, 0, sizeof hints);
-                hints.ai_family = Family;
-                hints.ai_socktype = Type;
-
-                if ((status = getaddrinfo(Domain.c_str(), "", &hints, &res)) != 0)
-                    return address;
-
-                if(res != NULL)
-                {
-                    Address address;
-                    if (res->ai_family == Network::Address::IPv4)
-                    {
-                        address = Address(((struct sockaddr_in *)res->ai_addr)->sin_addr);
-                    }
-                    else
-                    {
-                        address = Address(((struct sockaddr_in6 *)res->ai_addr)->sin6_addr);
-                    }
-                }
-
-                freeaddrinfo(res);
-
-                return address;
             }
 
             std::string Name(Address Target)
