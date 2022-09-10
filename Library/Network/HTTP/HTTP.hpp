@@ -244,7 +244,9 @@ namespace Core::Network::HTTP
             size_t Cursor = Start;
             size_t CursorTmp = 0;
             size_t BodyStart = End;
-            std::stringstream CookieStream;
+
+            Iterable::Queue<char> CookieQueue;
+            Format::Stream CookieStream(CookieQueue);
 
             if (End == 0)
             {
@@ -283,7 +285,7 @@ namespace Core::Network::HTTP
 
                 if (HeaderKey == "cookie")
                 {
-                    if (CookieStream.rdbuf()->in_avail())
+                    if (!CookieStream.Queue.IsEmpty())
                         CookieStream << ';';
 
                     CookieStream << std::move(HeaderValue);
@@ -301,8 +303,11 @@ namespace Core::Network::HTTP
                 Cursor = CursorTmp + 2;
             }
 
-            if (CookieStream.rdbuf()->in_avail())
-                Headers.insert_or_assign("cookie", CookieStream.str());
+            if (!CookieStream.Queue.IsEmpty())
+            {
+                auto [Pointer, Size] = CookieQueue.DataChunk();
+                Headers.insert_or_assign("cookie", std::string{Pointer, Size});
+            }
 
             return BodyStart + 4;
         }
