@@ -244,6 +244,7 @@ namespace Core::Network::HTTP
             size_t Cursor = Start;
             size_t CursorTmp = 0;
             size_t BodyStart = End;
+            std::stringstream CookieStream;
 
             if (End == 0)
             {
@@ -255,28 +256,53 @@ namespace Core::Network::HTTP
             {
                 // Find key
 
-                std::string HeaderKey(Text.substr(Cursor, CursorTmp - Cursor));
+                auto HeaderKeyView = Text.substr(Cursor, CursorTmp - Cursor);
                 Cursor = Text[CursorTmp + 1] == ' ' ? CursorTmp + 2 : CursorTmp + 1;
+
+                std::string HeaderKey;
+
+                // Make header field case insensitive
+
+                HeaderKey.resize(HeaderKeyView.length());
+
+                std::transform(
+                    HeaderKeyView.begin(),
+                    HeaderKeyView.end(),
+                    HeaderKey.begin(),
+                    [](auto c)
+                    {
+                        return std::tolower(c);
+                    });
 
                 // Find value
 
                 CursorTmp = Text.find('\r', Cursor);
+                std::string HeaderValue(Text.substr(Cursor, CursorTmp - Cursor));
+
+                // Decide on the key
+
+                if (HeaderKey == "cookie")
+                {
+                    if (CookieStream.rdbuf()->in_avail())
+                        CookieStream << ';';
+
+                    CookieStream << std::move(HeaderValue);
+                }
+                else
+                {
+                    Headers.insert_or_assign(std::move(HeaderKey), std::move(HeaderValue));
+                }
 
                 if (CursorTmp == std::string::npos)
                 {
-                    // @todo Insert or append
-
-                    std::string HeaderValue(Text.substr(Cursor));
-                    Headers.insert_or_assign(std::move(HeaderKey), std::move(HeaderValue));
-
                     break;
                 }
 
-                std::string HeaderValue(Text.substr(Cursor, CursorTmp - Cursor));
                 Cursor = CursorTmp + 2;
-
-                Headers.insert_or_assign(std::move(HeaderKey), std::move(HeaderValue));
             }
+
+            if (CookieStream.rdbuf()->in_avail())
+                Headers.insert_or_assign("cookie", CookieStream.str());
 
             return BodyStart + 4;
         }
