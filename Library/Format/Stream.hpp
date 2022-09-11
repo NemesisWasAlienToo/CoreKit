@@ -5,9 +5,7 @@
 #include <type_traits>
 
 #include <Iterable/Span.hpp>
-#include <Iterable/List.hpp>
 #include <Iterable/Queue.hpp>
-#include <Network/EndPoint.hpp>
 
 namespace Core::Format
 {
@@ -25,18 +23,6 @@ namespace Core::Format
         Stream(const Stream &) = delete;
 
         // Properties
-
-        // @todo Fix this
-
-        std::string ToString() const
-        {
-            return std::string(Queue.Content(), Queue.Length());
-        }
-
-        std::string_view ToStringView() const
-        {
-            return std::string_view(Queue.Content(), Queue.Length());
-        }
 
         void Clear()
         {
@@ -118,18 +104,6 @@ namespace Core::Format
             Queue.CopyFrom(Value.begin(), Value.length());
 
             return *this;
-        }
-
-        // @todo Remove this from here
-
-        Stream &operator<<(const Network::Address &Value)
-        {
-            return *this << Value.ToString();
-        }
-
-        Stream &operator<<(const Network::EndPoint &Value)
-        {
-            return *this << Value.ToString();
         }
 
         Stream &operator=(const Stream &) = delete;

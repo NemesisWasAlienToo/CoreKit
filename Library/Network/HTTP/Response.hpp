@@ -44,7 +44,7 @@ namespace Core::Network::HTTP
 
             Ser << *this;
 
-            return Ser.ToString();
+            return std::string{&Buffer.Head(), Buffer.Length()};
         }
 
         Response &SetCookie(const std::string &Name, const std::string &Value,
@@ -171,7 +171,7 @@ namespace Core::Network::HTTP
         {
             // @todo Hanlde null case
 
-            size_t Cursor = 5;
+            size_t Cursor = 6;
             size_t CursorTmp = 0;
 
             // Parse version

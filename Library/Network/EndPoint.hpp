@@ -3,7 +3,6 @@
 #include <sys/socket.h>
 
 #include <Network/Address.hpp>
-#include <Format/Serializer.hpp>
 
 namespace Core
 {
@@ -260,6 +259,11 @@ namespace Core
                     return false;
                 else
                     return true;
+            }
+
+            friend Format::Stream &operator<<(Format::Stream &Stream, Network::EndPoint const &Value)
+            {
+                return Stream << Value.ToString();
             }
 
             friend std::ostream &operator<<(std::ostream &os, const EndPoint &tc)

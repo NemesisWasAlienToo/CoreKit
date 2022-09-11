@@ -7,7 +7,6 @@
 
 #include <Duration.hpp>
 #include <Network/Socket.hpp>
-#include <Network/DNS.hpp>
 #include <Format/Stream.hpp>
 #include <Network/HTTP/Response.hpp>
 #include <Network/HTTP/Request.hpp>

@@ -186,6 +186,7 @@ namespace Core::Iterable
 
         constexpr std::tuple<T *, size_t> DataChunk(size_t Start = 0)
         {
+            // @todo Fix when (_First + Start) = 0
             return std::make_tuple(&_ElementAt(Start), std::min((Capacity() - ((_First + Start) % Capacity())), _Length - Start));
         }
 

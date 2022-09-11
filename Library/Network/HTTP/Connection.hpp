@@ -32,7 +32,7 @@ namespace Core
 
                     inline bool IsSecure()
                     {
-                        return Self.CallbackAs<HTTP::Connection>()->IsSecure();
+                        return HandlerAs<HTTP::Connection>().IsSecure();
                     }
 
                     inline bool HasKTLS()
@@ -50,7 +50,7 @@ namespace Core
                     {
                         Loop.AssertPermission();
 
-                        Self.CallbackAs<HTTP::Connection>()->AppendResponse(Response, std::move(file), FileLength);
+                        HandlerAs<HTTP::Connection>().AppendResponse(Response, std::move(file), FileLength);
 
                         ListenFor(ePoll::In | ePoll::Out);
                     }
@@ -59,7 +59,7 @@ namespace Core
                     {
                         Loop.AssertPermission();
 
-                        Self.CallbackAs<HTTP::Connection>()->AppendBuffer(std::move(Buffer), std::move(file), FileLength);
+                        HandlerAs<HTTP::Connection>().AppendBuffer(std::move(Buffer), std::move(file), FileLength);
 
                         ListenFor(ePoll::In | ePoll::Out);
                     }
@@ -105,7 +105,7 @@ namespace Core
                 Network::EndPoint Source;
 
                 Iterable::Queue<char> IBuffer{0};
-                Iterable::Queue<OutEntry> OBuffer;
+                Iterable::Queue<OutEntry> OBuffer{0};
                 Settings const &Setting;
                 TLSContext::SecureSocket SSL;
 
@@ -156,57 +156,47 @@ namespace Core
                     return bool(SSL);
                 }
 
-                void Continue100(Connection::Context &)
+                bool Continue100(Connection::Context &Context)
                 {
-                    return;
+                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
 
-                    // Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
+                    // Ensure version is HTTP 1.1
 
-                    // // Ensure version is HTTP 1.1
+                    if (Parser.Result.Version[5] == '1' && Parser.Result.Version[7] == '0')
+                    {
+                        throw HTTP::Status::ExpectationFailed;
+                    }
 
-                    // if (Parser.Result.Version[5] == '1' && Parser.Result.Version[7] == '0')
-                    // {
-                    //     throw HTTP::Status::ExpectationFailed;
-                    // }
+                    // Validate Content-Length
 
-                    // // Validate Content-Length
+                    if (!Parser.HasBody())
+                    {
+                        throw HTTP::Status::LengthRequired;
+                    }
 
-                    // if (!Parser.HasBody())
-                    // {
-                    //     throw HTTP::Status::LengthRequired;
-                    // }
+                    // Respond to 100-continue
 
-                    // // Respond to 100-continue
+                    // @todo Maybe handle HTTP 2.0 later too?
+                    // @todo Fix this and use actual request
 
-                    // // @todo Maybe handle HTTP 2.0 later too?
-                    // // @todo Fix this and use actual request
+                    constexpr auto ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
 
-                    // constexpr auto ContinueResponse = "HTTP/1.1 100 Continue\r\n\r\n";
+                    Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
+                    Format::Stream Stream(Temp);
 
-                    // Iterable::Queue<char> Temp(sizeof(ContinueResponse), false);
-                    // Format::Stream Stream(Temp);
+                    Temp.CopyFrom(ContinueResponse, sizeof(Stream));
 
-                    // Temp.CopyFrom(ContinueResponse, sizeof(Stream));
+                    // Send the response
 
-                    // // Send the response
+                    while (Temp.Length())
+                    {
+                        if ((SSL ? SSL.Write(Stream) : Client.Write(Stream)) <= 0)
+                        {
+                            return false;
+                        }
+                    }
 
-                    // while (Temp.Length())
-                    // {
-                    //     // (bool(SSL) ? SSL : Client) << Stream;
-
-                    //     if (SSL)
-                    //     {
-                    //         if (!(SSL << Stream))
-                    //         {
-                    //             Context.Remove();
-                    //             return;
-                    //         }
-                    //     }
-                    //     else
-                    //     {
-                    //         Client << Stream;
-                    //     }
-                    // }
+                    return true;
                 }
 
                 inline void AppendBuffer(Iterable::Queue<char> Buffer, File file = {}, size_t FileLength = 0)
@@ -233,11 +223,11 @@ namespace Core
 
                     if (!this->ShouldClose && Response.Version == HTTP::HTTP10)
                     {
-                        Ser << "Connection:keep-alive\r\n";
+                        Ser << "connection:keep-alive\r\n";
                     }
                     else if (this->ShouldClose && Response.Version == HTTP::HTTP11)
                     {
-                        Ser << "Connection:close\r\n";
+                        Ser << "connection:close\r\n";
                     }
 
                     if (file)
@@ -249,12 +239,13 @@ namespace Core
                         StringLength = Response.Content.length();
                     }
 
-                    Ser << "Content-Length:" << std::to_string(FileLength + StringLength) << "\r\n";
+                    if (Response.Headers.find("content-length") == Response.Headers.end())
+                        Ser << "content-length:" << std::to_string(FileLength + StringLength) << "\r\n";
 
                     Response.SetCookies.ForEach(
                         [&](auto const &Cookie)
                         {
-                            Ser << "Set-Cookie:" << Cookie << "\r\n";
+                            Ser << "set-cookie:" << Cookie << "\r\n";
                         });
 
                     Ser << "\r\n"
@@ -304,8 +295,7 @@ namespace Core
 
                         if (Parser.RequiresContinue100)
                         {
-                            Continue100(Context);
-                            return true;
+                            return Continue100(Context);
                         }
                     }
                     catch (HTTP::Status Method)

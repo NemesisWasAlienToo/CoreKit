@@ -1,10 +1,6 @@
 #pragma once
 
-#include <iostream>
 #include <string>
-#include <sstream>
-#include <map>
-
 #include <Machine.hpp>
 #include <Format/Stream.hpp>
 #include <Iterable/Queue.hpp>
@@ -66,7 +62,7 @@ namespace Core::Network::HTTP
 
         void Continue100()
         {
-            auto ExpectIterator = Result.Headers.find("Expect");
+            auto ExpectIterator = Result.Headers.find("expect");
 
             if (ExpectIterator != Result.Headers.end() && ExpectIterator->second == "100-continue")
             {
@@ -138,7 +134,7 @@ namespace Core::Network::HTTP
 
             // Check for content length
 
-            Iterator = Result.Headers.find("Content-Length");
+            Iterator = Result.Headers.find("content-length");
 
             if (Iterator != Result.Headers.end() && !Iterator->second.empty())
             {
@@ -179,7 +175,7 @@ namespace Core::Network::HTTP
             {
                 // Read the transfer encoding
 
-                Iterator = Result.Headers.find("Transfer-Encoding");
+                Iterator = Result.Headers.find("transfer-encoding");
 
                 if (Iterator == Result.Headers.end())
                 {

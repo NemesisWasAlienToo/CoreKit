@@ -1,12 +1,8 @@
 #pragma once
 
-#include <iostream>
-#include <functional>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <poll.h>
 #include <sys/ioctl.h>
 #include <system_error>
 #include <tuple>
