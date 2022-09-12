@@ -171,7 +171,7 @@ namespace Core::Network::HTTP
         {
             // @todo Hanlde null case
 
-            size_t Cursor = 6;
+            size_t Cursor = 5;
             size_t CursorTmp = 0;
 
             // Parse version

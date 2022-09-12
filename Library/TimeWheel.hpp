@@ -18,7 +18,7 @@ namespace Core
         struct Entry
         {
             Function<void()> Callback;
-            std::array<size_t, Stages> Posision;
+            std::array<size_t, Stages> Position;
             size_t Bucket;
             size_t Wheel;
         };
@@ -71,7 +71,7 @@ namespace Core
 
                     Iterator->Wheel = Stage;
 
-                    size_t &Index = Iterator->Posision[Stage];
+                    size_t &Index = Iterator->Position[Stage];
 
                     auto &DestinationBucket = Destination.Buckets[Index].Entries;
 
@@ -159,12 +159,12 @@ namespace Core
 
             size_t Level = 0;
 
-            for (Level = Wheels.size() - 1; Level > 0 && entry.Posision[Level] == 0; --Level)
+            for (Level = Wheels.size() - 1; Level > 0 && entry.Position[Level] == 0; --Level)
             {
             }
 
             entry.Wheel = Level;
-            entry.Bucket = (entry.Posision[Level] + Indices[Level]) % Wheels[Level].Buckets.size();
+            entry.Bucket = (entry.Position[Level] + Indices[Level]) % Wheels[Level].Buckets.size();
 
             return At(entry.Wheel, entry.Bucket).Add(std::move(entry));
         }
