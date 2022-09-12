@@ -233,12 +233,13 @@ namespace Core
                     return request;
                 }
 
-                static Request Get(std::string_view Version, std::string_view Path)
+                static Request Get(std::string_view Version, std::string_view Path, std::unordered_map<std::string, std::string> Headers = {})
                 {
                     return Request::From(
                         Version,
                         Methods::GET,
-                        Path);
+                        Path,
+                        std::move(Headers));
                 }
 
                 static Request Post(std::string_view Version, std::string_view Path, std::string_view Content)

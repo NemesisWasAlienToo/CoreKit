@@ -104,8 +104,8 @@ namespace Core
                 Network::EndPoint Target;
                 Network::EndPoint Source;
 
-                Iterable::Queue<char> IBuffer{0};
-                Iterable::Queue<OutEntry> OBuffer{0};
+                Iterable::Queue<char> IBuffer = Iterable::Queue<char>(1);
+                Iterable::Queue<OutEntry> OBuffer = Iterable::Queue<OutEntry>(1);
                 Settings const &Setting;
                 TLSContext::SecureSocket SSL;
 
@@ -217,13 +217,13 @@ namespace Core
                     // Serialize headers
 
                     for (auto const &[k, v] : Response.Headers)
-                        Ser << k << ':' << v << "\r\n";
+                        Ser << k << ": " << v << "\r\n";
 
                     // Handle keep-alive
 
                     if (!this->ShouldClose && Response.Version == HTTP::HTTP10)
                     {
-                        Ser << "connection:keep-alive\r\n";
+                        Ser << "connection: keep-alive\r\n";
                     }
                     else if (this->ShouldClose && Response.Version == HTTP::HTTP11)
                     {
@@ -240,12 +240,12 @@ namespace Core
                     }
 
                     if (Response.Headers.find("content-length") == Response.Headers.end())
-                        Ser << "content-length:" << std::to_string(FileLength + StringLength) << "\r\n";
+                        Ser << "content-length: " << std::to_string(FileLength + StringLength) << "\r\n";
 
                     Response.SetCookies.ForEach(
                         [&](auto const &Cookie)
                         {
-                            Ser << "set-cookie:" << Cookie << "\r\n";
+                            Ser << "set-cookie: " << Cookie << "\r\n";
                         });
 
                     Ser << "\r\n"
