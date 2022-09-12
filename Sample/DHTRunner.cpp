@@ -35,9 +35,10 @@ int main(int argc, char const *argv[])
 
     while (true)
     {
-        STDOUT.WriteLine("Waiting for commands");
+        std::cout << "Waiting for commands" << std::endl;
 
-        std::string Command = STDIN.ReadLine();
+        std::string Command;
+        std::cin >> Command;
 
         if (Command == "ping")
         {
@@ -130,11 +131,10 @@ int main(int argc, char const *argv[])
         else
         {
             Node.ForEach(
-                [&](const auto& Nodes)
+                [&](const auto &Nodes)
                 {
                     Node.Data(Nodes[0].EndPoint, Command);
-                }
-            );
+                });
         }
     }
 

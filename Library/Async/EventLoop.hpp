@@ -8,6 +8,7 @@
 #include <functional>
 
 #include <Event.hpp>
+#include <Timer.hpp>
 #include <Duration.hpp>
 #include <Function.hpp>
 #include <TimeWheel.hpp>
