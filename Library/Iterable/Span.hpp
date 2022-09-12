@@ -195,7 +195,7 @@ namespace Core
             size_t _Length = 0;
             T *_Content = nullptr;
 
-            constexpr inline void AssertIndex(size_t Index)
+            constexpr inline void AssertIndex(size_t Index) const
             {
                 if (Index >= _Length)
                     throw std::out_of_range("Index out of range");
