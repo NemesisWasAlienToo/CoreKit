@@ -9,6 +9,7 @@
 
 namespace Core::Network::HTTP
 {
+    template <typename TMessage>
     struct Parser : Machine<void()>
     {
         size_t HeaderLimit = 16 * 1024;
@@ -28,7 +29,7 @@ namespace Core::Network::HTTP
         size_t bodyPos = 0;
         size_t bodyPosTmp = 0;
 
-        HTTP::Request Result;
+        TMessage Result;
         std::unordered_map<std::string, std::string>::iterator Iterator;
 
         bool RequiresContinue100 = false;
@@ -40,7 +41,6 @@ namespace Core::Network::HTTP
             Machine::Reset();
             Queue.Free(bodyPos + ContentLength);
             Queue.Resize(Queue.Length() + RequestBufferSize);
-
 
             ContentLength = 0;
             lenPos = 0;
@@ -87,6 +87,8 @@ namespace Core::Network::HTTP
 
             while (bodyPos == 0)
             {
+                // @todo Optimize the no limitation case
+
                 if (HeaderLimit && Message.length() > HeaderLimit)
                 {
                     throw HTTP::Status::RequestEntityTooLarge;
@@ -171,43 +173,36 @@ namespace Core::Network::HTTP
 
                 Result.Content = Message.substr(bodyPos, ContentLength);
             }
+
+            // Check for content encoding
+
+            else if ((Iterator = Result.Headers.find("transfer-encoding")) == Result.Headers.end())
+            {
+                Continue100();
+
+                CO_TERMINATE();
+            }
+            else if (Iterator->second == "chunked")
+            {
+                // @todo Implement later
+                // @todo Check content length to be in the acceptable range
+
+                throw HTTP::Status::NotImplemented;
+            }
+            else if (Iterator->second == "gzip")
+            {
+                // Read the body chinks till the end
+
+                // @todo Implement later
+                // @todo Check content length to be in the acceptable range
+
+                throw HTTP::Status::NotImplemented;
+            }
             else
             {
-                // Read the transfer encoding
+                // Not implemented
 
-                Iterator = Result.Headers.find("transfer-encoding");
-
-                if (Iterator == Result.Headers.end())
-                {
-                    Continue100();
-
-                    CO_TERMINATE();
-                }
-
-                // @todo Maybe parse weighted encoding too?
-
-                else if (Iterator->second == "chunked")
-                {
-                    // @todo Implement later
-                    // @todo Check content length to be in the acceptable range
-
-                    throw HTTP::Status::NotImplemented;
-                }
-                else if (Iterator->second == "gzip")
-                {
-                    // Read the body chinks till the end
-
-                    // @todo Implement later
-                    // @todo Check content length to be in the acceptable range
-
-                    throw HTTP::Status::NotImplemented;
-                }
-                else
-                {
-                    // Not implemented
-
-                    throw HTTP::Status::NotImplemented;
-                }
+                throw HTTP::Status::NotImplemented;
             }
 
             CO_TERMINATE();

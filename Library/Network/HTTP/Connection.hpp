@@ -115,7 +115,7 @@ namespace Core
                 Core::Function<void()> OnSent;
 
                 // @todo Fix this limitations
-                HTTP::Parser Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize, IBuffer};
+                HTTP::Parser<HTTP::Request> Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize, IBuffer};
                 bool ShouldClose = false;
 
                 Connection(Network::EndPoint const &target, Network::EndPoint const &source, Settings &setting)

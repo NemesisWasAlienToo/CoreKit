@@ -4,6 +4,8 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <string_view>
+#include <type_traits>
 
 #include <Iterable/Span.hpp>
 
@@ -18,7 +20,7 @@ namespace Core::Format
 
         inline unsigned char Number(const unsigned char Big, const unsigned char Small, bool Upper = false)
         {
-            return ((Digit(Big) << 4) + Digit(Small));
+            return ((Digit(Big, Upper) << 4) + Digit(Small, Upper));
         }
 
         inline int PlainSize(int Size)
@@ -59,7 +61,7 @@ namespace Core::Format
             return ss.str();
         }
 
-        size_t Bytes(const std::string &HexString, char *Data, bool Upper = false)
+        size_t Bytes(std::string_view HexString, char *Data, bool Upper = false)
         {
             size_t Len = HexString.length() / 2;
 
@@ -71,7 +73,7 @@ namespace Core::Format
             return Len;
         }
 
-        Iterable::Span<char> Bytes(const std::string &HexString, bool Upper = false)
+        Iterable::Span<char> Bytes(std::string_view HexString, bool Upper = false)
         {
             Iterable::Span<char> Data(HexString.length() / 2);
 
@@ -81,6 +83,21 @@ namespace Core::Format
             }
 
             return Data;
+        }
+
+        template <typename T>
+        T To(std::string_view HexString, bool Upper = false)
+        {
+            T t = 0;
+            size_t Length = std::min(sizeof(T) * 2, HexString.length());
+
+            for (size_t i = 0; i < Length; i++)
+            {
+                t = t << 4;
+                t += Digit(HexString[i], Upper);
+            }
+
+            return t;
         }
     }
 }
