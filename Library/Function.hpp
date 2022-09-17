@@ -1,6 +1,8 @@
 #pragma once
 
 #include <type_traits>
+#include <stdexcept>
+#include <utility>
 
 namespace Core
 {
@@ -143,6 +145,93 @@ namespace Core
                       *Self = (void *)Other;
                   }),
               Hash(typeid(decltype(Function)).name()) {}
+
+        // template <typename T, typename... TCArgs>
+        // constexpr static Function From(TCArgs &&...CArgs)
+        // {
+        //     Function res;
+
+        //     res.Construct<T>(std::forward<TCArgs>(CArgs)...);
+
+        //     return res;
+        // }
+
+        template <typename T, typename... TCArgs>
+        constexpr static Function From(TCArgs &&...CArgs)
+        {
+            Function Result;
+
+            Result.Hash = typeid(T).name();
+
+            if constexpr (sizeof(T) > SmallSize)
+            {
+                Result.Object = new T(std::forward<TCArgs>(CArgs)...);
+
+                Result.Invoker = [](void *Item, TArgs &&...Args)
+                {
+                    return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
+                };
+
+                if constexpr (!std::is_trivially_destructible_v<T>)
+                {
+                    Result.Destructor = [](void const *Item)
+                    {
+                        delete static_cast<T const *>(Item);
+                    };
+                }
+                else
+                {
+                    Result.Destructor = nullptr;
+                }
+
+                if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
+                {
+                    Result.CopyConstructor = [](void **Self, void const *Other)
+                    {
+                        *Self = new T(*static_cast<T const *>(Other));
+                    };
+                }
+                else
+                {
+                    Result.CopyConstructor = nullptr;
+                }
+            }
+            else
+            {
+                std::construct_at(static_cast<T *>(static_cast<void *>(&Result.Object)), std::forward<TCArgs>(CArgs)...);
+
+                Result.Invoker = [](void *Item, TArgs &&...Args)
+                {
+                    return static_cast<T *>(static_cast<void *>(&Item))->operator()(std::forward<TArgs>(Args)...);
+                };
+
+                if constexpr (!std::is_trivially_destructible_v<T>)
+                {
+                    Result.Destructor = [](void const *Item)
+                    {
+                        static_cast<T const *>(static_cast<void *>(&Item))->~T();
+                    };
+                }
+                else
+                {
+                    Result.Destructor = nullptr;
+                }
+
+                if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
+                {
+                    Result.CopyConstructor = [](void **Self, void const *Other)
+                    {
+                        std::construct_at(static_cast<T *>(static_cast<void *>(Self)), *static_cast<T const *>(static_cast<void *>(&Other)));
+                    };
+                }
+                else
+                {
+                    Result.CopyConstructor = nullptr;
+                }
+            }
+
+            return Result;
+        }
 
         template <typename TFunctor>
         constexpr Function &operator=(TFunctor &&Functor) noexcept

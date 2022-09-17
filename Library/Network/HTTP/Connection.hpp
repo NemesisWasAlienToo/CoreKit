@@ -98,6 +98,7 @@ namespace Core
                     Core::Function<void(Context &, Network::HTTP::Request &)> OnRequest;
                     size_t MaxConnectionCount;
                     bool NoDelay;
+                    bool RawContent;
                     Duration Timeout;
                 };
 
@@ -115,7 +116,7 @@ namespace Core
                 Core::Function<void()> OnSent;
 
                 // @todo Fix this limitations
-                HTTP::Parser<HTTP::Request> Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize, IBuffer};
+                HTTP::Parser<HTTP::Request> Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize, IBuffer, Setting.RawContent};
                 bool ShouldClose = false;
 
                 Connection(Network::EndPoint const &target, Network::EndPoint const &source, Settings &setting)
@@ -227,8 +228,10 @@ namespace Core
                     }
                     else if (this->ShouldClose && Response.Version == HTTP::HTTP11)
                     {
-                        Ser << "connection:close\r\n";
+                        Ser << "connection: close\r\n";
                     }
+
+                    // Calculate length
 
                     if (file)
                     {
@@ -253,7 +256,7 @@ namespace Core
 
                     AppendBuffer(std::move(Buffer), std::move(file), FileLength);
                 }
-
+                
                 void operator()(Async::EventLoop::Context &Context, ePoll::Entry &Item)
                 {
                     Connection::Context ConnContext{Context, Target, Source};

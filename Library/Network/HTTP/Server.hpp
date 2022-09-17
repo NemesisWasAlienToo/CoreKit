@@ -32,6 +32,7 @@ namespace Core::Network::HTTP
             },
             1024,
             false,
+            false,
             {5, 0}};
 
         Server() = default;
@@ -237,6 +238,12 @@ namespace Core::Network::HTTP
             return *this;
         }
 
+        inline Server &RawContent(bool Value)
+        {
+            Settings.RawContent = Value;
+            return *this;
+        }
+
         template <typename TCallback, typename TEndCallback>
         inline Server &ListenWith(Network::EndPoint const &endPoint, TCallback &&Callback, TEndCallback &&EndCallback)
         {
@@ -295,6 +302,7 @@ namespace Core::Network::HTTP
                     Pool[Counter].Assign(
                         std::move(Client),
                         Connection(Info, endPoint, Settings),
+                        // Async::EventLoop::CallbackType::From<Connection>(Info, endPoint, Settings),
                         [this]
                         {
                             ConnectionCount.fetch_sub(1, std::memory_order_relaxed);
@@ -363,6 +371,7 @@ namespace Core::Network::HTTP
                             {
                                 SSL.ShakeHand = true;
                                 Context.ListenFor(ePoll::In);
+                                // Context.Upgrade(Async::EventLoop::CallbackType::From<Connection>(Info, endPoint, Settings, std::move(SSL)), Settings.Timeout);
                                 Context.Upgrade(Connection(Info, endPoint, Settings, std::move(SSL)), Settings.Timeout);
                                 return;
                             }

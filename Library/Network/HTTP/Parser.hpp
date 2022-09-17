@@ -3,6 +3,7 @@
 #include <string>
 #include <Machine.hpp>
 #include <Format/Stream.hpp>
+#include <Format/Hex.hpp>
 #include <Iterable/Queue.hpp>
 #include <Network/Socket.hpp>
 #include <Network/HTTP/Request.hpp>
@@ -15,19 +16,25 @@ namespace Core::Network::HTTP
         size_t HeaderLimit = 16 * 1024;
         size_t ContentLimit = 8 * 1024 * 1024;
         size_t RequestBufferSize = 1024;
+        Iterable::Queue<char> &Queue;
+        bool RawContent = false;
 
-        Parser(size_t headerLimit, size_t contentLimit, size_t SendBufferSize, Iterable::Queue<char> &queue) : Machine(), HeaderLimit(headerLimit), ContentLimit(contentLimit), RequestBufferSize(SendBufferSize), Queue(queue)
+        Parser(size_t headerLimit, size_t contentLimit, size_t SendBufferSize, Iterable::Queue<char> &queue, bool rawContent = false) : Machine(), HeaderLimit(headerLimit), ContentLimit(contentLimit), RequestBufferSize(SendBufferSize), Queue(queue), RawContent(rawContent)
         {
             Queue = Iterable::Queue<char>(SendBufferSize);
         }
 
-        Iterable::Queue<char> &Queue;
+        Iterable::Queue<char> ContentBuffer;
 
         size_t ContentLength = 0;
         size_t lenPos = 0;
 
         size_t bodyPos = 0;
         size_t bodyPosTmp = 0;
+
+        size_t ChunkLength = 0;
+        size_t ChunkStart = 0;
+        size_t ChunkStartTmp = 0;
 
         TMessage Result;
         std::unordered_map<std::string, std::string>::iterator Iterator;
@@ -184,10 +191,58 @@ namespace Core::Network::HTTP
             }
             else if (Iterator->second == "chunked")
             {
-                // @todo Implement later
-                // @todo Check content length to be in the acceptable range
+                Continue100();
 
-                throw HTTP::Status::NotImplemented;
+                ChunkStart = bodyPos;
+
+                do
+                {
+                    while ((ChunkStartTmp = Message.find("\r\n", ChunkStart)) == std::string::npos)
+                    {
+                        CO_YIELD();
+                    }
+
+                    // @todo Ensure hex string is lowe case and valid
+
+                    ChunkLength = Format::Hex::To<size_t>(Message.substr(ChunkStart, ChunkStartTmp - ChunkStart));
+
+                    ContentLength += ChunkLength;
+
+                    if (ContentLimit && ContentLength > ContentLimit)
+                    {
+                        throw HTTP::Status::RequestEntityTooLarge;
+                    }
+
+                    ChunkStart = (ChunkStartTmp + 2);
+
+                    while (Message.length() - ChunkStart < ChunkLength)
+                    {
+                        CO_YIELD();
+                    }
+
+                    // Take the chunk
+
+                    if (ChunkLength && !RawContent)
+                    {
+                        auto ChunkData = Message.substr(ChunkStart, ChunkLength);
+
+                        ContentBuffer.CopyFrom(ChunkData.data(), ChunkData.length());
+                    }
+
+                    ChunkStart += (ChunkLength + 2);
+
+                } while (ChunkLength);
+
+                if (RawContent)
+                {
+                    Result.Content = Message.substr(bodyPos, ChunkStart - bodyPos);
+                }
+                else
+                {
+                    Result.Content = std::string{ContentBuffer.Content(), ContentBuffer.Length()};
+                    Result.Headers.erase(Iterator);
+                    ContentBuffer.Free();
+                }
             }
             else if (Iterator->second == "gzip")
             {
