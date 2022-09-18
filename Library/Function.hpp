@@ -40,94 +40,80 @@ namespace Core
 
         constexpr Function(std::nullptr_t) noexcept {};
 
-        template <typename TFunctor>
-        constexpr Function(TFunctor &&Functor) noexcept
-            requires(!std::is_same_v<std::decay_t<TFunctor>, Function> && sizeof(std::decay_t<TFunctor>) > SmallSize)
-            : Object(new std::decay_t<TFunctor>(std::forward<TFunctor>(Functor))),
-              Invoker(
-                  [](void *Item, TArgs &&...Args)
-                  {
-                      using T = std::decay_t<TFunctor>;
-                      return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
-                  }),
-
-              Hash(typeid(TFunctor).name())
+        template <typename T, typename... TCArgs>
+        constexpr Function(std::type_identity<T>, TCArgs &&...CArgs) : Hash(typeid(T).name())
         {
-
-            using T = std::decay_t<TFunctor>;
-
-            if constexpr (!std::is_trivially_destructible_v<T>)
+            if constexpr (sizeof(T) > SmallSize)
             {
-                Destructor = [](void const *Item)
+                Object = new T(std::forward<TCArgs>(CArgs)...);
+
+                Invoker = [](void *Item, TArgs &&...Args)
                 {
-                    delete static_cast<T const *>(Item);
+                    return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
                 };
+
+                if constexpr (!std::is_trivially_destructible_v<T>)
+                {
+                    Destructor = [](void const *Item)
+                    {
+                        delete static_cast<T const *>(Item);
+                    };
+                }
+                else
+                {
+                    Destructor = nullptr;
+                }
+
+                if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
+                {
+                    CopyConstructor = [](void **Self, void const *Other)
+                    {
+                        *Self = new T(*static_cast<T const *>(Other));
+                    };
+                }
+                else
+                {
+                    CopyConstructor = nullptr;
+                }
             }
             else
             {
-                Destructor = nullptr;
-            }
+                std::construct_at(static_cast<T *>(static_cast<void *>(&Object)), std::forward<TCArgs>(CArgs)...);
 
-            if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
-            {
-                CopyConstructor = [](void **Self, void const *Other)
+                Invoker = [](void *Item, TArgs &&...Args)
                 {
-                    *Self = new T(*static_cast<T const *>(Other));
+                    return static_cast<T *>(static_cast<void *>(&Item))->operator()(std::forward<TArgs>(Args)...);
                 };
-            }
-            else
-            {
-                CopyConstructor = nullptr;
+
+                if constexpr (!std::is_trivially_destructible_v<T>)
+                {
+                    Destructor = [](void const *Item)
+                    {
+                        static_cast<T const *>(static_cast<void *>(&Item))->~T();
+                    };
+                }
+                else
+                {
+                    Destructor = nullptr;
+                }
+
+                if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
+                {
+                    CopyConstructor = [](void **Self, void const *Other)
+                    {
+                        std::construct_at(static_cast<T *>(static_cast<void *>(Self)), *static_cast<T const *>(static_cast<void *>(&Other)));
+                    };
+                }
+                else
+                {
+                    CopyConstructor = nullptr;
+                }
             }
         }
 
-        // @todo Maybe introduce in-place construction like iterables?
-
-        // template <typename TFunctor, typename... TArgs>
-        // void Construct(TArgs &&...Args)
-        // {
-        //     //
-        // }
-
         template <typename TFunctor>
         constexpr Function(TFunctor &&Functor) noexcept
-            requires(!std::is_same_v<std::decay_t<TFunctor>, Function> && sizeof(std::decay_t<TFunctor>) <= SmallSize)
-            : Hash(typeid(TFunctor).name())
-        {
-            using T = std::decay_t<TFunctor>;
-
-            std::construct_at(static_cast<T *>(static_cast<void *>(&Object)), std::forward<TFunctor>(Functor));
-
-            Invoker = [](void *Item, TArgs &&...Args)
-            {
-                return static_cast<T *>(static_cast<void *>(&Item))->operator()(std::forward<TArgs>(Args)...);
-                // return std::invoke(*static_cast<T *>(static_cast<void *>(&Item)), std::forward<TArgs>(Args)...);
-            };
-
-            if constexpr (!std::is_trivially_destructible_v<T>)
-            {
-                Destructor = [](void const *Item)
-                {
-                    static_cast<T const *>(static_cast<void *>(&Item))->~T();
-                };
-            }
-            else
-            {
-                Destructor = nullptr;
-            }
-
-            if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
-            {
-                CopyConstructor = [](void **Self, void const *Other)
-                {
-                    std::construct_at(static_cast<T *>(static_cast<void *>(Self)), *static_cast<T const *>(static_cast<void *>(&Other)));
-                };
-            }
-            else
-            {
-                CopyConstructor = nullptr;
-            }
-        }
+            : Function(std::type_identity<TFunctor>{}, std::forward<TFunctor>(Functor)) {}
 
         constexpr Function(TRet (*Function)(TArgs...)) noexcept
             : Object(reinterpret_cast<void *>(Function)),
@@ -146,134 +132,13 @@ namespace Core
                   }),
               Hash(typeid(decltype(Function)).name()) {}
 
-        // template <typename T, typename... TCArgs>
-        // constexpr static Function From(TCArgs &&...CArgs)
-        // {
-        //     Function res;
-
-        //     res.Construct<T>(std::forward<TCArgs>(CArgs)...);
-
-        //     return res;
-        // }
-
-        template <typename T, typename... TCArgs>
-        constexpr static Function From(TCArgs &&...CArgs)
-        {
-            Function Result;
-
-            Result.Hash = typeid(T).name();
-
-            if constexpr (sizeof(T) > SmallSize)
-            {
-                Result.Object = new T(std::forward<TCArgs>(CArgs)...);
-
-                Result.Invoker = [](void *Item, TArgs &&...Args)
-                {
-                    return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
-                };
-
-                if constexpr (!std::is_trivially_destructible_v<T>)
-                {
-                    Result.Destructor = [](void const *Item)
-                    {
-                        delete static_cast<T const *>(Item);
-                    };
-                }
-                else
-                {
-                    Result.Destructor = nullptr;
-                }
-
-                if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
-                {
-                    Result.CopyConstructor = [](void **Self, void const *Other)
-                    {
-                        *Self = new T(*static_cast<T const *>(Other));
-                    };
-                }
-                else
-                {
-                    Result.CopyConstructor = nullptr;
-                }
-            }
-            else
-            {
-                std::construct_at(static_cast<T *>(static_cast<void *>(&Result.Object)), std::forward<TCArgs>(CArgs)...);
-
-                Result.Invoker = [](void *Item, TArgs &&...Args)
-                {
-                    return static_cast<T *>(static_cast<void *>(&Item))->operator()(std::forward<TArgs>(Args)...);
-                };
-
-                if constexpr (!std::is_trivially_destructible_v<T>)
-                {
-                    Result.Destructor = [](void const *Item)
-                    {
-                        static_cast<T const *>(static_cast<void *>(&Item))->~T();
-                    };
-                }
-                else
-                {
-                    Result.Destructor = nullptr;
-                }
-
-                if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
-                {
-                    Result.CopyConstructor = [](void **Self, void const *Other)
-                    {
-                        std::construct_at(static_cast<T *>(static_cast<void *>(Self)), *static_cast<T const *>(static_cast<void *>(&Other)));
-                    };
-                }
-                else
-                {
-                    Result.CopyConstructor = nullptr;
-                }
-            }
-
-            return Result;
-        }
-
         template <typename TFunctor>
         constexpr Function &operator=(TFunctor &&Functor) noexcept
             requires(!std::is_same_v<std::decay_t<TFunctor>, Function> && sizeof(std::decay_t<TFunctor>) > SmallSize)
         {
-            Clear();
-
-            Object = new std::decay_t<TFunctor>(std::forward<TFunctor>(Functor));
-
-            Invoker = [](void *Item, TArgs &&...Args)
-            {
-                using T = std::decay_t<TFunctor>;
-                return static_cast<T *>(Item)->operator()(std::forward<TArgs>(Args)...);
-            };
-
-            Hash = typeid(TFunctor).name();
-
-            using T = std::decay_t<TFunctor>;
-
-            if constexpr (!std::is_trivially_destructible_v<T>)
-            {
-                Destructor = [](void const *Item)
-                {
-                    delete static_cast<T const *>(Item);
-                };
-            }
-            else
-            {
-                Destructor = nullptr;
-            }
-
-            if constexpr (std::is_copy_constructible_v<T> || std::is_trivially_constructible_v<T>)
-            {
-                CopyConstructor = [](void **Self, void const *Other)
-                {
-                    *Self = new T(*static_cast<T const *>(Other));
-                };
-            }
-            else
-            {
-                CopyConstructor = nullptr;
-            }
+            // @todo Optimize this
+            
+            *this = Function(std::type_identity<TFunctor>{}, std::forward<TFunctor>(Functor));
 
             return *this;
         }

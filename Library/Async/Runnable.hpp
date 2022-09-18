@@ -23,26 +23,3 @@ namespace Core::Async
         }
     };
 }
-
-// #include <atomic>
-
-// class Runnable
-// {
-// protected:
-//     std::atomic<bool> Running{false};
-
-//     inline void Run()
-//     {
-//         Running.store(true);
-//     }
-
-//     inline void Stop()
-//     {
-//         Running.store(false);
-//     }
-
-//     inline bool IsRunning()
-//     {
-//         return Running.load(std::memory_order_relaxed);
-//     }
-// };
