@@ -133,11 +133,11 @@ namespace Core
               Hash(typeid(decltype(Function)).name()) {}
 
         template <typename TFunctor>
-        constexpr Function &operator=(TFunctor &&Functor) noexcept
-            requires(!std::is_same_v<std::decay_t<TFunctor>, Function> && sizeof(std::decay_t<TFunctor>) > SmallSize)
+        constexpr Function &operator=(TFunctor &&Functor)
+        requires(!std::is_same_v<std::decay_t<TFunctor>, Function>)
         {
             // @todo Optimize this
-            
+
             *this = Function(std::type_identity<TFunctor>{}, std::forward<TFunctor>(Functor));
 
             return *this;
