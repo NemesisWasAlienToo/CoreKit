@@ -3,8 +3,9 @@
 #include <memory>
 #include <set>
 
-#include <Format/Stream.hpp>
+#include <Network/HTTP/Modules/Router.hpp>
 #include <Network/HTTP/Server.hpp>
+#include <Format/Stream.hpp>
 #include <File.hpp>
 #include <Test.hpp>
 
@@ -14,7 +15,7 @@ int main(int, char const *[])
 {
     // Create an instance of http runner with a 2 working threads
 
-    HTTP::Server Server(2);
+    HTTP::Server<HTTP::Modules::Router> Server(2);
 
     Test::Log("Server started");
 
@@ -199,7 +200,7 @@ int main(int, char const *[])
 
         .MaxHeaderSize(1024 * 1024 * 2)
         .MaxBodySize(1024 * 1024 * 10)
-        .MaxConnectionCount(1024)
+        .MaxConnections(1024)
         .RequestBufferSize(256)
         .ResponseBufferSize(256)
 

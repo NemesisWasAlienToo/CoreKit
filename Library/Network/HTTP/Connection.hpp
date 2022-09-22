@@ -96,7 +96,6 @@ namespace Core
                     size_t ResponseBufferSize;
                     Core::Function<void(Context &, Network::HTTP::Response &)> OnError;
                     Core::Function<void(Context &, Network::HTTP::Request &)> OnRequest;
-                    size_t MaxConnectionCount;
                     bool NoDelay;
                     bool RawContent;
                     Duration Timeout;
