@@ -91,29 +91,21 @@ namespace Core::Async
             template <typename TCallback>
             inline auto Schedule(Duration const &Timeout, TCallback &&Callback)
             {
-                // Loop.AssertPermission();
-
                 return Loop.Schedule(Timeout, std::forward<TCallback>(Callback));
             }
 
             inline void Reschedule(Duration const &Timeout)
             {
-                // Loop.AssertPermission();
-
                 Loop.Reschedule(Self, Timeout);
             }
 
             inline void Reschedule(Entry &entry, Duration const &Timeout)
             {
-                // Loop.AssertPermission();
-
                 Loop.Reschedule(entry, Timeout);
             }
 
             inline auto Reschedule(TimeWheelType::Bucket::Iterator Iterator, Duration const &Timeout)
             {
-                // Loop.AssertPermission();
-
                 return Loop.Reschedule(Iterator, Timeout);
             }
 

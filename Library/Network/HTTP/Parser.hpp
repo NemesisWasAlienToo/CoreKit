@@ -3,24 +3,28 @@
 #include <string>
 #include <Machine.hpp>
 #include <Format/Stream.hpp>
+#include <Format/Hex.hpp>
 #include <Iterable/Queue.hpp>
 #include <Network/Socket.hpp>
 #include <Network/HTTP/Request.hpp>
 
 namespace Core::Network::HTTP
 {
+    template <typename TMessage>
     struct Parser : Machine<void()>
     {
         size_t HeaderLimit = 16 * 1024;
         size_t ContentLimit = 8 * 1024 * 1024;
         size_t RequestBufferSize = 1024;
+        Iterable::Queue<char> &Queue;
+        bool RawContent = false;
 
-        Parser(size_t headerLimit, size_t contentLimit, size_t SendBufferSize, Iterable::Queue<char> &queue) : Machine(), HeaderLimit(headerLimit), ContentLimit(contentLimit), RequestBufferSize(SendBufferSize), Queue(queue)
+        Parser(size_t headerLimit, size_t contentLimit, size_t SendBufferSize, Iterable::Queue<char> &queue, bool rawContent = false) : Machine(), HeaderLimit(headerLimit), ContentLimit(contentLimit), RequestBufferSize(SendBufferSize), Queue(queue), RawContent(rawContent)
         {
             Queue = Iterable::Queue<char>(SendBufferSize);
         }
 
-        Iterable::Queue<char> &Queue;
+        Iterable::Queue<char> ContentBuffer;
 
         size_t ContentLength = 0;
         size_t lenPos = 0;
@@ -28,7 +32,11 @@ namespace Core::Network::HTTP
         size_t bodyPos = 0;
         size_t bodyPosTmp = 0;
 
-        HTTP::Request Result;
+        size_t ChunkLength = 0;
+        size_t ChunkStart = 0;
+        size_t ChunkStartTmp = 0;
+
+        TMessage Result;
         std::unordered_map<std::string, std::string>::iterator Iterator;
 
         bool RequiresContinue100 = false;
@@ -40,7 +48,6 @@ namespace Core::Network::HTTP
             Machine::Reset();
             Queue.Free(bodyPos + ContentLength);
             Queue.Resize(Queue.Length() + RequestBufferSize);
-
 
             ContentLength = 0;
             lenPos = 0;
@@ -87,6 +94,8 @@ namespace Core::Network::HTTP
 
             while (bodyPos == 0)
             {
+                // @todo Optimize the no limitation case
+
                 if (HeaderLimit && Message.length() > HeaderLimit)
                 {
                     throw HTTP::Status::RequestEntityTooLarge;
@@ -171,43 +180,84 @@ namespace Core::Network::HTTP
 
                 Result.Content = Message.substr(bodyPos, ContentLength);
             }
-            else
+
+            // Check for content encoding
+
+            else if ((Iterator = Result.Headers.find("transfer-encoding")) == Result.Headers.end())
             {
-                // Read the transfer encoding
+                Continue100();
 
-                Iterator = Result.Headers.find("transfer-encoding");
+                CO_TERMINATE();
+            }
+            else if (Iterator->second == "chunked")
+            {
+                Continue100();
 
-                if (Iterator == Result.Headers.end())
+                ChunkStart = bodyPos;
+
+                do
                 {
-                    Continue100();
+                    while ((ChunkStartTmp = Message.find("\r\n", ChunkStart)) == std::string::npos)
+                    {
+                        CO_YIELD();
+                    }
 
-                    CO_TERMINATE();
-                }
+                    // @todo Ensure hex string is lowe case and valid
 
-                // @todo Maybe parse weighted encoding too?
+                    ChunkLength = Format::Hex::To<size_t>(Message.substr(ChunkStart, ChunkStartTmp - ChunkStart));
 
-                else if (Iterator->second == "chunked")
+                    ContentLength += ChunkLength;
+
+                    if (ContentLimit && ContentLength > ContentLimit)
+                    {
+                        throw HTTP::Status::RequestEntityTooLarge;
+                    }
+
+                    ChunkStart = (ChunkStartTmp + 2);
+
+                    while (Message.length() - ChunkStart < ChunkLength)
+                    {
+                        CO_YIELD();
+                    }
+
+                    // Take the chunk
+
+                    if (ChunkLength && !RawContent)
+                    {
+                        auto ChunkData = Message.substr(ChunkStart, ChunkLength);
+
+                        ContentBuffer.CopyFrom(ChunkData.data(), ChunkData.length());
+                    }
+
+                    ChunkStart += (ChunkLength + 2);
+
+                } while (ChunkLength);
+
+                if (RawContent)
                 {
-                    // @todo Implement later
-                    // @todo Check content length to be in the acceptable range
-
-                    throw HTTP::Status::NotImplemented;
-                }
-                else if (Iterator->second == "gzip")
-                {
-                    // Read the body chinks till the end
-
-                    // @todo Implement later
-                    // @todo Check content length to be in the acceptable range
-
-                    throw HTTP::Status::NotImplemented;
+                    Result.Content = Message.substr(bodyPos, ChunkStart - bodyPos);
                 }
                 else
                 {
-                    // Not implemented
-
-                    throw HTTP::Status::NotImplemented;
+                    Result.Content = std::string{ContentBuffer.Content(), ContentBuffer.Length()};
+                    Result.Headers.erase(Iterator);
+                    ContentBuffer.Free();
                 }
+            }
+            else if (Iterator->second == "gzip")
+            {
+                // Read the body chinks till the end
+
+                // @todo Implement later
+                // @todo Check content length to be in the acceptable range
+
+                throw HTTP::Status::NotImplemented;
+            }
+            else
+            {
+                // Not implemented
+
+                throw HTTP::Status::NotImplemented;
             }
 
             CO_TERMINATE();
