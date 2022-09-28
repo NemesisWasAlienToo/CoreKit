@@ -321,7 +321,7 @@ namespace Core
 
                     // Decide if we should keep the connection
 
-                    auto It = Parser.Result.Headers.find("Connection");
+                    auto It = Parser.Result.Headers.find("connection");
                     auto End = Parser.Result.Headers.end();
 
                     // @todo Optimize this
@@ -347,8 +347,8 @@ namespace Core
 
                         // @todo Optimize this
 
-                        if ((Parser.Result.Version == HTTP::HTTP10 && ConnectionValue != "keep-alive") ||
-                            (Parser.Result.Version == HTTP::HTTP11 && ConnectionValue == "close"))
+                        if ((Parser.Result.Version == HTTP::HTTP10 && (ConnectionValue != "keep-alive" || ConnectionValue != "Keep-Alive")) ||
+                            (Parser.Result.Version == HTTP::HTTP11 && (ConnectionValue == "close" || ConnectionValue == "Close")))
                         {
                             Client.ShutDown(Network::Socket::ShutdownRead);
                             ShouldClose = true;

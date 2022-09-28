@@ -263,7 +263,7 @@ namespace Core::Network::HTTP
 
                 std::string HeaderKey;
 
-                // Make header field case insensitive
+                // Make header key case insensitive
 
                 HeaderKey.resize(HeaderKeyView.length());
 
