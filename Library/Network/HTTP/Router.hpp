@@ -19,10 +19,17 @@ struct Repeater<0, T, S...>
     using Tuple = std::tuple<S...>;
 };
 
-template <ctll::fixed_string Pattern, bool Group = false>
+template <ctll::fixed_string Pattern>
 struct Route
 {
 protected:
+    constexpr static auto GroupImp()
+    {
+        return Pattern.size() > 1 && Pattern[Pattern.size() - 2] == '/' && Pattern[Pattern.size() - 1] == '*';
+    }
+
+
+    constexpr static bool Group = GroupImp();
     constexpr static ctll::fixed_string Parameter{"[]"};
     constexpr static ctll::fixed_string Capture{"([^/?]+)"};
     constexpr static size_t Count = FindCount<Pattern, Parameter>();
@@ -30,8 +37,8 @@ protected:
     using Sequence = typename std::make_index_sequence<Count + Group>;
     using Arguments = typename Repeater<Count + Group, std::string_view>::Tuple;
 
-    template <typename TCallback, size_t... S, typename... TArgs, typename... TupleTArgs>
-    static constexpr auto _Apply(std::string_view Path, std::integer_sequence<size_t, S...>, std::tuple<TupleTArgs...>, TCallback &&Callback, TArgs &&...Args)
+    template <typename TCallback, size_t... S, typename... TArgs>
+    static constexpr auto ApplyImpl(std::string_view Path, std::integer_sequence<size_t, S...>, TCallback &&Callback, TArgs &&...Args)
     {
         if (auto m = Match(Path))
         {
@@ -42,7 +49,7 @@ protected:
         return false;
     }
 
-    constexpr static auto _Regex()
+    constexpr static auto RegexImpl()
     {
         if constexpr (Group)
         {
@@ -55,7 +62,7 @@ protected:
     }
 
 public:
-    constexpr static auto Regex = _Regex();
+    constexpr static auto Regex = RegexImpl();
 
     static constexpr auto Match(std::string_view Path)
     {
@@ -65,7 +72,7 @@ public:
     template <typename TCallback, typename... TArgs>
     static constexpr inline auto Apply(std::string_view Path, TCallback Callback, TArgs &&...Args)
     {
-        return _Apply(Path, Sequence{}, Arguments{}, Callback, std::forward<TArgs>(Args)...);
+        return ApplyImpl(Path, Sequence{}, Callback, std::forward<TArgs>(Args)...);
     }
 };
 
@@ -110,10 +117,10 @@ public:
         Default(Args...);
     }
 
-    template <ctll::fixed_string TSignature, bool Group = false, typename TCallback>
+    template <ctll::fixed_string TSignature, typename TCallback>
     void Add(Network::HTTP::Methods Method, TCallback &&Callback)
     {
-        using T = Route<TSignature, Group>;
+        using T = Route<TSignature>;
 
         Routes.Add(
             Method,

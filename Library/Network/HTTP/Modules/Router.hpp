@@ -28,76 +28,76 @@ namespace Core::Network::HTTP::Modules
             return static_cast<T &>(*this);
         }
 
-        template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
+        template <ctll::fixed_string TRoute, typename TAction>
         inline T &Set(HTTP::Methods Method, TAction &&Action)
         {
             static_assert(TRoute.size() > 0 && TRoute[0] == '/', "Route must start with \'/\' character");
             static_assert((TRoute.size() == 1 && TRoute[0] == '/') || (TRoute[TRoute.size() - 1] != '/'), "Route must start with \'/\' character");
 
-            _Router.Add<TRoute, Group>(Method, std::forward<TAction>(Action));
+            _Router.Add<TRoute>(Method, std::forward<TAction>(Action));
             return static_cast<T &>(*this);
         }
 
-        template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
+        template <ctll::fixed_string TRoute, typename TAction>
         inline auto &GET(TAction &&Action)
         {
-            return Set<TRoute, Group>(
+            return Set<TRoute>(
                 HTTP::Methods::GET,
                 std::forward<TAction>(Action));
         }
 
-        template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
+        template <ctll::fixed_string TRoute, typename TAction>
         inline auto &POST(TAction &&Action)
         {
-            return Set<TRoute, Group>(
+            return Set<TRoute>(
                 HTTP::Methods::POST,
                 std::forward<TAction>(Action));
         }
 
-        template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
+        template <ctll::fixed_string TRoute, typename TAction>
         inline auto &PUT(TAction &&Action)
         {
-            return Set<TRoute, Group>(
+            return Set<TRoute>(
                 HTTP::Methods::PUT,
                 std::forward<TAction>(Action));
         }
 
-        template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
+        template <ctll::fixed_string TRoute, typename TAction>
         inline auto &DELETE(TAction &&Action)
         {
-            return Set<TRoute, Group>(
+            return Set<TRoute>(
                 HTTP::Methods::DELETE,
                 std::forward<TAction>(Action));
         }
 
-        template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
+        template <ctll::fixed_string TRoute, typename TAction>
         inline auto &HEAD(TAction &&Action)
         {
-            return Set<TRoute, Group>(
+            return Set<TRoute>(
                 HTTP::Methods::HEAD,
                 std::forward<TAction>(Action));
         }
 
-        template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
+        template <ctll::fixed_string TRoute, typename TAction>
         inline auto &OPTIONS(TAction &&Action)
         {
-            return Set<TRoute, Group>(
+            return Set<TRoute>(
                 HTTP::Methods::OPTIONS,
                 std::forward<TAction>(Action));
         }
 
-        template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
+        template <ctll::fixed_string TRoute, typename TAction>
         inline auto &PATCH(TAction &&Action)
         {
-            return Set<TRoute, Group>(
+            return Set<TRoute>(
                 HTTP::Methods::PATCH,
                 std::forward<TAction>(Action));
         }
 
-        template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
+        template <ctll::fixed_string TRoute, typename TAction>
         inline auto &Any(TAction &&Action)
         {
-            return Set<TRoute, Group>(
+            return Set<TRoute>(
                 HTTP::Methods::Any,
                 std::forward<TAction>(Action));
         }
