@@ -255,7 +255,7 @@ namespace Core
 
                     AppendBuffer(std::move(Buffer), std::move(file), FileLength);
                 }
-                
+
                 void operator()(Async::EventLoop::Context &Context, ePoll::Entry &Item)
                 {
                     Connection::Context ConnContext{Context, Target, Source};
@@ -410,10 +410,7 @@ namespace Core
 
                     if (Item.FileContentLength)
                     {
-                        if (SSL)
-                            Item.FileContentLength -= SSL.SendFile(Item.FilePtr, Item.FileContentLength);
-                        else
-                            Item.FileContentLength -= Client.SendFile(Item.FilePtr, Item.FileContentLength);
+                        Item.FileContentLength -= SSL ? SSL.SendFile(Item.FilePtr, Item.FileContentLength) : Client.SendFile(Item.FilePtr, Item.FileContentLength);
                     }
 
                     // Pop buffer if we're done

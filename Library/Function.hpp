@@ -43,7 +43,7 @@ namespace Core
         template <typename T, typename... TCArgs>
         constexpr Function(std::type_identity<T>, TCArgs &&...CArgs) : Hash(typeid(T).name())
         {
-            if constexpr (sizeof(T) > SmallSize)
+            if constexpr (SmallSize < (sizeof(T) + alignof(T)))
             {
                 Object = new T(std::forward<TCArgs>(CArgs)...);
 
@@ -113,7 +113,8 @@ namespace Core
 
         template <typename TFunctor>
         constexpr Function(TFunctor &&Functor) noexcept
-            : Function(std::type_identity<TFunctor>{}, std::forward<TFunctor>(Functor)) {}
+            requires(!std::is_same_v<std::decay_t<TFunctor>, Function>)
+            : Function(std::type_identity<std::decay_t<TFunctor>>{}, std::forward<TFunctor>(Functor)) {}
 
         constexpr Function(TRet (*Function)(TArgs...)) noexcept
             : Object(reinterpret_cast<void *>(Function)),
@@ -133,12 +134,11 @@ namespace Core
               Hash(typeid(decltype(Function)).name()) {}
 
         template <typename TFunctor>
-        constexpr Function &operator=(TFunctor &&Functor)
-        requires(!std::is_same_v<std::decay_t<TFunctor>, Function>)
+        constexpr Function &operator=(TFunctor &&Functor) requires(!std::is_same_v<std::decay_t<TFunctor>, Function>)
         {
-            // @todo Optimize this
+            Clear();
 
-            *this = Function(std::type_identity<TFunctor>{}, std::forward<TFunctor>(Functor));
+            new (this) Function(std::forward<TFunctor>(Functor));
 
             return *this;
         }

@@ -1,11 +1,43 @@
 #pragma once
 
 #include <string>
-#include <mutex>
+#include <system_error>
 #include <Network/Socket.hpp>
 #include <Format/Stream.hpp>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+
+// enum class SSLError
+// {
+//     SSL = SSL_ERROR_SSL,
+//     WantRead = SSL_ERROR_WANT_READ,
+//     WantWrite = SSL_ERROR_WANT_WRITE,
+// };
+
+// namespace std
+// {
+//     template <>
+//     struct is_error_condition_enum<SSLError> : public true_type
+//     {
+//     };
+// }
+
+// // custom category:
+// class custom_category_t : public std::error_category
+// {
+// public:
+//     virtual const char *name() const noexcept { return "openssl"; }
+
+//     virtual std::string message(int ev) const
+//     {
+//         //
+//     }
+// } openssl_category;
+
+// std::error_condition make_error_condition(SSLError e)
+// {
+//     return std::error_condition(static_cast<int>(e), openssl_category);
+// }
 
 namespace Core::Network
 {
@@ -28,7 +60,7 @@ namespace Core::Network
 
                 if (!Result)
                 {
-                    throw std::runtime_error(std::to_string(GetError(Result)));
+                    throw std::runtime_error(GetErrorString());
                 }
             }
 
@@ -70,9 +102,19 @@ namespace Core::Network
                 return SSL_shutdown(ssl);
             }
 
+            inline void ClearErrors()
+            {
+                ERR_clear_error();
+            }
+
             inline int GetError(int Result) const
             {
                 return SSL_get_error(ssl, Result);
+            }
+
+            char const *GetErrorString() const
+            {
+                return SSL_state_string(ssl);
             }
 
             ssize_t Write(void const *Data, size_t Size) const
@@ -81,7 +123,7 @@ namespace Core::Network
 
                 if (Result < 0)
                 {
-                    throw std::runtime_error(std::to_string(GetError(Result)));
+                    throw std::runtime_error(GetErrorString());
                 }
 
                 return Result;
@@ -89,11 +131,12 @@ namespace Core::Network
 
             ssize_t Read(void *Data, size_t Size) const
             {
+                ERR_clear_error();
                 ssize_t Result = SSL_read(ssl, Data, Size);
 
                 if (Result < 0)
                 {
-                    throw std::runtime_error(std::to_string(GetError(Result)));
+                    throw std::runtime_error(GetErrorString());
                 }
 
                 return Result;
@@ -136,14 +179,10 @@ namespace Core::Network
                 int Result = 0;
                 size_t Size = 0;
                 ssize_t GotBytes = 0;
+                ERR_clear_error();
 
                 do
                 {
-                    // size_t Free = Stream.Queue.IsFree();
-
-                    // if (Free < 1024)
-                    //     Stream.Queue.IncreaseCapacity(1024 - Free);
-
                     auto [Pointer, S] = Stream.Queue.EmptyChunk();
                     Size = S;
 
@@ -173,76 +212,17 @@ namespace Core::Network
 
             ssize_t SendFile(Descriptor const &descriptor, size_t Size, off_t Offset = 0) const
             {
+                ERR_clear_error();
                 int Result = SSL_sendfile(ssl, descriptor.INode(), Offset, Size, 0);
 
                 // Error handling here
 
                 if (Result < 0)
                 {
-                    throw std::runtime_error(std::to_string(GetError(Result)));
+                    throw std::runtime_error(GetErrorString());
                 }
 
                 return Result;
-            }
-
-            friend bool operator<<(SecureSocket &descriptor, Format::Stream &Stream)
-            {
-                while (!Stream.Queue.IsEmpty())
-                {
-                    ERR_clear_error();
-
-                    auto [Pointer, Size] = Stream.Queue.DataChunk();
-
-                    auto Result = SSL_write(descriptor.ssl, Pointer, Size);
-
-                    if (Result <= 0)
-                    {
-                        int Error = SSL_get_error(descriptor.ssl, Result);
-
-                        if (Error == SSL_ERROR_WANT_WRITE)
-                        {
-                            return true;
-                        }
-
-                        return false;
-                    }
-
-                    Stream.Queue.AdvanceHead(Result);
-                }
-
-                return true;
-            }
-
-            friend bool operator>>(SecureSocket &descriptor, Format::Stream &Stream)
-            {
-                int Result = 0;
-                size_t Size = 0;
-
-                do
-                {
-                    Stream.Queue.IncreaseCapacity(1024);
-                    auto [Pointer, S] = Stream.Queue.EmptyChunk();
-                    Size = S;
-
-                    Result = SSL_read(descriptor.ssl, Pointer, Size);
-
-                    if (Result <= 0)
-                    {
-                        int Error = SSL_get_error(descriptor.ssl, Result);
-
-                        if (Error == SSL_ERROR_WANT_READ)
-                        {
-                            return true;
-                        }
-
-                        return false;
-                    }
-
-                    Stream.Queue.AdvanceTail(Result);
-
-                } while (static_cast<size_t>(Result) == Size);
-
-                return true;
             }
 
             inline operator bool()

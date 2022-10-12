@@ -1,7 +1,7 @@
 #pragma once
 
 #include <tuple>
-#include <functional>
+#include <Function.hpp>
 
 #include <Extra/ctre_extension.hpp>
 #include <Iterable/List.hpp>
@@ -78,8 +78,8 @@ template <typename... TArgs>
 class Router<void(TArgs...)>
 {
 protected:
-    using TDefault = std::function<void(TArgs...)>;
-    using TMatcher = std::function<bool(std::string_view, TArgs...)>;
+    using TDefault = Core::Function<void(TArgs...)>;
+    using TMatcher = Core::Function<bool(std::string_view, TArgs...)>;
 
     Iterable::List<std::tuple<Network::HTTP::Methods, TMatcher>> Routes;
 

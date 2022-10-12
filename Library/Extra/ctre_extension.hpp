@@ -5,7 +5,7 @@
 template <ctll::fixed_string... Strings>
 constexpr auto Concatenate() noexcept
 {
-    char32_t Data[(Strings.size() + ...) + 1];
+    char32_t Data[(Strings.size() + ...) + 1] = {0};
 
     size_t Index = 0;
 
@@ -74,6 +74,9 @@ constexpr auto Find(size_t Index)
 template <ctll::fixed_string Original, ctll::fixed_string Phrase>
 constexpr size_t FindCount()
 {
+    if (!Phrase.size() || !Original.size())
+        return 0;
+
     size_t Count = 0;
     size_t Index = 0;
 
@@ -86,29 +89,34 @@ constexpr size_t FindCount()
     return Count;
 }
 
-template <size_t Original, size_t Count, size_t PSize, size_t TSize>
-constexpr auto ReplacedSize() noexcept
-{
-    if (PSize == TSize)
-        return Original;
-
-    if constexpr (TSize > PSize)
-    {
-        return Original + Count * (TSize - PSize);
-    }
-    else
-    {
-        return Original - Count * (PSize - TSize);
-    }
-}
-
 template <ctll::fixed_string Original, ctll::fixed_string Phrase, ctll::fixed_string Text>
 constexpr auto Replace(size_t Index)
 {
-    char32_t Data[ReplacedSize<Original.size(), FindCount<Original, Phrase>(), Phrase.size(), Text.size()>() + 1];
+    constexpr size_t DataSize = []()
+    {
+        if (Phrase.size() == Text.size())
+            return Original.size();
+        
+        size_t Count = FindCount<Original, Phrase>();
+
+        if (Text.size() > Phrase.size())
+        {
+            return Original.size() + Count * (Text.size() - Phrase.size());
+        }
+        else
+        {
+            return Original.size() - Count * (Phrase.size() - Text.size());
+        }
+    }();
+
+    char32_t Data[DataSize + 1];
+
+    if (!Original.size() || !Phrase.size())
+        return ctll::fixed_string(Data);
+
     size_t OCounter = 0, RCounter = 0;
 
-    while ((Index = Find<Original, Phrase>(Index + 1)) != static_cast<size_t>(-1))
+    while ((Index = Find<Original, Phrase>(RCounter)) != static_cast<size_t>(-1))
     {
         for (; RCounter < Index; RCounter++)
         {
@@ -131,34 +139,34 @@ constexpr auto Replace(size_t Index)
     return ctll::fixed_string(Data);
 }
 
-template <size_t L, size_t N, size_t M>
-constexpr auto Replace(ctll::fixed_string<L> Original, ctll::fixed_string<N> Phrase, ctll::fixed_string<M> Text, size_t Index)
-{
-    char32_t Data[ReplacedSize<Original.size(), FindCount<Original, Phrase>(), Phrase.size(), Text.size()>() + 1];
-    size_t OCounter = 0, RCounter = 0;
+// template <size_t L, size_t N, size_t M>
+// constexpr auto Replace(ctll::fixed_string<L> Original, ctll::fixed_string<N> Phrase, ctll::fixed_string<M> Text, size_t Index)
+// {
+//     char32_t Data[ReplacedSize<Original.size(), FindCount<Original, Phrase>(), Phrase.size(), Text.size()>() + 1];
+//     size_t OCounter = 0, RCounter = 0;
 
-    while ((Index = Find(Original, Phrase, Index + 1)) != static_cast<size_t>(-1))
-    {
-        for (; RCounter < Index; RCounter++)
-        {
-            Data[OCounter++] = Original[RCounter];
-        }
+//     while ((Index = Find(Original, Phrase, Index + 1)) != static_cast<size_t>(-1))
+//     {
+//         for (; RCounter < Index; RCounter++)
+//         {
+//             Data[OCounter++] = Original[RCounter];
+//         }
 
-        for (size_t i = 0; i < M; i++)
-        {
-            Data[OCounter++] = Text[i];
-        }
+//         for (size_t i = 0; i < M; i++)
+//         {
+//             Data[OCounter++] = Text[i];
+//         }
 
-        RCounter += N;
-    }
+//         RCounter += N;
+//     }
 
-    for (; RCounter < L; RCounter++)
-    {
-        Data[OCounter++] = Original[RCounter];
-    }
+//     for (; RCounter < L; RCounter++)
+//     {
+//         Data[OCounter++] = Original[RCounter];
+//     }
 
-    return ctll::fixed_string(Data);
-}
+//     return ctll::fixed_string(Data);
+// }
 
 template <size_t Size>
 void Print(ctll::fixed_string<Size> const &String)

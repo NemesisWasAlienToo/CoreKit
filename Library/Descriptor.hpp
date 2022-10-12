@@ -102,23 +102,6 @@ namespace Core
             return Result;
         }
 
-        ssize_t Write(Iterable::Span<char> const &Data) const
-        {
-            ssize_t Result = write(_INode, Data.Content(), Data.Length());
-
-            if (Result < 0)
-            {
-                auto EB = errno;
-
-                if (EB == EAGAIN)
-                    return 0;
-
-                throw std::system_error(EB, std::generic_category());
-            }
-
-            return Result;
-        }
-
         ssize_t Read(struct iovec *Vector, size_t Count) const
         {
             ssize_t Result = readv(_INode, Vector, Count);
@@ -151,47 +134,6 @@ namespace Core
             }
 
             return Result;
-        }
-
-        ssize_t Read(Iterable::Span<char> &Data) const
-        {
-            ssize_t Result = read(_INode, Data.Content(), Data.Length());
-
-            if (Result < 0)
-            {
-                auto EB = errno;
-
-                if (EB == EAGAIN)
-                    return 0;
-
-                throw std::system_error(EB, std::generic_category());
-            }
-
-            return Result;
-        }
-
-        Iterable::Span<char> Read(size_t Size) const
-        {
-            Iterable::Span<char> Data(Size);
-
-            ssize_t Result = read(_INode, Data.Content(), Data.Length());
-
-            if (Result < 0)
-            {
-                auto EB = errno;
-
-                if (EB == EAGAIN)
-                    Iterable::Span<char>();
-
-                throw std::system_error(EB, std::generic_category());
-            }
-
-            if (static_cast<size_t>(Result) != Data.Length())
-            {
-                Data.Resize(Result);
-            }
-
-            return Data;
         }
 
         void Blocking(bool Value)
@@ -253,7 +195,7 @@ namespace Core
 
         ssize_t SendFile(Descriptor const &Other, size_t Size, off_t Offset) const
         {
-            int Result = sendfile(Other._INode, _INode, &Offset, Size);
+            ssize_t Result = sendfile(Other._INode, _INode, &Offset, Size);
 
             // Error handling here
 
@@ -272,7 +214,7 @@ namespace Core
 
         ssize_t SendFile(Descriptor const &Other, size_t Size) const
         {
-            int Result = sendfile(_INode, Other._INode, nullptr, Size);
+            ssize_t Result = sendfile(_INode, Other._INode, nullptr, Size);
 
             // Error handling here
 

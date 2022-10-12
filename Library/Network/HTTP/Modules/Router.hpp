@@ -31,6 +31,8 @@ namespace Core::Network::HTTP::Modules
         template <ctll::fixed_string TRoute, bool Group = false, typename TAction>
         inline T &Set(HTTP::Methods Method, TAction &&Action)
         {
+            static_assert(TRoute.size() > 0 && TRoute[0] == '/', "Route must start with \'/\' character");
+
             _Router.Add<TRoute, Group>(Method, std::forward<TAction>(Action));
             return static_cast<T &>(*this);
         }
@@ -207,8 +209,7 @@ namespace Core::Network::HTTP::Modules
 
                     static_cast<T &>(*this).ThreadPool()[Counter].Assign(
                         std::move(Client),
-                        Connection(Info, endPoint, Settings),
-                        // Async::EventLoop::CallbackType::From<Connection>(Info, endPoint, Settings),
+                        Async::EventLoop::CallbackType(std::type_identity<Connection>{}, Info, endPoint, Settings),
                         [this]
                         {
                             static_cast<T &>(*this).DecrementConnectionCount();
@@ -271,8 +272,7 @@ namespace Core::Network::HTTP::Modules
                             {
                                 SSL.ShakeHand = true;
                                 Context.ListenFor(ePoll::In);
-                                // Context.Upgrade(Async::EventLoop::CallbackType::From<Connection>(Info, endPoint, Settings, std::move(SSL)), Settings.Timeout);
-                                Context.Upgrade(Connection(Info, endPoint, Settings, std::move(SSL)), Settings.Timeout);
+                                Context.Upgrade(Async::EventLoop::CallbackType(std::type_identity<Connection>{}, Info, endPoint, Settings, std::move(SSL)), Settings.Timeout);
                                 return;
                             }
 
@@ -300,6 +300,11 @@ namespace Core::Network::HTTP::Modules
                     Counter = static_cast<T &>(*this).ThreadPool().Length() ? (Counter + 1) % static_cast<T &>(*this).ThreadPool().Length() : 0;
                 },
                 nullptr);
+        }
+
+        void Default(HTTP::Connection::Context &Context, HTTP::Request &Request)
+        {
+            _Router.Default(Context, Request);
         }
 
     private:

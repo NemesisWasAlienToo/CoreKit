@@ -10,9 +10,11 @@ namespace Core
     class Result
     {
     public:
+        static_assert(!(std::is_reference_v<T> || std::is_reference_v<E>), "Result can't contain reference");
+        static_assert(!(std::is_void_v<T> || std::is_void_v<E>), "Result can't contain void");
+
         template <typename TArg>
-        requires(!std::is_same_v<std::decay_t<TArg>, Result>)
-        Result(TArg &&Arg)
+        Result(TArg &&Arg) requires(!std::is_same_v<std::decay_t<TArg>, Result>)
         {
             if constexpr (std::is_constructible_v<T, TArg>)
             {
@@ -23,6 +25,18 @@ namespace Core
             {
                 HasValue = false;
                 new (&Storage) E(std::forward<TArg>(Arg));
+            }
+        }
+
+        Result(Result &&Other) : HasValue(Other.HasValue)
+        {
+            if (Other.HasValue)
+            {
+                new (&Storage) T(std::move(*reinterpret_cast<T *>(&Storage)));
+            }
+            else
+            {
+                new (&Storage) E(std::move(*reinterpret_cast<E *>(&Storage)));
             }
         }
 
@@ -38,16 +52,14 @@ namespace Core
             }
         }
 
-        Result(Result &&Other) = delete;
-
         ~Result()
         {
             Clear();
         }
 
         template <typename TArg>
-        requires(!std::is_same_v<std::decay_t<TArg>, Result>)
-        Result &operator=(TArg &&Arg)
+
+        Result &operator=(TArg &&Arg) requires(!std::is_same_v<std::decay_t<TArg>, Result>)
         {
             Clear();
 
@@ -82,7 +94,22 @@ namespace Core
             return *this;
         }
 
-        Result &operator=(Result &&Other) = delete;
+        Result &operator=(Result &&Other)
+        {
+            Clear();
+            HasValue = Other.HasValue;
+
+            if (Other.HasValue)
+            {
+                new (&Storage) T(std::move(*reinterpret_cast<T const *>(&Other.Storage)));
+            }
+            else
+            {
+                new (&Storage) E(std::move(*reinterpret_cast<E const *>(&Other.Storage)));
+            }
+
+            return *this;
+        }
 
         inline operator bool()
         {
