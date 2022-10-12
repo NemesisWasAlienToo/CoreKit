@@ -32,6 +32,7 @@ namespace Core::Network::HTTP::Modules
         inline T &Set(HTTP::Methods Method, TAction &&Action)
         {
             static_assert(TRoute.size() > 0 && TRoute[0] == '/', "Route must start with \'/\' character");
+            static_assert((TRoute.size() == 1 && TRoute[0] == '/') || (TRoute[TRoute.size() - 1] != '/'), "Route must start with \'/\' character");
 
             _Router.Add<TRoute, Group>(Method, std::forward<TAction>(Action));
             return static_cast<T &>(*this);
