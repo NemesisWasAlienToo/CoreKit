@@ -46,11 +46,11 @@ namespace Core
                         return !s || (s && HasKTLS());
                     }
 
-                    inline void SendResponse(HTTP::Response const &Response, File file = {}, size_t FileLength = 0) const
+                    inline void SendResponse(HTTP::Response &&Response, File &&file = {}, size_t FileLength = 0)
                     {
                         Loop.AssertPermission();
 
-                        HandlerAs<HTTP::Connection>().AppendResponse(Response, std::move(file), FileLength);
+                        HandlerAs<HTTP::Connection>().Setting.OnResponse(*this, std::move(Response), std::move(file), FileLength);
 
                         ListenFor(ePoll::In | ePoll::Out);
                     }
@@ -94,8 +94,8 @@ namespace Core
                     size_t MaxBodySize;
                     size_t RequestBufferSize;
                     size_t ResponseBufferSize;
-                    Core::Function<void(Context &, Network::HTTP::Response &)> OnError;
                     Core::Function<void(Context &, Network::HTTP::Request &)> OnRequest;
+                    Core::Function<void(Context &, Network::HTTP::Response &&, File &&, size_t)> OnResponse;
                     bool NoDelay;
                     bool RawContent;
                     Duration Timeout;
@@ -204,58 +204,6 @@ namespace Core
                     OBuffer.Insert({std::move(Buffer), std::move(file), FileLength});
                 }
 
-                void AppendResponse(HTTP::Response const &Response, File file = {}, size_t FileLength = 0)
-                {
-                    size_t StringLength = 0;
-                    auto Buffer = Iterable::Queue<char>(Setting.ResponseBufferSize);
-                    Format::Stream Ser(Buffer);
-
-                    // Serialize first line
-
-                    Ser << "HTTP/" << Response.Version << ' ' << std::to_string(static_cast<unsigned short>(Response.Status)) << ' ' << Response.Brief << "\r\n";
-
-                    // Serialize headers
-
-                    for (auto const &[k, v] : Response.Headers)
-                        Ser << k << ": " << v << "\r\n";
-
-                    // Handle keep-alive
-
-                    if (!this->ShouldClose && Response.Version == HTTP::HTTP10)
-                    {
-                        Ser << "connection: keep-alive\r\n";
-                    }
-                    else if (this->ShouldClose && Response.Version == HTTP::HTTP11)
-                    {
-                        Ser << "connection: close\r\n";
-                    }
-
-                    // Calculate length
-
-                    if (file)
-                    {
-                        FileLength = FileLength ? FileLength : file.BytesLeft();
-                    }
-                    else
-                    {
-                        StringLength = Response.Content.length();
-                    }
-
-                    if (Response.Headers.find("content-length") == Response.Headers.end())
-                        Ser << "content-length: " << std::to_string(FileLength + StringLength) << "\r\n";
-
-                    Response.SetCookies.ForEach(
-                        [&](auto const &Cookie)
-                        {
-                            Ser << "set-cookie: " << Cookie << "\r\n";
-                        });
-
-                    Ser << "\r\n"
-                        << Response.Content;
-
-                    AppendBuffer(std::move(Buffer), std::move(file), FileLength);
-                }
-
                 void operator()(Async::EventLoop::Context &Context, ePoll::Entry &Item)
                 {
                     Connection::Context ConnContext{Context, Target, Source};
@@ -302,12 +250,8 @@ namespace Core
                     }
                     catch (HTTP::Status Method)
                     {
-                        auto Response = HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, "");
-
-                        if (Setting.OnError)
-                            Setting.OnError(Context, Response);
-
-                        AppendResponse(Response);
+                        Context.SendResponse(
+                            HTTP::Response::From(Parser.Result.Version.empty() ? HTTP10 : Parser.Result.Version, Method, {{"Connection", "close"}}, ""));
 
                         Context.ListenFor(ePoll::Out);
 

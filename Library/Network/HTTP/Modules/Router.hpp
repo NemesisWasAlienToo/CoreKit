@@ -103,6 +103,19 @@ namespace Core::Network::HTTP::Modules
         }
 
         template <typename TCallback>
+        inline T &Processor(TCallback &&Callback)
+        {
+            using namespace std::placeholders;
+
+            Settings.OnResponse = std::bind(
+                std::forward<TCallback>(Callback),
+                _1, _2, _3, _4,
+                std::move(Settings.OnResponse));
+
+            return static_cast<T &>(*this);
+        }
+
+        template <typename TCallback>
         inline T &Middleware(TCallback &&Callback)
         {
             using namespace std::placeholders;
@@ -132,13 +145,6 @@ namespace Core::Network::HTTP::Modules
         inline T &InitStorages(TCallback &&Callback)
         {
             static_cast<T &>(*this).ThreadPool().InitStorages(Callback);
-            return static_cast<T &>(*this);
-        }
-
-        template <typename TCallback>
-        inline T &OnError(TCallback &&Callback)
-        {
-            Settings.OnError = std::forward<TCallback>(Callback);
             return static_cast<T &>(*this);
         }
 
@@ -314,10 +320,62 @@ namespace Core::Network::HTTP::Modules
             1024 * 1024 * 5,
             1024,
             1024,
-            nullptr,
             [this](Connection::Context &Context, Network::HTTP::Request &Request)
             {
                 _Router.Match(Request.Path, Request.Method, Context, Request);
+            },
+            [](Connection::Context &Context, HTTP::Response &&Response, File &&file, size_t FileLength)
+            {
+                HTTP::Connection &Connection = Context.HandlerAs<HTTP::Connection>();
+
+                size_t StringLength = 0;
+                auto Buffer = Iterable::Queue<char>(Connection.Setting.ResponseBufferSize);
+                Format::Stream Ser(Buffer);
+
+                // Serialize first line
+
+                Ser << "HTTP/" << Response.Version << ' ' << std::to_string(static_cast<unsigned short>(Response.Status)) << ' ' << Response.Brief << "\r\n";
+
+                // Serialize headers
+
+                for (auto const &[k, v] : Response.Headers)
+                    Ser << k << ": " << v << "\r\n";
+
+                // Handle keep-alive
+
+                if (!Connection.ShouldClose && Response.Version == HTTP::HTTP10)
+                {
+                    Ser << "connection: keep-alive\r\n";
+                }
+                else if (Connection.ShouldClose && Response.Version == HTTP::HTTP11)
+                {
+                    Ser << "connection: close\r\n";
+                }
+
+                // Calculate length
+
+                if (file)
+                {
+                    FileLength = FileLength ? FileLength : file.BytesLeft();
+                }
+                else
+                {
+                    StringLength = Response.Content.length();
+                }
+
+                if (Response.Headers.find("content-length") == Response.Headers.end())
+                    Ser << "content-length: " << std::to_string(FileLength + StringLength) << "\r\n";
+
+                Response.SetCookies.ForEach(
+                    [&](auto const &Cookie)
+                    {
+                        Ser << "set-cookie: " << Cookie << "\r\n";
+                    });
+
+                Ser << "\r\n"
+                    << Response.Content;
+
+                Connection.AppendBuffer(std::move(Buffer), std::move(file), FileLength);
             },
             false,
             false,
@@ -327,9 +385,7 @@ namespace Core::Network::HTTP::Modules
 
         static void DefaultRoute(HTTP::Connection::Context &Context, HTTP::Request &Req)
         {
-            auto static Response = HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>");
-
-            Context.SendResponse(Response);
+            Context.SendResponse(HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>"));
         }
     };
 }
