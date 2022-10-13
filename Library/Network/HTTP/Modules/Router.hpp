@@ -383,9 +383,9 @@ namespace Core::Network::HTTP::Modules
 
         ::Router<void(HTTP::Connection::Context &, HTTP::Request &)> _Router;
 
-        static void DefaultRoute(HTTP::Connection::Context &Context, HTTP::Request &Req)
+        static void DefaultRoute(HTTP::Connection::Context &Context, HTTP::Request &Request)
         {
-            Context.SendResponse(HTTP::Response::HTML(Req.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>"));
+            Context.SendResponse(HTTP::Response::HTML(Request.Version, HTTP::Status::NotFound, "<h1>404 Not Found</h1>"));
         }
     };
 }

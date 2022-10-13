@@ -208,7 +208,8 @@ namespace Core
                 {
                     Connection::Context ConnContext{Context, Target, Source};
 
-                    if (Item.Happened(ePoll::HangUp) || Item.Happened(ePoll::Error) ||
+                    if (Item.Happened(ePoll::Error) ||
+                        (!Item.Happened(ePoll::In) && Item.Happened(ePoll::HangUp)) ||
                         ((Item.Happened(ePoll::In) || Item.Happened(ePoll::UrgentIn)) && !OnRead(ConnContext)) ||
                         (Item.Happened(ePoll::Out) && !OnWrite(ConnContext)))
                     {
