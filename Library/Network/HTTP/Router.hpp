@@ -2,7 +2,7 @@
 
 #include <tuple>
 #include <Function.hpp>
-
+#include <regex>
 #include <Extra/ctre_extension.hpp>
 #include <Iterable/List.hpp>
 
@@ -27,7 +27,6 @@ protected:
     {
         return Pattern.size() > 1 && Pattern[Pattern.size() - 2] == '/' && Pattern[Pattern.size() - 1] == '*';
     }
-
 
     constexpr static bool Group = GroupImp();
     constexpr static ctll::fixed_string Parameter{"[]"};
@@ -73,6 +72,65 @@ public:
     static constexpr inline auto Apply(std::string_view Path, TCallback Callback, TArgs &&...Args)
     {
         return ApplyImpl(Path, Sequence{}, Callback, std::forward<TArgs>(Args)...);
+    }
+};
+
+template <ctll::fixed_string Pattern>
+struct RegexRoute
+{
+protected:
+    constexpr static auto GroupImp()
+    {
+        return Pattern.size() > 1 && Pattern[Pattern.size() - 2] == '/' && Pattern[Pattern.size() - 1] == '*';
+    }
+
+    constexpr static bool Group = GroupImp();
+    constexpr static ctll::fixed_string Parameter{"[]"};
+    constexpr static ctll::fixed_string Capture{"([^/?]+)"};
+    constexpr static size_t Count = FindCount<Pattern, Parameter>();
+
+    using Sequence = typename std::make_index_sequence<Count + Group>;
+    using Arguments = typename Repeater<Count + Group, std::string_view>::Tuple;
+
+    template <typename TCallback, size_t... S, typename... TArgs>
+    static constexpr decltype(auto) ApplyImpl(std::smatch &Match, std::integer_sequence<size_t, S...>, TCallback &&Callback, TArgs &&...Args)
+    {
+        // return std::invoke(Callback, std::forward<TArgs>(Args)..., m.template get<S + 1>()...);
+        return std::invoke(Callback, std::forward<TArgs>(Args)..., Match[S + 1]...);
+    }
+
+    constexpr static auto RegexImpl()
+    {
+        if constexpr (Group)
+        {
+            return Concatenate<Replace<Pattern, Parameter, Capture>(0), "(?:\\/([^?]*))?(?:\\/|\\?.*)?">();
+        }
+        else
+        {
+            return Concatenate<Replace<Pattern, Parameter, Capture>(0), "(?:\\/|\\?.*)?">();
+        }
+    }
+
+public:
+    constexpr static auto Regex = RegexImpl();
+
+    static std::string RegexString()
+    {
+        std::string Result;
+        Result.resize(Regex.size());
+
+        for (size_t i = 0; i < Regex.size(); i++)
+        {
+            Result[i] = Regex[i];
+        }
+
+        return Result;
+    }
+
+    template <typename TCallback, typename... TArgs>
+    static constexpr inline decltype(auto) Apply(std::smatch &Match, TCallback Callback, TArgs &&...Args)
+    {
+        return ApplyImpl(Match, Sequence{}, Callback, std::forward<TArgs>(Args)...);
     }
 };
 
@@ -128,5 +186,63 @@ public:
             {
                 return T::Apply(Path, CB, std::forward<TArgs>(Args)...);
             });
+    }
+};
+
+template <typename TRet, typename... TArgs>
+class Router<TRet(TArgs...)>
+{
+protected:
+    using THandler = Core::Function<TRet(std::smatch &, TArgs...)>;
+    using TDefault = Core::Function<TRet(TArgs...)>;
+
+    struct Branch
+    {
+        Network::HTTP::Methods Method;
+        std::regex Regex;
+        THandler Handler;
+    };
+
+    Iterable::List<Branch> Routes;
+
+public:
+    TDefault Default;
+
+    Router() = default;
+
+    template <typename TCallback>
+    Router(TCallback &&Callback) : Default(std::forward<TCallback>(Callback)) {}
+
+    // Had to redefine args to enable universal reference
+
+    template <typename... RTArgs>
+    TRet Match(std::string const &Path, Network::HTTP::Methods Method, RTArgs &&...Args)
+    {
+        for (size_t i = 0; i < Routes.Length(); i++)
+        {
+            Branch &Item = Routes[i];
+            std::smatch Match;
+
+            if ((Item.Method == Network::HTTP::Methods::Any || Item.Method == Method) && std::regex_match(Path, Match, Item.Regex))
+            {
+                return Item.Handler(Match, std::forward<RTArgs>(Args)...);
+            }
+        }
+
+        return Default(Args...);
+    }
+
+    template <ctll::fixed_string TSignature, typename TCallback>
+    void Add(Network::HTTP::Methods Method, TCallback &&Callback)
+    {
+        using T = RegexRoute<TSignature>;
+
+        Routes.Insert(
+            {Method,
+             std::regex(T::RegexString()),
+             [CB = std::forward<TCallback>(Callback)](std::smatch Match, TArgs &&...Args)
+             {
+                 return T::Apply(Match, CB, std::forward<TArgs>(Args)...);
+             }});
     }
 };
