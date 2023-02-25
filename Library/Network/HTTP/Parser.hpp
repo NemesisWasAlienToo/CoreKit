@@ -6,7 +6,6 @@
 #include <Format/Hex.hpp>
 #include <Iterable/Queue.hpp>
 #include <Network/Socket.hpp>
-#include <Network/HTTP/Request.hpp>
 
 namespace Core::Network::HTTP
 {

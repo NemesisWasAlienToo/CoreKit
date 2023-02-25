@@ -80,7 +80,8 @@ namespace Core::Network
         {
 
             struct sockaddr *SocketAddress;
-            int Size = 0, Result = 0, yes = 1;
+            socklen_t Size = 0;
+            int Result = 0, yes = 1;
 
             if (Host.Address().Family() == Address::IPv4)
             {
@@ -137,7 +138,7 @@ namespace Core::Network
             }
         }
 
-        void Connect(const Address &address, short Port) const
+        void Connect(Address const &address, uint16_t Port) const
         {
             Connect(EndPoint(address, Port));
         }
@@ -290,7 +291,7 @@ namespace Core::Network
         size_t Received() const
         {
 
-            int Count = 0;
+            size_t Count = 0;
             int Result = ioctl(_INode, TIOCINQ, &Count);
 
             if (Result < 0)

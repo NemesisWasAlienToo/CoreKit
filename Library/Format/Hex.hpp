@@ -13,14 +13,14 @@ namespace Core::Format
 {
     namespace Hex
     {
-        inline unsigned char Digit(char HexChar, bool Upper = false)
+        inline unsigned char Digit(unsigned char HexChar, bool Upper = false)
         {
             return HexChar - (HexChar > '9' ? ((Upper ? 'A' : 'a') - 10) : '0');
         }
 
         inline unsigned char Number(const unsigned char Big, const unsigned char Small, bool Upper = false)
         {
-            return ((Digit(Big, Upper) << 4) + Digit(Small, Upper));
+            return (static_cast<unsigned char>(Digit(Big, Upper) << 4) + Digit(Small, Upper));
         }
 
         inline int PlainSize(int Size)
@@ -61,13 +61,13 @@ namespace Core::Format
             return ss.str();
         }
 
-        size_t Bytes(std::string_view HexString, char *Data, bool Upper = false)
+        size_t Bytes(std::string_view HexString, unsigned char *Data, bool Upper = false)
         {
             size_t Len = HexString.length() / 2;
 
             for (size_t i = 0; i < Len; i++)
             {
-                Data[i] = Number(HexString[2 * i], HexString[(2 * i) + 1], Upper);
+                Data[i] = Number(static_cast<unsigned char>(HexString[2 * i]), static_cast<unsigned char>(HexString[(2 * i) + 1]), Upper);
             }
 
             return Len;
@@ -79,7 +79,7 @@ namespace Core::Format
 
             for (size_t i = 0; i < Data.Length(); i++)
             {
-                Data[i] = Number(HexString[2 * i], HexString[(2 * i) + 1], Upper);
+                Data[i] = static_cast<char>(Number(static_cast<unsigned char>(HexString[2 * i]), static_cast<unsigned char>(HexString[(2 * i) + 1]), Upper));
             }
 
             return Data;
@@ -94,7 +94,7 @@ namespace Core::Format
             for (size_t i = 0; i < Length; i++)
             {
                 t = t << 4;
-                t += Digit(HexString[i], Upper);
+                t += Digit(static_cast<unsigned char>(HexString[i]), Upper);
             }
 
             return t;

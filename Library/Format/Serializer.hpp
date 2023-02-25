@@ -41,7 +41,7 @@ namespace Core::Format
         }
 #endif
         template <typename T>
-        static T Order(const T &Source)
+        static T Order(T const &Source)
         {
             T Res;
 

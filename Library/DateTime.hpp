@@ -97,12 +97,12 @@ namespace Core
             return Diff;
         }
 
-        inline int Nanosecond() const
+        inline time_t Nanosecond() const
         {
             return Spec.tv_nsec;
         }
 
-        inline void AddNanosecond(int nanosecond)
+        inline void AddNanosecond(time_t nanosecond)
         {
             Spec.tv_nsec += nanosecond;
         }
@@ -118,7 +118,7 @@ namespace Core
             return State.tm_sec;
         }
 
-        inline void AddSecond(int seconds)
+        inline void AddSecond(time_t seconds)
         {
             State.tm_sec += seconds;
 

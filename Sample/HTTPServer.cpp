@@ -2,6 +2,7 @@
 #include <string>
 #include <memory>
 #include <set>
+#include <fmt/core.h>
 
 #include <Network/HTTP/Modules/Router.hpp>
 #include <Network/HTTP/Server.hpp>

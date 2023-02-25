@@ -39,6 +39,8 @@ protected:
     template <typename TCallback, size_t... S, typename... TArgs>
     static constexpr auto ApplyImpl(std::string_view Path, std::integer_sequence<size_t, S...>, TCallback &&Callback, TArgs &&...Args)
     {
+        // @todo Provide readable compile time error
+        
         if (auto m = Match(Path))
         {
             std::invoke(Callback, std::forward<TArgs>(Args)..., m.template get<S + 1>()...);

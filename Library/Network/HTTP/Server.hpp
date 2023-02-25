@@ -17,14 +17,32 @@
 
 namespace Core::Network::HTTP
 {
+    template <typename T>
+    struct Module
+    {
+        T &Cast()
+        {
+            return static_cast<T &>(*this);
+        }
+
+        T const &Cast() const
+        {
+            return static_cast<T const &>(*this);
+        }
+    };
+
     template <template <typename> typename... TModules>
     class Server : public Async::Runnable, public TModules<Server<TModules...>>...
     {
     public:
-        Server(size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500)) : Pool(Interval, ThreadCount)
 
+        Server(size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500)) : Pool(Interval, ThreadCount)
         {
         }
+
+        // Server(size_t ThreadCount = std::thread::hardware_concurrency(), Duration const &Interval = Duration::FromMilliseconds(500), TModules<Server<TModules...>>&& ... Modules) :  TModules<Server<TModules...>>(std::forward<TModules>(Modules)...)..., Pool(Interval, ThreadCount)
+        // {
+        // }
 
         inline Async::ThreadPool &ThreadPool()
         {

@@ -291,7 +291,7 @@ namespace Core
 
         size_t Offset() const
         {
-            int Result = lseek(_INode, 0, Current);
+            auto Result = lseek(_INode, 0, Current);
 
             if (Result < 0)
             {
@@ -385,7 +385,7 @@ namespace Core
             return S_ISREG(st.st_mode);
         }
 
-        inline static size_t SizeOf(std::string const &Path)
+        inline static off_t SizeOf(std::string const &Path)
         {
             return Stat(Path).st_size;
         }

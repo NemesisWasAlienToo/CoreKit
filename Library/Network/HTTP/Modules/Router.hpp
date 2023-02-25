@@ -17,7 +17,7 @@ namespace Core::Network::HTTP::Modules
     class Router
     {
     public:
-        Router() : _Router(DefaultRoute) {}
+        // Router() : _Router(DefaultRoute) {}
 
         // Router functions
 
@@ -198,7 +198,7 @@ namespace Core::Network::HTTP::Modules
                 endPoint,
                 [this, endPoint, Counter = 0ull](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
                 {
-                    Network::Socket &Router = static_cast<Network::Socket &>(Context.Self.File);
+                    Network::Socket &Router = static_cast<Network::Socket &>(Context.Self->File);
 
                     auto [Client, Info] = Router.Accept();
 
@@ -230,11 +230,16 @@ namespace Core::Network::HTTP::Modules
 
         inline auto &Listen(Network::EndPoint const &endPoint, std::string_view Certification, std::string_view Key)
         {
+            if (!Core::File::Exist(std::string{Certification}) || !Core::File::Exist(std::string{Key}))
+            {
+                throw std::invalid_argument("Provided Cert/Key file does not exist");
+            }
+
             return static_cast<T &>(*this).ListenWith(
                 endPoint,
                 [this, endPoint, Counter = 0ull, TLS = TLSContext(Certification, Key)](Async::EventLoop::Context &Context, ePoll::Entry &) mutable
                 {
-                    Network::Socket &Router = static_cast<Network::Socket &>(Context.Self.File);
+                    Network::Socket &Router = static_cast<Network::Socket &>(Context.Self->File);
 
                     auto [Client, Info] = Router.Accept();
 
@@ -324,7 +329,10 @@ namespace Core::Network::HTTP::Modules
             {
                 _Router.Match(Request.Path, Request.Method, Context, Request);
             },
-            [](Connection::Context &Context, HTTP::Response &&Response, File &&file, size_t FileLength)
+
+            // @todo Remove file rvalue reference
+            
+            [](Connection::Context &Context, HTTP::Response const &Response, File &&file, size_t FileLength)
             {
                 HTTP::Connection &Connection = Context.HandlerAs<HTTP::Connection>();
 
@@ -381,7 +389,7 @@ namespace Core::Network::HTTP::Modules
             false,
             {5, 0}};
 
-        ::Router<void(HTTP::Connection::Context &, HTTP::Request &)> _Router;
+        ::Router<void(HTTP::Connection::Context &, HTTP::Request &)> _Router = DefaultRoute;
 
         static void DefaultRoute(HTTP::Connection::Context &Context, HTTP::Request &Request)
         {

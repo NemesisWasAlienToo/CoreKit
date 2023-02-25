@@ -89,13 +89,13 @@ namespace Core
 
             EndPoint(const std::string &Content)
             {
-                int Seprator = Content.find(':');
+                size_t Seprator = Content.find(':');
 
                 std::string IP = Content.substr(0, Seprator);
                 std::string Port = Content.substr(Seprator + 1);
 
                 _Address = Network::Address(IP);
-                _Port = htons(std::stoi(Port));
+                _Port = htons(static_cast<uint16_t>(std::stoi(Port)));
             }
 
             // Functions :
@@ -163,15 +163,15 @@ namespace Core
                 return _Port;
             }
 
-            int Flow() const { return _Flow; }
-            int Flow(int Flow)
+            uint32_t Flow() const { return _Flow; }
+            uint32_t Flow(uint32_t Flow)
             {
                 _Flow = Flow;
                 return _Flow;
             }
 
-            int Scope() const { return _Scope; }
-            int Scope(int Scope)
+            uint32_t Scope() const { return _Scope; }
+            uint32_t Scope(uint32_t Scope)
             {
                 _Scope = Scope;
                 return _Scope;
@@ -179,7 +179,7 @@ namespace Core
 
             //  Setters
 
-            void Set(Network::Address address, int Port, int Scope, int Flow)
+            void Set(Network::Address address, uint16_t Port, uint32_t Scope, uint32_t Flow)
             {
                 _Address = address;
                 _Port = Port;
@@ -275,8 +275,8 @@ namespace Core
             {
                 Ser >> Value.Address();
                 Value.Port(Format::Serializer::Order(Ser.Take<unsigned short>()));
-                Value.Flow(Format::Serializer::Order(Ser.Take<int>()));
-                Value.Scope(Format::Serializer::Order(Ser.Take<int>()));
+                Value.Flow(Format::Serializer::Order(Ser.Take<uint32_t>()));
+                Value.Scope(Format::Serializer::Order(Ser.Take<uint32_t>()));
 
                 return Ser;
             }

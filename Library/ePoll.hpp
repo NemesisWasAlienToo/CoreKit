@@ -95,7 +95,7 @@ namespace Core
 
         void Add(const Descriptor &descriptor, uint32_t Events)
         {
-            Entry _Entry = Entry::From(descriptor.INode(), Events);
+            Entry _Entry = Entry::From(static_cast<uint64_t>(descriptor.INode()), Events);
 
             if (epoll_ctl(_INode, int(Commands::Add), descriptor.INode(), (struct epoll_event *)&_Entry) == -1)
             {
@@ -110,9 +110,9 @@ namespace Core
             epoll_ctl(_INode, int(Commands::Modify), descriptor.INode(), (struct epoll_event *)&_Entry);
         }
 
-        void Modify(const Descriptor &descriptor, uint32_t Events)
+        void Modify(const Descriptor &descriptor, uint32_t Events) const
         {
-            Entry _Entry = Entry::From(descriptor.INode(), Events);
+            Entry _Entry = Entry::From(static_cast<uint64_t>(descriptor.INode()), Events);
 
             epoll_ctl(_INode, int(Commands::Modify), descriptor.INode(), (struct epoll_event *)&_Entry);
         }
@@ -141,7 +141,7 @@ namespace Core
                 throw std::system_error(Saved, std::generic_category());
             }
 
-            Items.Length(Count);
+            Items.Length(static_cast<size_t>(Count));
         }
 
         ePoll &operator=(ePoll const &Other) = delete;

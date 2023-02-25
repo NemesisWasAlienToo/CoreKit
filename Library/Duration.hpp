@@ -15,90 +15,69 @@ namespace Core
 
         constexpr Duration() = default;
 
-        constexpr Duration(time_t seconds, time_t nanoseconds = 0) : Seconds(seconds), Nanoseconds(nanoseconds) {}
+        constexpr Duration(time_t seconds, time_t nanoseconds) : Seconds(seconds + (nanoseconds  / (long)1e9)), Nanoseconds(nanoseconds % (long)1e9) {}
 
-        constexpr Duration(itimerspec ITimeSpec)
+        constexpr Duration(timespec TimeSpec) : Duration(TimeSpec.tv_sec, TimeSpec.tv_nsec) {}
+        
+        static constexpr Duration FromNanoseconds(time_t nanoseconds)
         {
-            if (ITimeSpec.it_interval.tv_sec == 0 && ITimeSpec.it_interval.tv_nsec == 0)
-            {
-                Seconds = ITimeSpec.it_value.tv_sec;
-
-                Nanoseconds = ITimeSpec.it_value.tv_nsec;
-            }
-            else
-            {
-                Seconds = ITimeSpec.it_interval.tv_sec;
-
-                Nanoseconds = ITimeSpec.it_interval.tv_nsec;
-            }
+            return Duration(nanoseconds / (long)1e9, nanoseconds % (long)1e9);
         }
 
-        constexpr Duration(timespec TimeSpec)
+        static constexpr Duration FromMilliseconds(time_t milliseconds)
         {
-            Seconds = TimeSpec.tv_sec + (TimeSpec.tv_nsec / (long)1e9);
-
-            Nanoseconds = TimeSpec.tv_nsec % (long)1e9;
+            return FromNanoseconds(milliseconds * (long)1e6);
         }
 
-        constexpr Duration(time_t nanoseconds)
+        static constexpr Duration FromMicroseconds(time_t microseconds)
         {
-            Seconds = nanoseconds / (long)1e9;
-
-            Nanoseconds = nanoseconds % (long)1e9;
+            return FromNanoseconds(microseconds * (long)1e3);
         }
 
-        static constexpr Duration FromMilliseconds(size_t milliseconds)
+        void AddNanoseconds(time_t Value)
         {
-            return Duration(milliseconds / 1000, (milliseconds % 1000) * 1e6);
-        }
+            Seconds += Value / (long)1e9;
 
-        static constexpr Duration FromMicroseconds(size_t microseconds)
-        {
-            return Duration(microseconds / 1000'000, (microseconds % 1000) * 1e3);
+            Value %= (long)1e9;
+
+            Nanoseconds += Value;
+
+            Seconds += Nanoseconds / (long)1e9;
+
+            Nanoseconds %= (long)1e9;
         }
 
         void AddMilliseconds(time_t Value)
         {
-            Seconds += Value / (long)1e3;
-
-            Value %= (long)1e3;
-
-            Nanoseconds += (Value * (long)1e6);
-
-            Seconds += Nanoseconds / (long)1e9;
-
-            Nanoseconds %= (long)1e9;
+            AddNanoseconds(Value * (long)1e6);
         }
 
         void AddMicroseconds(time_t Value)
         {
-            Seconds += Value / (long)1e6;
-
-            Value %= (long)1e6;
-
-            Nanoseconds += (Value * (long)10e2);
-
-            Seconds += Nanoseconds / (long)1e9;
-
-            Nanoseconds %= (long)1e9;
+            AddNanoseconds(Value * (long)1e3);
         }
 
-        time_t AsMilliseconds() const
+        inline constexpr time_t AsSeconds() const
+        {
+            return Seconds;
+        }
+
+        inline constexpr time_t AsMilliseconds() const
         {
             return (Seconds * (long)10e2) + (Nanoseconds / (long)1e6);
         }
 
-        time_t AsMicroseconds() const
+        inline constexpr time_t AsMicroseconds() const
         {
             return (Seconds * (long)1e6) + (Nanoseconds / (long)10e2);
         }
 
-        time_t AsNanoseconds() const
+        inline constexpr time_t AsNanoseconds() const
         {
             return (Seconds * (long)1e9) + Nanoseconds;
         }
 
-        bool IsZero() { return Seconds == 0 && Nanoseconds == 00; }
+        inline constexpr bool IsZero() { return Seconds == 0 && Nanoseconds == 00; }
 
         void Fill(timespec &TimeSpec)
         {
@@ -113,34 +92,44 @@ namespace Core
             return ss.str();
         }
 
-        bool operator==(const Duration &Other)
+        inline Duration operator-(const Duration &Other)
+        {
+            return FromNanoseconds(AsNanoseconds() - Other.AsNanoseconds());
+        }
+
+        inline Duration operator+(const Duration &Other)
+        {
+            return FromNanoseconds(AsNanoseconds() + Other.AsNanoseconds());
+        }
+
+        inline bool operator==(const Duration &Other)
         {
             return Seconds == Other.Seconds &&
                    Nanoseconds == Other.Nanoseconds;
         }
 
-        bool operator!=(const Duration &Other)
+        inline bool operator!=(const Duration &Other)
         {
             return Seconds != Other.Seconds ||
                    Nanoseconds != Other.Nanoseconds;
         }
 
-        bool operator<(const Duration &Other)
+        inline bool operator<(const Duration &Other)
         {
             return Seconds < Other.Seconds ? true : Seconds == Other.Seconds && Nanoseconds < Other.Nanoseconds;
         }
 
-        bool operator>(const Duration &Other)
+        inline bool operator>(const Duration &Other)
         {
             return Seconds > Other.Seconds ? true : Seconds == Other.Seconds && Nanoseconds > Other.Nanoseconds;
         }
 
-        bool operator<=(const Duration &Other)
+        inline bool operator<=(const Duration &Other)
         {
             return Seconds > Other.Seconds ? false : Seconds != Other.Seconds || Nanoseconds <= Other.Nanoseconds;
         }
 
-        bool operator>=(const Duration &Other)
+        inline bool operator>=(const Duration &Other)
         {
             return Seconds < Other.Seconds ? false : Seconds != Other.Seconds || Nanoseconds >= Other.Nanoseconds;
         }

@@ -308,9 +308,9 @@ namespace Core::Network
 
         friend Format::Serializer &operator<<(Format::Serializer &Ser, const Network::Address &Value)
         {
-            Network::Address::AddressFamily _Family = Format::Serializer::Order(Value.Family());
+            Network::Address::AddressFamily Family = Format::Serializer::Order(Value.Family());
 
-            Ser.Queue.CopyFrom((char *)&_Family, sizeof(_Family));
+            Ser.Queue.CopyFrom((char *)&Family, sizeof(Family));
 
             Ser.Queue.CopyFrom((char *)Value.Content(), 16);
 
@@ -319,11 +319,11 @@ namespace Core::Network
 
         friend Format::Serializer &operator>>(Format::Serializer &Ser, Network::Address &Value)
         {
-            Network::Address::AddressFamily _Family;
+            Network::Address::AddressFamily Family;
 
-            Ser.Queue.MoveTo((char *)&_Family, sizeof(_Family));
+            Ser.Queue.MoveTo((char *)&Family, sizeof(Family));
 
-            Value.Family() = Format::Serializer::Order(_Family);
+            Value.Family() = Format::Serializer::Order(Family);
 
             Ser.Queue.MoveTo((char *)Value.Content(), 16);
 

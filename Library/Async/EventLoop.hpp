@@ -30,7 +30,7 @@ namespace Core::Async
         struct Context;
 
         using TimeWheelType = TimeWheel<32, 5>;
-        using Container = std::list<Entry>;
+        using Container = std::list<std::shared_ptr<Entry>>;
         using CallbackType = Core::Function<void(EventLoop::Context &, ePoll::Entry &)>;
         using EndCallbackType = Core::Function<void()>;
 
@@ -52,7 +52,7 @@ namespace Core::Async
         struct Context
         {
             EventLoop &Loop;
-            Entry &Self;
+            std::shared_ptr<Entry> Self;
 
             // Context functions
 
@@ -65,27 +65,29 @@ namespace Core::Async
             template <typename T>
             inline T &HandlerAs() const
             {
-                return *Self.CallbackAs<T>();
+                return *Self->CallbackAs<T>();
             }
 
             template <typename T>
             inline T &FileAs()
             {
-                return *static_cast<Network::Socket *>(&Self.File);
+                return *static_cast<T *>(&Self->File);
             }
 
             inline void ListenFor(ePoll::Event Events) const
             {
                 // Loop.AssertPermission();
 
-                Loop.Modify(Self, Events);
+                // @todo Fix bug
+
+                Loop.Modify(*Self, Events);
             }
 
             inline void Remove()
             {
                 // Loop.AssertPermission();
 
-                Loop.Remove(Self.Iterator);
+                Loop.Remove(Self->Iterator);
             }
 
             template <typename TCallback>
@@ -96,7 +98,7 @@ namespace Core::Async
 
             inline void Reschedule(Duration const &Timeout)
             {
-                Loop.Reschedule(Self, Timeout);
+                Loop.Reschedule(*Self, Timeout);
             }
 
             inline void Reschedule(Entry &entry, Duration const &Timeout)
@@ -126,7 +128,7 @@ namespace Core::Async
                 Event(0, 0),
                 [](EventLoop::Context &Context, ePoll::Entry &)
                 {
-                    Event &ev = *static_cast<Event *>(&Context.Self.File);
+                    Event &ev = *static_cast<Event *>(&Context.Self->File);
 
                     ev.Listen();
 
@@ -149,7 +151,7 @@ namespace Core::Async
 
             // Assign interrupt event
 
-            Interrupt = static_cast<Event *>(&IIterator->File);
+            Interrupt = static_cast<Event *>(&(*IIterator)->File);
 
             // Add expire event
 
@@ -157,7 +159,7 @@ namespace Core::Async
                 Timer(Timer::Monotonic, 0),
                 [](EventLoop::Context &Context, ePoll::Entry &)
                 {
-                    auto &Ev = *static_cast<Event *>(&Context.Self.File);
+                    auto &Ev = *static_cast<Event *>(&Context.Self->File);
 
                     Ev.Listen();
                     Context.Loop.Wheel.Tick();
@@ -167,7 +169,7 @@ namespace Core::Async
 
             // Assign expire event
 
-            Expire = static_cast<Timer *>(&TIterator->File);
+            Expire = static_cast<Timer *>(&(*TIterator)->File);
         }
 
         inline bool HasPermission() const
@@ -213,12 +215,12 @@ namespace Core::Async
         {
             AssertPermission();
 
-            if (Iterator->End)
+            if ((*Iterator)->End)
             {
-                Iterator->End();
+                (*Iterator)->End();
             }
 
-            _Poll.Delete(Iterator->File);
+            _Poll.Delete((*Iterator)->File);
             Handlers.erase(Iterator);
         }
 
@@ -226,18 +228,18 @@ namespace Core::Async
         {
             AssertPermission();
 
-            Wheel.Remove(Iterator->Timer);
+            Wheel.Remove((*Iterator)->Timer);
         }
 
         void Remove(Container::iterator Iterator)
         {
-            Wheel.Remove(Iterator->Timer);
+            Wheel.Remove((*Iterator)->Timer);
             RemoveHandler(Iterator);
         }
 
         void Modify(Entry &Self, ePoll::Event Events)
         {
-            _Poll.Modify(Self.File, Events, (size_t)&Self);
+            _Poll.Modify(Self.File, Events, (size_t)std::addressof(*Self.Iterator));
         }
 
         template <typename TCallback>
@@ -291,14 +293,15 @@ namespace Core::Async
                 std::move(Client), std::move(Callback), std::move(End), Interval);
         }
 
-        void Upgrade(Entry &Self, CallbackType &&Callback, Duration const &Interval = {0, 0}, ePoll::Event Events = ePoll::In)
+        void Upgrade(std::shared_ptr<Entry> &Self, CallbackType &&Callback, Duration const &Interval = {0, 0}, ePoll::Event Events = ePoll::In)
         {
             Execute(
                 [this, Events](Container::iterator si, CallbackType &&cb, Duration const &to) mutable
                 {
+                    // @todo Shouldn't I set the use the returned iterator to update si?
                     Insert(si, std::move(cb), to, Events);
                 },
-                Self.Iterator, std::move(Callback), Interval);
+                Self->Iterator, std::move(Callback), Interval);
         }
 
         void Notify(uint64_t Value = 1)
@@ -322,9 +325,9 @@ namespace Core::Async
                 Events.ForEach(
                     [this](ePoll::Entry &Item)
                     {
-                        EventLoop::Context Context{*this, *reinterpret_cast<Entry *>(Item.Data)};
+                        EventLoop::Context CTX{*this, *reinterpret_cast<std::shared_ptr<Entry> *>(Item.Data)};
 
-                        Context.Self.Callback(Context, Item);
+                        CTX.Self->Callback(CTX, Item);
                     });
             }
 
@@ -350,12 +353,12 @@ namespace Core::Async
     private:
         Container::iterator Insert(Descriptor &&descriptor, CallbackType &&handler, EndCallbackType &&end, Duration const &Timeout, ePoll::Event Events = ePoll::In)
         {
-            auto Iterator = Handlers.insert(Handlers.end(), {std::move(descriptor), std::move(handler), std::move(end), Handlers.end(), Wheel.end()});
-            Iterator->Iterator = Iterator;
+            auto Iterator = Handlers.insert(Handlers.end(), std::make_shared<Entry>(std::move(descriptor), std::move(handler), std::move(end), Handlers.end(), Wheel.end()));
+            (*Iterator)->Iterator = Iterator;
 
             if (Timeout.AsMilliseconds() > 0)
             {
-                Iterator->Timer = Wheel.Add(
+                (*Iterator)->Timer = Wheel.Add(
                     Timeout,
                     [this, Iterator]
                     {
@@ -381,22 +384,22 @@ namespace Core::Async
             }
             else
             {
-                Iterator->Timer = Wheel.At(0, 0).Entries.end();
+                (*Iterator)->Timer = Wheel.At(0, 0).Entries.end();
             }
 
-            _Poll.Add(Iterator->File, Events, (size_t) & *Iterator);
+            _Poll.Add((*Iterator)->File, Events, (size_t) std::addressof(*Iterator));
 
             return Iterator;
         }
 
         Container::iterator Insert(Container::iterator Item, CallbackType &&handler, Duration const &Timeout, ePoll::Event Events = ePoll::In)
         {
-            auto Iterator = Handlers.insert(Handlers.end(), {std::move(Item->File), std::move(handler), std::move(Item->End), Handlers.end(), Wheel.end()});
-            Iterator->Iterator = Iterator;
+            auto Iterator = Handlers.insert(Handlers.end(), std::make_shared<Entry>(std::move((*Item)->File), std::move(handler), std::move((*Item)->End), Handlers.end(), Wheel.end()));
+            (*Iterator)->Iterator = Iterator;
 
             if (Timeout.AsMilliseconds() > 0)
             {
-                Iterator->Timer = Wheel.Add(
+                (*Iterator)->Timer = Wheel.Add(
                     Timeout,
                     [this, Iterator]
                     {
@@ -405,10 +408,10 @@ namespace Core::Async
             }
             else
             {
-                Iterator->Timer = Wheel.At(0, 0).Entries.end();
+                (*Iterator)->Timer = Wheel.At(0, 0).Entries.end();
             }
 
-            _Poll.Modify(Iterator->File, Events, (size_t) & *Iterator);
+            _Poll.Modify((*Iterator)->File, Events, (size_t) addressof(*Iterator));
 
             RemoveTimer(Item);
             Handlers.erase(Item);

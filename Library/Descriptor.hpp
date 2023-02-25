@@ -75,7 +75,7 @@ namespace Core
 
         ssize_t Write(struct iovec *Vector, size_t Count)
         {
-            ssize_t Result = writev(_INode, Vector, Count);
+            ssize_t Result = writev(_INode, Vector, static_cast<int>(Count));
 
             if (Result < 0)
             {
@@ -104,7 +104,7 @@ namespace Core
 
         ssize_t Read(struct iovec *Vector, size_t Count) const
         {
-            ssize_t Result = readv(_INode, Vector, Count);
+            ssize_t Result = readv(_INode, Vector, static_cast<int>(Count));
 
             if (Result < 0)
             {
@@ -287,7 +287,7 @@ namespace Core
             ssize_t Result = Write(Vectors, Stream.Queue.DataVectors(Vectors));
 
             if (Result > 0)
-                Stream.Queue.Free(Result);
+                Stream.Queue.Free(static_cast<size_t>(Result));
 
             return Result;
         }
@@ -298,7 +298,7 @@ namespace Core
             ssize_t Result = Read(Vectors, Stream.Queue.EmptyVectors(Vectors));
 
             if (Result > 0)
-                Stream.Queue.AdvanceTail(Result);
+                Stream.Queue.AdvanceTail(static_cast<size_t>(Result));
 
             return Result;
         }

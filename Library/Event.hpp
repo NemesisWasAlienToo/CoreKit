@@ -26,7 +26,7 @@ namespace Core
 
         Event(int Handler) : Descriptor(Handler) {}
 
-        Event(int Value, int Flags)
+        Event(unsigned int Value, int Flags)
         {
             int Result = eventfd(Value, Flags);
 
@@ -45,7 +45,7 @@ namespace Core
 
         void Emit(uint64_t Value) const
         {
-            int Result = write(_INode, &Value, sizeof Value);
+            ssize_t Result = write(_INode, &Value, sizeof Value);
 
             if (Result < 0)
             {
@@ -73,7 +73,7 @@ namespace Core
         {
             uint64_t Value;
 
-            int Result = read(_INode, &Value, sizeof Value);
+            ssize_t Result = read(_INode, &Value, sizeof Value);
 
             if (Result < 0)
             {

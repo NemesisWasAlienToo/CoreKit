@@ -136,15 +136,6 @@ namespace Core
                 {
                 }
 
-                Connection(Connection &&Other) : Target(Other.Target),
-                                                 Source(Other.Source),
-                                                 IBuffer(std::move(Other.IBuffer)),
-                                                 OBuffer(std::move(Other.OBuffer)),
-                                                 Setting(Other.Setting),
-                                                 SSL(std::move(Other.SSL))
-                {
-                }
-
                 ~Connection()
                 {
                     if (OnRemove)
@@ -158,7 +149,7 @@ namespace Core
 
                 bool Continue100(Connection::Context &Context)
                 {
-                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
+                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self->File);
 
                     // Ensure version is HTTP 1.1
 
@@ -222,7 +213,7 @@ namespace Core
 
                 bool OnRead(Connection::Context &Context)
                 {
-                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
+                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self->File);
 
                     // @todo Optimize parser by giving it parsing error callbacks so we
                     // dont need try catch block
@@ -313,7 +304,7 @@ namespace Core
 
                 bool OnWrite(Connection::Context &Context)
                 {
-                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self.File);
+                    Network::Socket &Client = static_cast<Network::Socket &>(Context.Self->File);
 
                     // If there is nothing to send
 
