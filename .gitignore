@@ -1,0 +1,15 @@
+.vs
+.vscode
+Build
+build
+.fake
+.ionide
+Public.pem
+Private.pem
+TestFile
+opendir
+Makefile
+Tests
+Ignore
+Library/ThirdParty
+*.pem
