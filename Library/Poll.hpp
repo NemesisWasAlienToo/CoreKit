@@ -60,6 +60,7 @@ namespace Core
 
         enum PollOptions
         {
+            None = 0,
             In = POLLIN,
             UrgentIn = POLLPRI,
             Out = POLLOUT,

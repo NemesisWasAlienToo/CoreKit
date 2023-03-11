@@ -63,6 +63,7 @@ namespace Core
 
         enum ePollOptions
         {
+            None = 0,
             In = EPOLLIN,
             UrgentIn = POLLPRI,
             Out = EPOLLOUT,
@@ -120,7 +121,7 @@ namespace Core
         void Delete(const Descriptor &descriptor)
         {
             if (epoll_ctl(_INode, int(Commands::Delete), descriptor.INode(), (struct epoll_event *)nullptr) == -1)
-            {
+            {                
                 throw std::system_error(errno, std::generic_category());
             }
         }

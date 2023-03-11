@@ -30,9 +30,14 @@ namespace Core
                     Network::EndPoint const &Target;
                     Network::EndPoint const &Source;
 
+                    HTTP::Connection &Connection()
+                    {
+                        return HandlerAs<HTTP::Connection>();
+                    }
+
                     inline bool IsSecure()
                     {
-                        return HandlerAs<HTTP::Connection>().IsSecure();
+                        return Connection().IsSecure();
                     }
 
                     inline bool HasKTLS()
@@ -50,41 +55,23 @@ namespace Core
                     {
                         Loop.AssertPermission();
 
-                        HandlerAs<HTTP::Connection>().Setting.OnResponse(*this, std::move(Response), std::move(file), FileLength);
+                        Connection().Setting.OnResponse(*this, std::move(Response), std::move(file), FileLength);
 
                         ListenFor(ePoll::In | ePoll::Out);
                     }
 
-                    inline void SendBuffer(Iterable::Queue<char> Buffer, File file = {}, size_t FileLength = 0) const
+                    inline void SendBuffer(Iterable::Queue<char> Buffer, File file = {}, size_t FileLength = 0) // const
                     {
                         Loop.AssertPermission();
 
-                        HandlerAs<HTTP::Connection>().AppendBuffer(std::move(Buffer), std::move(file), FileLength);
+                        Connection().AppendBuffer(std::move(Buffer), std::move(file), FileLength);
 
                         ListenFor(ePoll::In | ePoll::Out);
                     }
 
                     inline bool WillClose()
                     {
-                        return HandlerAs<HTTP::Connection>().ShouldClose;
-                    }
-
-                    template <typename TCallback>
-                    inline void OnRemove(TCallback &&Callback)
-                    {
-                        HandlerAs<HTTP::Connection>().OnRemove = std::forward<TCallback>(Callback);
-                    }
-
-                    template <typename TCallback>
-                    inline void OnReceived(TCallback &&Callback)
-                    {
-                        HandlerAs<HTTP::Connection>().OnReceived = std::forward<TCallback>(Callback);
-                    }
-
-                    template <typename TCallback>
-                    inline void OnSent(TCallback &&Callback)
-                    {
-                        HandlerAs<HTTP::Connection>().OnSent = std::forward<TCallback>(Callback);
+                        return Connection().ShouldClose;
                     }
                 };
 
@@ -114,6 +101,9 @@ namespace Core
                 Core::Function<void()> OnReceived;
                 Core::Function<void()> OnSent;
 
+                // Connection related extra data
+                std::shared_ptr<void> Storage;
+
                 // @todo Fix this limitations
                 HTTP::Parser<HTTP::Request> Parser{Setting.MaxHeaderSize, Setting.MaxBodySize, Setting.RequestBufferSize, IBuffer, Setting.RawContent};
                 bool ShouldClose = false;
@@ -140,6 +130,11 @@ namespace Core
                 {
                     if (OnRemove)
                         OnRemove();
+
+                    // if (OnRemove)
+                    // {
+                    //     //
+                    // }
                 }
 
                 inline bool IsSecure()
@@ -294,7 +289,10 @@ namespace Core
                     Setting.OnRequest(Context, Parser.Result);
 
                     if (OnReceived)
-                        OnReceived();
+                    {
+                        // OnReceived();
+                        Context.Loop.Enqueue(std::move(OnReceived));
+                    }
 
                     if (!ShouldClose)
                         Parser.Reset();
@@ -319,7 +317,10 @@ namespace Core
                         Context.ListenFor(ePoll::In);
 
                         if (OnSent)
-                            OnSent();
+                        {
+                            // OnSent();
+                            Context.Loop.Enqueue(std::move(OnSent));
+                        }
 
                         return true;
                     }

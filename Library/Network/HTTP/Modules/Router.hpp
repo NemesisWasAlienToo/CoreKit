@@ -276,14 +276,12 @@ namespace Core::Network::HTTP::Modules
                                 return;
                             }
 
-                            //
-
                             auto Result = SSL.Handshake();
 
                             if (Result == 1)
                             {
                                 SSL.ShakeHand = true;
-                                Context.ListenFor(ePoll::In);
+                                Context.ListenFor(ePoll::None);
                                 Context.Upgrade(Async::EventLoop::CallbackType(std::type_identity<Connection>{}, Info, endPoint, Settings, std::move(SSL)), Settings.Timeout);
                                 return;
                             }
