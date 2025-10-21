@@ -1,29 +1,34 @@
 cmake_minimum_required(VERSION 3.10)
-
 project(CoreKit VERSION "0.1.0" LANGUAGES CXX)
-
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    set(IS_TOPLEVEL_PROJECT TRUE)
-else()
-    set(IS_TOPLEVEL_PROJECT FALSE)
-endif()
-
 set(CMAKE_CXX_STANDARD 20)
 
+option(COREKIT_BUILD_EXAMPLES "Builds the example programs" ON)
+
 add_library(${PROJECT_NAME} INTERFACE)
-add_subdirectory(Library)
 target_include_directories(${PROJECT_NAME} INTERFACE Library)
 
-# Add openssl
-
+find_package(ctre REQUIRED)
 find_package(OpenSSL REQUIRED)
+target_link_libraries(${PROJECT_NAME} INTERFACE ctre::ctre openssl::openssl)
 
-if(NOT OPENSSL_FOUND)
-    message(FATAL_ERROR "OpenSSL is needed")
+if (COREKIT_BUILD_EXAMPLES)
+    add_subdirectory(Sample)
 endif()
 
-target_link_libraries(${PROJECT_NAME} INTERFACE ${OPENSSL_LIBRARIES})
+install(
+    DIRECTORY Library/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.hpp"
+)
 
-# Add pthread
+install(
+    TARGETS ${PROJECT_NAME}
+    EXPORT ${PROJECT_NAME}Targets
+    INCLUDES DESTINATION include
+)
 
-target_link_libraries(${PROJECT_NAME} INTERFACE pthread)
+install(
+    EXPORT ${PROJECT_NAME}Targets
+    FILE ${PROJECT_NAME}Targets.cmake
+    DESTINATION lib/cmake/${PROJECT_NAME}
+)
