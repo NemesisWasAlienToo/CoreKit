@@ -7,6 +7,7 @@
 #include "Iterable/Span.hpp"
 #include "Iterable/Queue.hpp"
 #include "Duration.hpp"
+#include <functional>
 
 namespace Core
 {
